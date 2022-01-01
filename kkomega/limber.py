@@ -29,16 +29,20 @@ class Limber:
         Nchi : int
             Number of Chi values to use is integrals.
         """
+        self.ellmax = ellmax
+        self.Nchi = Nchi
         self._pars = camb.CAMBparams()
         self._pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122)
         self._results = camb.get_background(self._pars)
         self._PK = self._get_weyl_PK()
-        self.ellmax = ellmax
-        self.Nchi = Nchi
         self.ells_review, self.Cl_phi_review = self._phi_ps_review(self.ellmax, self.Nchi)
 
     def _get_weyl_PK(self):
-        PK_weyl = camb.get_matter_power_interpolator(self._pars, hubble_units=False, zmin=0, zmax=2000, kmax=100, k_hunit=False, var1=camb.model.Transfer_Weyl, var2=camb.model.Transfer_Weyl)
+        zbuffer = 100
+        zmax = self._eta_to_z(self._get_eta0() - self._get_chi_star()) + zbuffer
+        kbuffer = 10
+        kmax = self.ellmax * self.Nchi/self._get_chi_star() + kbuffer
+        PK_weyl = camb.get_matter_power_interpolator(self._pars, hubble_units=False, zmin=0, zmax=zmax, kmax=kmax, k_hunit=False, var1="Weyl", var2="Weyl")
         return PK_weyl
 
     def get_weyl_ps(self, z, k, curly=False, scaled=True):
