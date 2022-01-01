@@ -41,7 +41,7 @@ class Limber:
         PK_weyl = camb.get_matter_power_interpolator(self._pars, hubble_units=False, zmin=0, zmax=2000, kmax=100, k_hunit=False, var1=camb.model.Transfer_Weyl, var2=camb.model.Transfer_Weyl)
         return PK_weyl
 
-    def get_weyl_ps(self, z, k):
+    def get_weyl_ps(self, z, k, curly=False, scaled=True):
         """
         Returns the Weyl power spectrum.
 
@@ -51,13 +51,22 @@ class Limber:
             Redshift.
         k : int or float or ndarray
             [Mpc^-1].
+        curly : bool
+            Return dimensionless power spectrum.
+        scaled : bool
+            Accept default CAMB scaling of Weyl potential by k^2.
 
         Returns
         -------
         ndarray
             Weyl power spectrum calculated at specific points z and k.
         """
-        return self._PK.P(z, k, grid=False)
+        ps = self._PK.P(z, k, grid=False)
+        if not scaled:
+            ps *= k**-4
+        if curly:
+            return ps * k** 3 / (2 * np.pi ** 2)
+        return ps
 
     def _get_chi_star(self):
         return self._get_eta0() - self._results.tau_maxvis
@@ -82,13 +91,13 @@ class Limber:
         for ell in ells[1:]:
             ks = ell / Chis
             win = (Chi_str - Chis) / (Chi_str * Chis)
-            I = Chis * self.get_weyl_ps(zs, ks) * dChi * win ** 2
+            I = Chis * self.get_weyl_ps(zs, ks, curly=True, scaled=False) * dChi * win ** 2
             Cl_weyl[ell] = np.sum(I) / ell ** 3 * 8 * np.pi ** 2
         return ells[1:], Cl_weyl[1:]
 
 if __name__ == "__main__":
     ks = np.logspace(-4, 2, 200)
-    z = 10
+    z = 20
     limber = Limber()
     ps = limber.get_weyl_ps(z, ks)
 
@@ -97,7 +106,7 @@ if __name__ == "__main__":
     plt.show()
 
     ells = limber.ells_review
-    Cl_weyl = limber.Cl_weyl_review
+    Cl_weyl = limber.Cl_phi_review
     plt.figure()
-    plt.loglog(ells, Cl_weyl*(ells*(ells + 1))**2/2*np.pi)
+    plt.loglog(ells, Cl_weyl*(ells*(ells + 1))**2/(2*np.pi))
     plt.show()
