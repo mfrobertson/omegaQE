@@ -11,11 +11,15 @@ class Limber:
     ellmax : int
         Maximum ell value over which to calculate potentials.
     Nchi : int
-        Number of Chi values to use is integrals.
-    ells_review : ndarray
-        1D array of ell values over which Cl_phi_review is calculated for.
-    Cl_phi_review : ndarray
+        Number of Chi values to use during integration.
+    ells : ndarray
+        1D array of ell values over which Cl_phi is calculated for.
+    Cl_phi : ndarray
         1D array of the lensing potential power spectrum calculated with reference to Weak Gravitational Lensing of the CMB (Lewis et al. 2006).
+    ells_extended : ndarray
+        1D array of ell values over which Cl_phi_extended is calculated for.
+    Cl_phi_extended : ndarray
+        1D array of the lensing potential power spectrum calculated with extended Limber approximation ( i.e. k=(ell+0.5)/Chi).
     """
 
     def __init__(self, ellmax=3000, Nchi=100):
@@ -35,7 +39,8 @@ class Limber:
         self._pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122)
         self._results = camb.get_background(self._pars)
         self._PK = self._get_weyl_PK()
-        self.ells_review, self.Cl_phi_review = self._phi_ps_review(self.ellmax, self.Nchi)
+        self.ells, self.Cl_phi = self._phi_ps(self.ellmax, self.Nchi)
+        self.ells_extended, self.Cl_phi_extended = self._phi_ps(self.ellmax, self.Nchi, extended=True)
 
     def _get_weyl_PK(self):
         zbuffer = 100
@@ -81,7 +86,7 @@ class Limber:
     def _eta_to_z(self, eta):
         return self._results.redshift_at_conformal_time(eta)
 
-    def _phi_ps_review(self, ellmax, Nchi):
+    def _phi_ps(self, ellmax, Nchi, extended=False):
         ells = np.arange(ellmax)
         Chi_str = self._get_chi_star()
         Chis = np.linspace(0, Chi_str, Nchi)
@@ -93,10 +98,16 @@ class Limber:
         Chis = Chis[1:]
         Cl_weyl = np.zeros(np.size(ells))
         for ell in ells[1:]:
-            ks = ell / Chis
+            if extended:
+                ks = (ell + 0.5)/ Chis
+            else:
+                ks = ell / Chis
             win = (Chi_str - Chis) / (Chi_str * Chis)
             I = Chis * self.get_weyl_ps(zs, ks, curly=True, scaled=False) * dChi * win ** 2
-            Cl_weyl[ell] = np.sum(I) / ell ** 3 * 8 * np.pi ** 2
+            if extended:
+                Cl_weyl[ell] = np.sum(I) / (ell+0.5)** 3 * 8 * np.pi ** 2
+            else:
+                Cl_weyl[ell] = np.sum(I) / ell ** 3 * 8 * np.pi ** 2
         return ells[1:], Cl_weyl[1:]
 
 if __name__ == "__main__":
@@ -109,8 +120,8 @@ if __name__ == "__main__":
     plt.loglog(ks, ps)
     plt.show()
 
-    ells = limber.ells_review
-    Cl_weyl = limber.Cl_phi_review
+    ells = limber.ells
+    Cl_weyl = limber.Cl_phi
     plt.figure()
     plt.loglog(ells, Cl_weyl*(ells*(ells + 1))**2/(2*np.pi))
     plt.show()
