@@ -90,7 +90,7 @@ class Limber:
         ells = np.arange(ellmax)
         Chi_str = self._get_chi_star()
         Chis = np.linspace(0, Chi_str, Nchi)
-        dChi = Chis[1]
+        dChi = Chis[1] - Chis[0]
         eta0 = self._get_eta0()
         etas = eta0 - Chis
         zs = self._eta_to_z(etas)
