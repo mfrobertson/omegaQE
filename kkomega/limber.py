@@ -31,7 +31,7 @@ class Limber:
         ellmax : int
             Maximum ell value over which to calculate potentials.
         Nchi : int
-            Number of Chi values to use is integrals.
+            Number of Chi values to use in integrals.
         """
         self.ellmax = ellmax
         self.Nchi = Nchi
@@ -86,29 +86,70 @@ class Limber:
     def _eta_to_z(self, eta):
         return self._results.redshift_at_conformal_time(eta)
 
-    def _phi_ps(self, ellmax, Nchi, extended=False):
-        ells = np.arange(ellmax)
+    def _z_to_Chi(self, z):
+        return self._results.comoving_radial_distance(z)
+
+    def _phi_ps(self, ellmax, Nchi, zmin=0, zmax=None, kmin=0, kmax=100, extended=False):
+        Chi_min = self._z_to_Chi(zmin)
         Chi_str = self._get_chi_star()
-        Chis = np.linspace(0, Chi_str, Nchi)
+        if zmax is None:
+            Chi_max = Chi_str
+        else:
+            Chi_max = self._z_to_Chi(zmax)
+        Chis = np.linspace(Chi_min, Chi_max, Nchi)
         dChi = Chis[1] - Chis[0]
         eta0 = self._get_eta0()
         etas = eta0 - Chis
         zs = self._eta_to_z(etas)
         zs = zs[1:]
         Chis = Chis[1:]
+        step = np.ones(Chis.shape)
+        win = (Chi_str - Chis) / (Chi_str * Chis)
+        ells = np.arange(ellmax)
         Cl_weyl = np.zeros(np.size(ells))
         for ell in ells[1:]:
             if extended:
                 ks = (ell + 0.5)/ Chis
             else:
                 ks = ell / Chis
-            win = (Chi_str - Chis) / (Chi_str * Chis)
-            I = Chis * self.get_weyl_ps(zs, ks, curly=True, scaled=False) * dChi * win ** 2
+            step[:] = 1
+            step[ks < kmin] = 0
+            step[ks > kmax] = 0
+            I = step * Chis * self.get_weyl_ps(zs, ks, curly=True, scaled=False) * dChi * win ** 2
             if extended:
                 Cl_weyl[ell] = np.sum(I) / (ell+0.5)** 3 * 8 * np.pi ** 2
             else:
                 Cl_weyl[ell] = np.sum(I) / ell ** 3 * 8 * np.pi ** 2
         return ells[1:], Cl_weyl[1:]
+
+    def get_phi_ps(self, zmin=0, zmax=None, kmin=0, kmax=100, extended=True):
+        """
+        Return the Limber approximated lensing potential power spectrum.
+
+        Parameters
+        ----------
+        zmin : int or float
+            Minimum redshift to be used in the calculation.
+        zmax : int or float or None
+            Maximum redshift to be used in the calculation. None value will default yo surface of last scattering.
+        kmin : int or float
+            Minimum wavelength to be used in the calculation.
+        kmax : int or float
+            Minimum wavelength to be used in the calculation.
+        extended : bool
+            Use extended Limber approximation.
+
+        Returns
+        -------
+        2-tuple
+            The first object in the tuple in a 1D ndarry of the ell values. The second object is a 1D ndarray of the calculated lensing potential.
+        """
+        if (zmin, zmax, kmin, kmax) == (0, None, 0, 100):
+            if extended:
+                return self.ells_extended, self.Cl_phi_extended
+            else:
+                return self.ells, self.Cl_phi
+        return self._phi_ps(self.ellmax, self.Nchi, zmin, zmax, kmin, kmax, extended)
 
 if __name__ == "__main__":
     ks = np.logspace(-4, 2, 200)
