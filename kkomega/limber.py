@@ -55,6 +55,28 @@ class Limber:
         kmax = self.ellmax * self.Nchi/self._cosmo.get_chi_star() + kbuffer
         return self._cosmo.get_weyl_PK(kmax, zmax)
 
+    def get_weyl_ps(self, z, k, curly=False, scaled=True):
+        """
+        Returns the Weyl power spectrum.
+
+        Parameters
+        ----------
+        z : int or float or ndarray
+            Redshift.
+        k : int or float or ndarray
+            [Mpc^-1].
+        curly : bool
+            Return dimensionless power spectrum.
+        scaled : bool
+            Accept default CAMB scaling of Weyl potential by k^2.
+
+        Returns
+        -------
+        ndarray
+            Weyl power spectrum calculated at specific points z and k.
+        """
+        return self._cosmo.get_weyl_ps(self._PK, z, k, curly, scaled)
+
     def _phi_ps(self, ellmax, Nchi, zmin=0, zmax=None, kmin=0, kmax=100, extended=False):
         Chi_min = self._cosmo.z_to_Chi(zmin)
         Chi_str = self._cosmo.get_chi_star()
