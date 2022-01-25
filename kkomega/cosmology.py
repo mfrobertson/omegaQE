@@ -71,6 +71,21 @@ class Cosmology:
         """
         return self._results.redshift_at_conformal_time(eta)
 
+    def Chi_to_z(self, Chi):
+        """
+
+        Parameters
+        ----------
+        Chi : int or float or ndarray
+            Comoving radial distance [Mpc].
+
+        Returns
+        -------
+        float or ndarray
+            The redhsift at the corresponding Chi(s).
+        """
+        return self._results.redshift_at_conformal_time(Chi)
+
 
     def z_to_Chi(self, z):
         """
