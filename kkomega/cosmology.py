@@ -1,7 +1,7 @@
 import camb
 import numpy as np
 
-class cosmology:
+class Cosmology:
     """
     Container for useful cosmological functionality.
     """

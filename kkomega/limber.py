@@ -1,6 +1,7 @@
 import camb
 import numpy as np
 import matplotlib.pyplot as plt
+from cosmology import Cosmology
 
 class Limber:
     """
@@ -37,9 +38,7 @@ class Limber:
         """
         self.ellmax = ellmax
         self.Nchi = Nchi
-        self._pars = camb.CAMBparams()
-        self._pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122)
-        self._results = camb.get_background(self._pars)
+        self._cosmo = Cosmology()
 
         if compute:
             self.compute()
@@ -51,88 +50,27 @@ class Limber:
 
     def _get_weyl_PK(self):
         zbuffer = 100
-        zmax = self._eta_to_z(self._get_eta0() - self._get_chi_star()) + zbuffer
+        zmax = self._cosmo.eta_to_z(self._cosmo.get_eta0() - self._cosmo.get_chi_star()) + zbuffer
         kbuffer = 10
-        kmax = self.ellmax * self.Nchi/self._get_chi_star() + kbuffer
-        PK_weyl = camb.get_matter_power_interpolator(self._pars, hubble_units=False, zmin=0, zmax=zmax, kmax=kmax, k_hunit=False, var1="Weyl", var2="Weyl")
-        return PK_weyl
-
-    def get_weyl_ps(self, z, k, curly=False, scaled=True):
-        """
-        Returns the Weyl power spectrum.
-
-        Parameters
-        ----------
-        z : int or float or ndarray
-            Redshift.
-        k : int or float or ndarray
-            [Mpc^-1].
-        curly : bool
-            Return dimensionless power spectrum.
-        scaled : bool
-            Accept default CAMB scaling of Weyl potential by k^2.
-
-        Returns
-        -------
-        ndarray
-            Weyl power spectrum calculated at specific points z and k.
-        """
-        ps = self._PK.P(z, k, grid=False)
-        if not scaled:
-            ps *= k**-4
-        if curly:
-            return ps * k** 3 / (2 * np.pi ** 2)
-        return ps
-
-    def _get_chi_star(self):
-        return self._get_eta0() - self._results.tau_maxvis
-
-    def _get_eta0(self):
-        return self._results.conformal_time(0)
-
-    def _eta_to_z(self, eta):
-        return self._results.redshift_at_conformal_time(eta)
-
-    def _z_to_Chi(self, z):
-        return self._results.comoving_radial_distance(z)
-
-    def _window(self, Chi1, Chi2):
-        return (Chi2 - Chi1)/(Chi1 * Chi2)
-
-    def window(self, Chi1, Chi2):
-        """
-        Computes the Window function.
-
-        Parameters
-        ----------
-        Chi1 : int or float or ndarray
-            Comoving radial distance [Mpc]. Usually the one being integrated over.
-        Chi2 : int or float
-            Comiving radial distance [Mpc]. Usually the limit, and Chi2 > Chi1.
-
-        Returns
-        -------
-        int or float or ndarray
-            Returns the computed Window function. The dimensions will be equivalent to Chi1.
-        """
-        return self._window(Chi1, Chi2)
+        kmax = self.ellmax * self.Nchi/self._cosmo.get_chi_star() + kbuffer
+        return self._cosmo.get_weyl_PK(kmax, zmax)
 
     def _phi_ps(self, ellmax, Nchi, zmin=0, zmax=None, kmin=0, kmax=100, extended=False):
-        Chi_min = self._z_to_Chi(zmin)
-        Chi_str = self._get_chi_star()
+        Chi_min = self._cosmo.z_to_Chi(zmin)
+        Chi_str = self._cosmo.get_chi_star()
         if zmax is None:
             Chi_max = Chi_str
         else:
-            Chi_max = self._z_to_Chi(zmax)
+            Chi_max = self._cosmo.z_to_Chi(zmax)
         Chis = np.linspace(Chi_min, Chi_max, Nchi)
         dChi = Chis[1] - Chis[0]
-        eta0 = self._get_eta0()
+        eta0 = self._cosmo.get_eta0()
         etas = eta0 - Chis
-        zs = self._eta_to_z(etas)
+        zs = self._cosmo.eta_to_z(etas)
         zs = zs[1:]
         Chis = Chis[1:]
         step = np.ones(Chis.shape)
-        win = self._window(Chis, Chi_max)
+        win = self._cosmo.window(Chis, Chi_max)
         ells = np.arange(ellmax)
         Cl_weyl = np.zeros(np.size(ells))
         for ell in ells[1:]:
@@ -143,7 +81,8 @@ class Limber:
             step[:] = 1
             step[ks < kmin] = 0
             step[ks > kmax] = 0
-            I = step * Chis * self.get_weyl_ps(zs, ks, curly=True, scaled=False) * dChi * win ** 2
+            weyl_ps = self._cosmo.get_weyl_ps(self._PK, zs, ks, curly=True, scaled=False)
+            I = step * Chis * weyl_ps * dChi * win ** 2
             if extended:
                 Cl_weyl[ell] = np.sum(I) / (ell+0.5)** 3 * 8 * np.pi ** 2
             else:
@@ -183,11 +122,6 @@ if __name__ == "__main__":
     ks = np.logspace(-4, 2, 200)
     z = 20
     limber = Limber()
-    ps = limber.get_weyl_ps(z, ks)
-
-    plt.figure()
-    plt.loglog(ks, ps)
-    plt.show()
 
     ells = limber.ells
     Cl_weyl = limber.Cl_phi
