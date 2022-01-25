@@ -22,7 +22,7 @@ class Limber:
         1D array of the lensing potential power spectrum calculated with extended Limber approximation ( i.e. k=(ell+0.5)/Chi).
     """
 
-    def __init__(self, ellmax=3000, Nchi=100):
+    def __init__(self, ellmax=3000, Nchi=100, compute=True):
         """
         Constructor.
 
@@ -32,12 +32,19 @@ class Limber:
             Maximum ell value over which to calculate potentials.
         Nchi : int
             Number of Chi values to use in integrals.
+        compute : bool
+            Calculate interpolated Weyl potential and compute the limber approximated lensing potential power spectra.
         """
         self.ellmax = ellmax
         self.Nchi = Nchi
         self._pars = camb.CAMBparams()
         self._pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122)
         self._results = camb.get_background(self._pars)
+
+        if compute:
+            self.compute()
+
+    def compute(self):
         self._PK = self._get_weyl_PK()
         self.ells, self.Cl_phi = self._phi_ps(self.ellmax, self.Nchi)
         self.ells_extended, self.Cl_phi_extended = self._phi_ps(self.ellmax, self.Nchi, extended=True)
@@ -89,6 +96,27 @@ class Limber:
     def _z_to_Chi(self, z):
         return self._results.comoving_radial_distance(z)
 
+    def _window(self, Chi1, Chi2):
+        return (Chi2 - Chi1)/(Chi1 * Chi2)
+
+    def window(self, Chi1, Chi2):
+        """
+        Computes the Window function.
+
+        Parameters
+        ----------
+        Chi1 : int or float or ndarray
+            Comoving radial distance [Mpc]. Usually the one being integrated over.
+        Chi2 : int or float
+            Comiving radial distance [Mpc]. Usually the limit, and Chi2 > Chi1.
+
+        Returns
+        -------
+        int or float or ndarray
+            Returns the computed Window function. The dimensions will be equivalent to Chi1.
+        """
+        return self._window(Chi1, Chi2)
+
     def _phi_ps(self, ellmax, Nchi, zmin=0, zmax=None, kmin=0, kmax=100, extended=False):
         Chi_min = self._z_to_Chi(zmin)
         Chi_str = self._get_chi_star()
@@ -104,7 +132,7 @@ class Limber:
         zs = zs[1:]
         Chis = Chis[1:]
         step = np.ones(Chis.shape)
-        win = (Chi_str - Chis) / (Chi_str * Chis)
+        win = self._window(Chis, Chi_max)
         ells = np.arange(ellmax)
         Cl_weyl = np.zeros(np.size(ells))
         for ell in ells[1:]:
