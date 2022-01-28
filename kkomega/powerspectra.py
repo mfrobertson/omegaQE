@@ -3,7 +3,7 @@ from cosmology import Cosmology
 
 class Powerspectra:
     """
-    Calculates Limber approximated CMB lensing power spectra.
+    Calculates Limber approximated CMB lensing power spectra at the order of the Born approximation.
 
     Attributes
     ----------
@@ -28,13 +28,14 @@ class Powerspectra:
 
     def recalculate_weyl(self, ellmax,  Nchi):
         """
-        Force recalculation of Weyl power spectrum interpolator, optimised for the supplied lensing power spectrum calculation parameters.
+        Force recalculation of Weyl power spectrum interpolator, self.weyl_PK. This recalculation is optimised for power spectra calculations where ellmax and Nchi will be supplied as input parameters.
 
         Parameters
         ----------
         ellmax : float or int
+            The maximum moment the power spectra will be calculated over.
         Nchi : int
-
+            The number of steps in the integral during the power spectra calculation.
         Returns
         -------
         None
@@ -47,7 +48,7 @@ class Powerspectra:
 
     def get_weyl_ps(self, z, k, curly=False, scaled=True):
         """
-        Returns the Weyl power spectrum.
+        Returns the Weyl power spectrum, calculated from the interpolator self.weyl_PK.
 
         Parameters
         ----------
@@ -160,8 +161,8 @@ class Powerspectra:
 
         Returns
         -------
-        2-tuple
-            The first object in the tuple in a 1D ndarry of the ell values. The second object is a 1D ndarray of the calculated lensing potential.
+        ndarray
+            1D ndarray of the lensing potential power spectrum calculated at the supplied ell values.
         """
         if recalc_weyl:
             self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
@@ -192,8 +193,8 @@ class Powerspectra:
 
         Returns
         -------
-        2-tuple
-            The first object in the tuple in a 1D ndarry of the ell values. The second object is a 1D ndarray of the calculated convergence spectra.
+        ndarray
+            1D ndarray of the lensing convergence power spectrum calculated at the supplied ell values.
         """
         if recalc_weyl:
             self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
@@ -206,11 +207,11 @@ class Powerspectra:
         Parameters
         ----------
         ells : int or float or ndarray
-            Multipole moment at which to calculate the power spectrum.
+            Multipole moments at which to calculate the power spectrum.
         Chi_source1 : int or float or ndarray
-            Chi_source1 > Chi_source2
+            Comoving radial distance(s) of the first source plane(s) [Mpc]. Will be used for the first window function, and as the integral limit.
         Chi_source2 : int or float
-
+            Comoving radial distance of the second source plane [Mpc]. Will be used for the second window function.
         Nchi : int
             Number of steps in the integral over Chi.
         kmin : int or float
@@ -224,9 +225,8 @@ class Powerspectra:
 
         Returns
         -------
-        2-tuple
-            The first object in the tuple in a 1D ndarry of the ell values. The second object is a 1D ndarray of the calculated convergence spectra.
-        """
+        ndarray
+            2D ndarray of the lensing convergence power spectrum calculated at the supplied ell and Chi_source1 values. Indexed by [ell, Chi_source1].         """
         if recalc_weyl:
             self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
         return self._Cl_kappa_2source(ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended)
