@@ -1,38 +1,40 @@
-from limber import Limber
+from powerspectra import Powerspectra
 from cosmology import Cosmology
 import numpy as np
 
-class modecoupling:
+class Modecoupling:
 
     def __init__(self):
         self._cosmo = Cosmology()
-        self._weyl_PK = self._get_weyl_PK()
+        self._powerspectra = Powerspectra()
+        self.weyl_PK = self._powerspectra.weyl_PK
 
-    def _get_weyl_PK(self):
-        zbuffer = 100
-        zmax = self._cosmo.eta_to_z(self._cosmo.get_eta0() - self._cosmo.get_chi_star()) + zbuffer
-        kbuffer = 10
-        kmax = self.ellmax * self.Nchi/self._cosmo.get_chi_star() + kbuffer
-        return self._cosmo.get_weyl_PK(kmax, zmax)
-
-    def compute(self, ell1, ell2, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100):
-        Chi_min = self._cosmo.z_to_Chi(zmin)
-        Chi_str = self._cosmo.get_chi_star()
-        if zmax is None:
-            Chi_max = Chi_str
-        else:
-            Chi_max = self._cosmo.z_to_Chi(zmax)
-        Chis = np.linspace(Chi_min, Chi_max, Nchi)
+    def _integral_prep(self, Nchi):
+        Chi_max = self._cosmo.get_chi_star()
+        Chis = np.linspace(0, Chi_max, Nchi)
         dChi = Chis[1] - Chis[0]
         zs = self._cosmo.Chi_to_z(Chis)
         zs = zs[1:]
         Chis = Chis[1:]
-        step = np.ones(Chis.shape)
-        win = self._cosmo.window(Chis, Chi_max)
-        ks1 = ell1 / Chis
-        step[:] = 1
-        step[ks1 < kmin] = 0
-        step[ks1 > kmax] = 0
-        weyl_ps = self._cosmo.get_weyl_ps(self._weyl_PK, zs, ks1, curly=True, scaled=False)
-        I = step * weyl_ps * dChi * (win/Chis)**2
-        return ell1**4 * I
+        window = self._cosmo.window(Chis, Chi_max)
+        return zs, Chis, dChi, window
+
+    def compute(self, ells1, ells2, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=True):
+        zs, Chis, dChi, win = self._integral_prep(Nchi)
+        M = np.zeros(np.shape(ells1))
+        Cl_kappa = self._powerspectra.get_kappa_ps_2source(ells2, Chis, self._cosmo.get_chi_star(), recalc_weyl=recalc_weyl)
+        if recalc_weyl:
+            self.weyl_PK = self._powerspectra.weyl_PK
+        for iii, ell1 in enumerate(ells1):
+            if extended:
+                ks = (ell1 + 0.5)/ Chis
+            else:
+                ks = ell1 / Chis
+            step = self._cosmo.heaviside(ks, kmin, kmax)
+            weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=False, scaled=False)
+            I = step * weyl_ps/Chis**2 * dChi * win ** 2 * Cl_kappa[iii]
+            if extended:
+                M[iii] = np.sum(I) * (ell1 + 0.5) ** 4
+            else:
+                M[iii] = np.sum(I) * ell1 ** 4
+        return M

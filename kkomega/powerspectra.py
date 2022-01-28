@@ -75,20 +75,11 @@ class Powerspectra:
             Chi_max = self._cosmo.z_to_Chi(zmax)
         Chis = np.linspace(Chi_min, Chi_max, Nchi)
         dChi = Chis[1] - Chis[0]
-        eta0 = self._cosmo.get_eta0()
-        etas = eta0 - Chis
-        zs = self._cosmo.eta_to_z(etas)
+        zs = self._cosmo.Chi_to_z(Chis)
         zs = zs[1:]
         Chis = Chis[1:]
         window = self._cosmo.window(Chis, Chi_max)
         return zs, Chis, dChi, window
-
-    def _heaviside(self, ks, kmin, kmax):
-        step = np.ones(ks.shape)
-        step[:] = 1
-        step[ks < kmin] = 0
-        step[ks > kmax] = 0
-        return step
 
     def _Cl_phi(self, ells, Nchi, zmin=0, zmax=None, kmin=0, kmax=100, extended=False):
         zs, Chis, dChi, win = self._integral_prep(Nchi, zmin, zmax)
@@ -98,7 +89,7 @@ class Powerspectra:
                 ks = (ell + 0.5)/ Chis
             else:
                 ks = ell / Chis
-            step = self._heaviside(ks, kmin, kmax)
+            step = self._cosmo.heaviside(ks, kmin, kmax)
             weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=True, scaled=False)
             I = step * Chis * weyl_ps * dChi * win ** 2
             if extended:
@@ -115,13 +106,33 @@ class Powerspectra:
                 ks = (ell + 0.5) / Chis
             else:
                 ks = ell / Chis
-            step = self._heaviside(ks, kmin, kmax)
+            step = self._cosmo.heaviside(ks, kmin, kmax)
             weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=False, scaled=False)
             I = step * weyl_ps/(Chis)**2 * dChi * win ** 2
             if extended:
                 Cl_kappa[iii] = np.sum(I) * (ell + 0.5)** 4
             else:
                 Cl_kappa[iii] = np.sum(I) * ell** 4
+        return Cl_kappa
+
+    def _Cl_kappa_2source(self, ells, Chi_source1, Chi_source2, Nchi, kmin=0, kmax=100, extended=False):
+        Cl_kappa = np.zeros((np.size(ells), np.size(Chi_source1)))
+        zmax = self._cosmo.Chi_to_z(Chi_source1)
+        zs, Chis, dChi, _ = self._integral_prep(Nchi, zmin=0, zmax=zmax)
+        win1 = self._cosmo.window(Chis, Chi_source1)
+        win2 = self._cosmo.window(Chis, Chi_source2)
+        for iii, ell in enumerate(ells):
+            if extended:
+                ks = (ell + 0.5) / Chis
+            else:
+                ks = ell / Chis
+            step = self._cosmo.heaviside(ks, kmin, kmax)
+            weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=False, scaled=False)
+            I = step * weyl_ps / Chis ** 2 * dChi * win1 * win2
+            if extended:
+                Cl_kappa[iii] = I.sum(axis=0) * (ell + 0.5) ** 4
+            else:
+                Cl_kappa[iii] = I.sum(axis=0) * ell ** 4
         return Cl_kappa
 
     def get_phi_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_weyl=False):
@@ -187,6 +198,38 @@ class Powerspectra:
         if recalc_weyl:
             self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
         return self._Cl_kappa(ells, Nchi, zmin, zmax, kmin, kmax, extended)
+
+    def get_kappa_ps_2source(self, ells, Chi_source1, Chi_source2, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
+        """
+        Return the Limber approximated lensing convergence power spectrum for two source planes.
+
+        Parameters
+        ----------
+        ells : int or float or ndarray
+            Multipole moment at which to calculate the power spectrum.
+        Chi_source1 : int or float or ndarray
+            Chi_source1 > Chi_source2
+        Chi_source2 : int or float
+
+        Nchi : int
+            Number of steps in the integral over Chi.
+        kmin : int or float
+            Minimum wavelength to be used in the calculation.
+        kmax : int or float
+            Minimum wavelength to be used in the calculation.
+        extended : bool
+            Use extended Limber approximation.
+        recalc_weyl : bool
+            Recalculate the Weyl potential power spectrum interpolator optimised for this particular calculation given the supplied inputs.
+
+        Returns
+        -------
+        2-tuple
+            The first object in the tuple in a 1D ndarry of the ell values. The second object is a 1D ndarray of the calculated convergence spectra.
+        """
+        if recalc_weyl:
+            self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
+        return self._Cl_kappa_2source(ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended)
 
 
 if __name__ == "__main__":

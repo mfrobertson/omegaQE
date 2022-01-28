@@ -15,7 +15,7 @@ class Cosmology:
         self._results = camb.get_background(self._pars)
 
 
-    def window(self, Chi1, Chi2):
+    def window(self, Chi1, Chi2, heaviside=True):
         """
         Computes the Window function.
 
@@ -31,7 +31,20 @@ class Cosmology:
         int or float or ndarray
             Returns the computed Window function. The dimensions will be equivalent to Chi1.
         """
-        return (Chi2 - Chi1) / (Chi1 * Chi2)
+        win = (Chi2 - Chi1) / (Chi1 * Chi2)
+        if np.size(Chi1) == 1 and heaviside and Chi1 > Chi2:
+            return 0
+        if heaviside:
+            win[win < 0] = 0
+        return win
+
+
+    def heaviside(self, arr, min, max):
+        step = np.ones(arr.shape)
+        step[:] = 1
+        step[arr < min] = 0
+        step[arr > max] = 0
+        return step
 
 
     def get_chi_star(self):
@@ -84,7 +97,7 @@ class Cosmology:
         float or ndarray
             The redhsift at the corresponding Chi(s).
         """
-        return self._results.redshift_at_conformal_time(Chi)
+        return self._results.redshift_at_comoving_radial_distance(Chi)
 
 
     def z_to_Chi(self, z):
