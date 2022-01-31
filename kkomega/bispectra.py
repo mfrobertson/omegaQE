@@ -4,7 +4,7 @@ import numpy as np
 
 class Bispectra:
     """
-    Calculates the convergence and convergence-rotation bispectrum.
+    Calculates the convergence and convergence-rotation bispectrum to leading order in the Post Born approximation.
 
     """
 
@@ -24,13 +24,19 @@ class Bispectra:
         L12_dot = self._triangle_dot_product(L1, L2, L3)
         return M1, M2, L12_dot
 
-    def _kappa_kappa_kappa(self, L1, L2, L3):
+    def _kappa1_kappa1_kappa2(self, L1, L2, L3):
         M1, M2, L12_dot = self._bispectra_prep(L1, L2, L3)
         L13_dot = self._triangle_dot_product(L1, L3, L2)
         L23_dot = self._triangle_dot_product(L2, L3, L1)
         return 2*L12_dot*(L13_dot*M1 + L23_dot*M2)/(L1**2 * L2**2)
 
-    def _kappa_kappa_omega(self, L1, L2, L3):
+    def _kappa1_kappa2_kappa1(self, L1, L2, L3):
+        return self._kappa1_kappa1_kappa2(L3, L1, L2)
+
+    def _kappa2_kappa1_kappa1(self, L1, L2, L3):
+        return self._kappa1_kappa1_kappa2(L2, L3, L1)
+
+    def _kappa1_kappa1_omega2(self, L1, L2, L3):
         M1, M2, L12_dot = self._bispectra_prep(L1, L2, L3)
         L13_cross = self._triangle_cross_product(L1, L3, L2)
         L23_cross = self._triangle_cross_product(L2, L3, L1)
@@ -55,7 +61,10 @@ class Bispectra:
         float or ndarray
             The bispectrum.
         """
-        return self._kappa_kappa_kappa(L1, L2, L3)
+        b1 = self._kappa2_kappa1_kappa1(L1, L2, L3)
+        b2 = self._kappa1_kappa2_kappa1(L1, L2, L3)
+        b3 = self._kappa1_kappa1_kappa2(L1, L2, L3)
+        return b1 + b2 + b3
 
     def get_convergence_rotation_bispectrum(self, L1, L2, L3):
         """
@@ -76,4 +85,4 @@ class Bispectra:
         float or ndarray
             The bispectrum.
         """
-        return self._kappa_kappa_omega(L1, L2, L3)
+        return self._kappa1_kappa1_omega2(L1, L2, L3)
