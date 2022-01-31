@@ -44,7 +44,7 @@ class Bispectra:
 
     def get_convergence_bispectrum(self, L1, L2, L3):
         """
-        Calculates the convergence bispectrum 'kappa kappa kappa' for one leading order post-Born convergence term.
+        Calculates the convergence bispectrum 'kappa kappa kappa' to leading order in the Post Born correction.
 
         Parameters
         ----------
