@@ -135,7 +135,7 @@ class Cosmology:
         if zmax is None:
             zmax = self.eta_to_z(self.get_eta0() - self.get_chi_star())
         if kmax is None:
-            kmax = 10
+            kmax = 100
         PK_weyl = camb.get_matter_power_interpolator(self._pars, hubble_units=False, zmin=0, zmax=zmax, kmax=kmax,
                                                      k_hunit=False, var1="Weyl", var2="Weyl")
         return PK_weyl

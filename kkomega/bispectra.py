@@ -8,7 +8,8 @@ class Bispectra:
 
     """
 
-    def __init__(self): pass
+    def __init__(self):
+        self._mode = Modecoupling()
 
     def _triangle_dot_product(self, mag1, mag2, mag3):
         return (mag1**2 + mag2**2 - mag3**2)/2
@@ -18,9 +19,8 @@ class Bispectra:
         return 2 * np.sqrt(s*(s-mag1)*(s-mag2)*(s-mag3))
 
     def _bispectra_prep(self, L1, L2, L3):
-        mode = Modecoupling()
-        M1 = mode.components(L1, L2)
-        M2 = mode.components(L2, L1)
+        M1 = self._mode.components(L1, L2)
+        M2 = self._mode.components(L2, L1)
         L12_dot = self._triangle_dot_product(L1, L2, L3)
         return M1, M2, L12_dot
 

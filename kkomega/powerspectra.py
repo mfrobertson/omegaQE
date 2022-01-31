@@ -19,7 +19,9 @@ class Powerspectra:
         self._cosmo = Cosmology()
         self.weyl_PK = self._get_weyl_PK()
 
-    def _get_weyl_PK(self, ellmax=1000, Nchi=100):
+    def _get_weyl_PK(self, ellmax=None, Nchi=None):
+        if ellmax is None and Nchi is None:
+            return self._cosmo.get_weyl_PK()
         zbuffer = 100
         zmax = self._cosmo.eta_to_z(self._cosmo.get_eta0() - self._cosmo.get_chi_star()) + zbuffer
         kbuffer = 10
@@ -68,73 +70,66 @@ class Powerspectra:
         """
         return self._cosmo.get_weyl_ps(self.weyl_PK, z, k, curly, scaled)
 
-    def _integral_prep(self, Nchi, zmin, zmax):
+    def _vectorise_ells(self, ells, ndim):
+        if np.size(ells) == 1:
+            return ells
+        if ndim == 1:
+            return ells[:, None]
+        if ndim == 2:
+            return ells[:, None, None]
+
+    def _vectorise_zs(self, zs, Nells):
+        ndim = zs.ndim
+        if ndim == 1:
+            return np.repeat(zs[np.newaxis, :], Nells, 0)
+        if ndim == 2:
+            return np.repeat(zs[np.newaxis, :, :], Nells, 0)
+
+    def _integral_prep(self, ells, Nchi, zmin, zmax, kmin, kmax, extended, curly):
         Chi_min = self._cosmo.z_to_Chi(zmin)
         if zmax is None:
             Chi_max = self._cosmo.get_chi_star()
         else:
             Chi_max = self._cosmo.z_to_Chi(zmax)
-        Chis = np.linspace(Chi_min, Chi_max, Nchi)
+        Chis = np.linspace(Chi_min, Chi_max, Nchi)[1:]
         dChi = Chis[1] - Chis[0]
-        zs = self._cosmo.Chi_to_z(Chis)
-        zs = zs[1:]
-        Chis = Chis[1:]
         window = self._cosmo.window(Chis, Chi_max)
-        return zs, Chis, dChi, window
+        Nells = np.size(ells)
+        zs = self._cosmo.Chi_to_z(Chis)
+        ells = self._vectorise_ells(ells, zs.ndim)
+        zs = self._vectorise_zs(zs, Nells)
+        if extended:
+            ks = (ells + 0.5)/Chis
+        else:
+            ks = ells/Chis
+        step = self._cosmo.heaviside(ks, kmin, kmax)
+        weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=curly, scaled=False)
+        return step, Chis, weyl_ps, dChi, window
 
     def _Cl_phi(self, ells, Nchi, zmin=0, zmax=None, kmin=0, kmax=100, extended=False):
-        zs, Chis, dChi, win = self._integral_prep(Nchi, zmin, zmax)
-        Cl_phi = np.zeros(np.shape(ells))
-        for iii, ell in enumerate(ells):
-            if extended:
-                ks = (ell + 0.5)/ Chis
-            else:
-                ks = ell / Chis
-            step = self._cosmo.heaviside(ks, kmin, kmax)
-            weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=True, scaled=False)
-            I = step * Chis * weyl_ps * dChi * win ** 2
-            if extended:
-                Cl_phi[iii] = np.sum(I) / (ell + 0.5) ** 3 * 8 * np.pi ** 2
-            else:
-                Cl_phi[iii] = np.sum(I) / ell ** 3 * 8 * np.pi ** 2
-        return Cl_phi
+        step, Chis, weyl_ps, dChi, win = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=True)
+        I = step * Chis * weyl_ps * dChi * win ** 2
+        if extended:
+            return I.sum(axis=1) / (ells + 0.5) ** 3 * 8 * np.pi ** 2
+        return I.sum(axis=1) / ells ** 3 * 8 * np.pi ** 2
 
     def _Cl_kappa(self, ells, Nchi, zmin=0, zmax=None, kmin=0, kmax=100, extended=False):
-        zs, Chis, dChi, win = self._integral_prep(Nchi, zmin, zmax)
-        Cl_kappa = np.zeros(np.shape(ells))
-        for iii, ell in enumerate(ells):
-            if extended:
-                ks = (ell + 0.5) / Chis
-            else:
-                ks = ell / Chis
-            step = self._cosmo.heaviside(ks, kmin, kmax)
-            weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=False, scaled=False)
-            I = step * weyl_ps/(Chis)**2 * dChi * win ** 2
-            if extended:
-                Cl_kappa[iii] = np.sum(I) * (ell + 0.5)** 4
-            else:
-                Cl_kappa[iii] = np.sum(I) * ell** 4
-        return Cl_kappa
+        step, Chis, weyl_ps, dChi, win = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False)
+        I = step * weyl_ps/(Chis)**2 * dChi * win ** 2
+        if extended:
+            return I.sum(axis=1) * (ells + 0.5)** 4
+        return I.sum(axis=1) * ells** 4
 
-    def _Cl_kappa_2source(self, ells, Chi_source1, Chi_source2, Nchi, kmin=0, kmax=100, extended=False):
-        Cl_kappa = np.zeros((np.size(ells), np.size(Chi_source1)))
+    def _Cl_kappa_2source(self, ells, Chi_source1, Chi_source2, Nchi, kmin=0, kmax=100, extended=True):
         zmax = self._cosmo.Chi_to_z(Chi_source1)
-        zs, Chis, dChi, _ = self._integral_prep(Nchi, zmin=0, zmax=zmax)
+        step, Chis, weyl_ps, dChi, _ = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False)
         win1 = self._cosmo.window(Chis, Chi_source1)
         win2 = self._cosmo.window(Chis, Chi_source2)
-        for iii, ell in enumerate(ells):
-            if extended:
-                ks = (ell + 0.5) / Chis
-            else:
-                ks = ell / Chis
-            step = self._cosmo.heaviside(ks, kmin, kmax)
-            weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=False, scaled=False)
-            I = step * weyl_ps / Chis ** 2 * dChi * win1 * win2
-            if extended:
-                Cl_kappa[iii] = I.sum(axis=0) * (ell + 0.5) ** 4
-            else:
-                Cl_kappa[iii] = I.sum(axis=0) * ell ** 4
-        return Cl_kappa
+        I = step * weyl_ps / Chis ** 2 * dChi * win1 * win2
+        ells = self._vectorise_ells(ells, 1)
+        if extended:
+            return I.sum(axis=1) * (ells + 0.5) ** 4
+        return I.sum(axis=1) * ells ** 4
 
     def get_phi_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
