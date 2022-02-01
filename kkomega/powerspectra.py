@@ -78,11 +78,15 @@ class Powerspectra:
         if ndim == 2:
             return ells[:, None, None]
 
-    def _vectorise_zs(self, zs, Nells):
-        ndim = zs.ndim
+    def _vectorise_zs(self, Chis, Nells):
+        ndim = Chis.ndim
         if ndim == 1:
+            zs = self._cosmo.Chi_to_z(Chis)
             return np.repeat(zs[np.newaxis, :], Nells, 0)
         if ndim == 2:
+            zs = np.ones(np.shape(Chis))
+            for row in range(np.shape(Chis)[0]):
+                zs[row] = self._cosmo.Chi_to_z(Chis[row])
             return np.repeat(zs[np.newaxis, :, :], Nells, 0)
 
     def _integral_prep(self, ells, Nchi, zmin, zmax, kmin, kmax, extended, curly):
@@ -95,9 +99,8 @@ class Powerspectra:
         dChi = Chis[1] - Chis[0]
         window = self._cosmo.window(Chis, Chi_max)
         Nells = np.size(ells)
-        zs = self._cosmo.Chi_to_z(Chis)
-        ells = self._vectorise_ells(ells, zs.ndim)
-        zs = self._vectorise_zs(zs, Nells)
+        ells = self._vectorise_ells(ells, Chis.ndim)
+        zs = self._vectorise_zs(Chis, Nells)
         if extended:
             ks = (ells + 0.5)/Chis
         else:
@@ -126,7 +129,8 @@ class Powerspectra:
         win1 = self._cosmo.window(Chis, Chi_source1)
         win2 = self._cosmo.window(Chis, Chi_source2)
         I = step * weyl_ps / Chis ** 2 * dChi * win1 * win2
-        ells = self._vectorise_ells(ells, 1)
+        if np.size(Chi_source1) > 1:
+            ells = self._vectorise_ells(ells, 1)
         if extended:
             return I.sum(axis=1) * (ells + 0.5) ** 4
         return I.sum(axis=1) * ells ** 4

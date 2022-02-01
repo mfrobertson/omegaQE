@@ -46,6 +46,28 @@ class Modecoupling:
         window = self._cosmo.window(Chis, Chi_max)
         return zs, Chis, dChi, window
 
+    def _components(self, ells1, ells2, Nchi, kmin, kmax, extended, recalc_weyl):
+        zs, Chis, dChi, win = self._integral_prep(Nchi)
+        # zs = np.repeat(zs[np.newaxis, :], np.size(ells1), 0)
+        Nells1 = np.size(ells1)
+        ells1_vec = self._vectorise_ells(ells1, zs.ndim)
+        zs = self._vectorise_zs(zs, Nells1)
+        Cl_kappa = self._powerspectra.get_kappa_ps_2source(ells2, Chis, self._cosmo.get_chi_star(),
+                                                           recalc_weyl=recalc_weyl)
+        if recalc_weyl:
+            self.weyl_PK = self._powerspectra.weyl_PK
+        if extended:
+            # ks = (ells1 +0.5)[:,None]*(1/Chis)
+            ks = (ells1_vec + 0.5) / Chis
+        else:
+            ks = ells1_vec / Chis
+        step = self._cosmo.heaviside(ks, kmin, kmax)
+        weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=False, scaled=False)
+        I = step * weyl_ps / Chis ** 2 * dChi * win ** 2 * Cl_kappa
+        if extended:
+            return I.sum(axis=1) * (ells1 + 0.5) ** 4
+        return I.sum(axis=1) * ells1 ** 4
+
     def components(self, ells1, ells2, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
@@ -72,22 +94,4 @@ class Modecoupling:
         ndarray
             The matrix components at (ells, ells2).
         """
-        zs, Chis, dChi, win = self._integral_prep(Nchi)
-        #zs = np.repeat(zs[np.newaxis, :], np.size(ells1), 0)
-        Nells1 = np.size(ells1)
-        ells1_vec = self._vectorise_ells(ells1, zs.ndim)
-        zs = self._vectorise_zs(zs, Nells1)
-        Cl_kappa = self._powerspectra.get_kappa_ps_2source(ells2, Chis, self._cosmo.get_chi_star(), recalc_weyl=recalc_weyl)
-        if recalc_weyl:
-            self.weyl_PK = self._powerspectra.weyl_PK
-        if extended:
-            #ks = (ells1 +0.5)[:,None]*(1/Chis)
-            ks = (ells1_vec + 0.5)/Chis
-        else:
-            ks = ells1_vec/Chis
-        step = self._cosmo.heaviside(ks, kmin, kmax)
-        weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=False, scaled=False)
-        I = step * weyl_ps/Chis**2 * dChi * win ** 2 * Cl_kappa
-        if extended:
-            return I.sum(axis=1) * (ells1 + 0.5) ** 4
-        return I.sum(axis=1) * ells1 ** 4
+        return self._components(ells1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
