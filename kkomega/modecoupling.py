@@ -2,6 +2,7 @@ from powerspectra import Powerspectra
 from cosmology import Cosmology
 import numpy as np
 
+
 class Modecoupling:
     """
     Calculates the mode-coupling matrix.
@@ -95,3 +96,15 @@ class Modecoupling:
             The matrix components at (ells, ells2).
         """
         return self._components(ells1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
+
+    def matrix(self, ellmax, Nell, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
+        ells2 = np.linspace(1, ellmax + 1, Nell)
+        M = np.ones((Nell, Nell))
+        for iii, ell1 in enumerate(ells2):
+            M[iii, :] = self._components(np.ones(Nell)*ell1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
+        return ells2, M
+
+    def spline(self, ellmax, Nell, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
+        from scipy.interpolate import RectBivariateSpline
+        ells, M = self.matrix(ellmax, Nell, Nchi, kmin, kmax, extended, recalc_weyl)
+        return RectBivariateSpline(ells, ells, M)
