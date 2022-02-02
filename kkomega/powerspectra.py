@@ -8,7 +8,7 @@ class Powerspectra:
     Attributes
     ----------
     weyl_PK : object
-        RectBivariateSpline PK object as the interpolator for the Weyl potential power spectrum.
+        CAMB RectBivariateSpline PK object as the interpolator for the Weyl potential power spectrum.
     """
 
     def __init__(self):
@@ -105,7 +105,7 @@ class Powerspectra:
             ks = (ells + 0.5)/Chis
         else:
             ks = ells/Chis
-        step = self._cosmo.heaviside(ks, kmin, kmax)
+        step = self._cosmo.rectangular_pulse_steps(ks, kmin, kmax)
         weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=curly, scaled=False)
         return step, Chis, weyl_ps, dChi, window
 
@@ -201,7 +201,7 @@ class Powerspectra:
 
     def get_kappa_ps_2source(self, ells, Chi_source1, Chi_source2, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
-        Return the Limber approximated lensing convergence power spectrum for two source planes.
+        Returns the Limber approximated lensing convergence power spectrum for two source planes.
 
         Parameters
         ----------

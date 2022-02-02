@@ -10,7 +10,7 @@ class Modecoupling:
     Attributes
     ----------
     weyl_PK : object
-        RectBivariateSpline PK object as the interpolator for the Weyl potential power spectrum.
+        CAMB RectBivariateSpline PK object as the interpolator for the Weyl potential power spectrum.
     """
 
     def __init__(self):
@@ -69,6 +69,13 @@ class Modecoupling:
             return I.sum(axis=1) * (ells1 + 0.5) ** 4
         return I.sum(axis=1) * ells1 ** 4
 
+    def _matrix(self, ellmax, Nell, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
+        ells2 = np.linspace(1, ellmax + 1, Nell)
+        M = np.ones((Nell, Nell))
+        for iii, ell1 in enumerate(ells2):
+            M[iii, :] = self._components(np.ones(Nell)*ell1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
+        return ells2, M
+
     def components(self, ells1, ells2, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
@@ -93,18 +100,36 @@ class Modecoupling:
         Returns
         -------
         ndarray
-            The matrix components at (ells, ells2).
+            1D array of the matrix components at [ells, ells2].
         """
         return self._components(ells1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
 
-    def matrix(self, ellmax, Nell, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
-        ells2 = np.linspace(1, ellmax + 1, Nell)
-        M = np.ones((Nell, Nell))
-        for iii, ell1 in enumerate(ells2):
-            M[iii, :] = self._components(np.ones(Nell)*ell1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
-        return ells2, M
-
     def spline(self, ellmax, Nell, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
+        """
+        Produces 2D spline of the mode coupling matrix.
+
+        Parameters
+        ----------
+        ellmax : int
+            Maximim moment.
+        Nell : int
+            Number of sample moments to use in the interpolation in each direction. Nell * Nell samples in total for 2D interpolation.
+        Nchi : int
+            The number of steps in the integral during the calculation.
+        kmin : int or float
+            Minimum wavelength to be used in the calculation.
+        kmax : int or float
+            Minimum wavelength to be used in the calculation.
+        extended : bool
+            Use extended Limber approximation.
+        recalc_weyl : bool
+            Recalculate the Weyl potential power spectrum interpolator optimised for this particular calculation given the supplied inputs.
+
+        Returns
+        -------
+        RectBivariateSpline
+            Returns the resulting spline object of the mode coupling matrix. RectBivariateSpline(ells1,ells2) will produce matrix. RectBivariateSpline.ev(ells1,ells2) will calculate components of the matrix.
+        """
         from scipy.interpolate import RectBivariateSpline
-        ells, M = self.matrix(ellmax, Nell, Nchi, kmin, kmax, extended, recalc_weyl)
+        ells, M = self._matrix(ellmax, Nell, Nchi, kmin, kmax, extended, recalc_weyl)
         return RectBivariateSpline(ells, ells, M)

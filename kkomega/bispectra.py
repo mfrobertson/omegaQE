@@ -9,9 +9,21 @@ class Bispectra:
     """
 
     def __init__(self, M_spline=False, ellmax=10000, Nell=100):
+        """
+        Constructor.
+
+        Parameters
+        ----------
+        M_spline : bool
+            On instantiation, build a spline for estimation of the mode-coupling components whcih can be used for quicker calculation.
+        ellmax : int
+            The maximum moment describing the range over which the spline will be calculated.
+        Nell : int
+            Number of sample moments to use in the interpolation in each direction. Nell * Nell samples in total for the 2D interpolation.
+        """
         self._mode = Modecoupling()
         if M_spline:
-            self._spline = self._mode.spline(ellmax, Nell)
+            self._spline = self.build_M_spline(ellmax, Nell)
 
     def _triangle_dot_product(self, mag1, mag2, mag3):
         return (mag1**2 + mag2**2 - mag3**2)/2
@@ -48,6 +60,23 @@ class Bispectra:
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return 2*L12_dot*(L13_cross*M1 + L23_cross*M2)/(L1**2 * L2**2)
 
+    def build_M_spline(self, ellmax=10000, Nell=100):
+        """
+        Generates and stores/replaces the spline for the mode-coupling matrix.
+
+        Parameters
+        ----------
+        ellmax : int
+            The maximum moment describing the range over which the spline will be calculated.
+        Nell : int
+            Number of sample moments to use in the interpolation in each direction. Nell * Nell samples in total for the 2D interpolation.
+
+        Returns
+        -------
+        None
+        """
+        return self._mode.spline(ellmax, Nell)
+
     def get_convergence_bispectrum(self, L1, L2, L3, M_spline=False):
         """
         Calculates the convergence bispectrum 'kappa kappa kappa' to leading order in the Post Born correction.
@@ -60,13 +89,16 @@ class Bispectra:
             Magnitude(s) of the second multiple moment. Must be of same dimensions as other moments.
         L3 : int or float or ndarray
             Magnitude(s) of the third multiple moment. Must be of same dimensions as other moments.
-
+        M_spline : bool
+            Use an interpolated estimation of the mode-coupling matrix for quicker computation.
 
         Returns
         -------
         float or ndarray
             The bispectrum.
         """
+        if M_spline and self._spline is None:
+            self._spline = self.build_M_spline()
         b1 = self._kappa2_kappa1_kappa1(L1, L2, L3, M_spline)
         b2 = self._kappa1_kappa2_kappa1(L1, L2, L3, M_spline)
         b3 = self._kappa1_kappa1_kappa2(L1, L2, L3, M_spline)
@@ -84,11 +116,14 @@ class Bispectra:
             Magnitude(s) of the second multiple moment. Must be of same dimensions as other moments.
         L3 : int or float or ndarray
             Magnitude(s) of the third multiple moment. Must be of same dimensions as other moments.
-
+        M_spline : bool
+            Use an interpolated estimation of the mode-coupling matrix for quicker computation.
 
         Returns
         -------
         float or ndarray
             The bispectrum.
         """
+        if M_spline and self._spline is None:
+            self._spline = self.build_M_spline()
         return self._kappa1_kappa1_omega2(L1, L2, L3, M_spline)

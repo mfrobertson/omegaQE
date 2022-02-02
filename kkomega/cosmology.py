@@ -25,6 +25,8 @@ class Cosmology:
             Comoving radial distance [Mpc]. Usually the one being integrated over.
         Chi2 : int or float
             Comiving radial distance [Mpc]. Usually the limit, and Chi2 > Chi1.
+        heaviside : bool
+            Perform a Heaviside step where Chi1 > Chi2. 
 
         Returns
         -------
@@ -39,7 +41,24 @@ class Cosmology:
         return win
 
 
-    def heaviside(self, arr, min, max):
+    def rectangular_pulse_steps(self, arr, min, max):
+        """
+        Produces the steps of a rectangular pulse function for given boundaries acting on the input array.
+
+        Parameters
+        ----------
+        arr : ndarray
+            Array for which the steps will be calculated.
+        min : int or float
+            Minimum boundary.
+        max : int or float
+            Maximum boundary.
+
+        Returns
+        -------
+        ndarray
+            The steps of same dimensions as the input array, containing the steps resulting from a rectangular pulse given the boundaries.
+        """
         step = np.ones(arr.shape)
         step[:] = 1
         step[arr < min] = 0
