@@ -8,7 +8,7 @@ class Bispectra:
 
     """
 
-    def __init__(self, M_spline=False, ellmax=10000, Nell=100):
+    def __init__(self, M_spline=False, ells_sample=None):
         """
         Constructor.
 
@@ -16,14 +16,12 @@ class Bispectra:
         ----------
         M_spline : bool
             On instantiation, build a spline for estimation of the mode-coupling components whcih can be used for quicker calculation.
-        ellmax : int
-            The maximum moment describing the range over which the spline will be calculated.
-        Nell : int
-            Number of sample moments to use in the interpolation in each direction. Nell * Nell samples in total for the 2D interpolation.
+        ells_sample : ndarray
+            1D array of the sample multipole moments that will used for generating the interpolator.
         """
         self._mode = Modecoupling()
         if M_spline:
-            self._spline = self.build_M_spline(ellmax, Nell)
+            self._spline = self.build_M_spline(ells_sample)
 
     def _triangle_dot_product(self, mag1, mag2, mag3):
         return (mag1**2 + mag2**2 - mag3**2)/2
@@ -60,22 +58,21 @@ class Bispectra:
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return 2*L12_dot*(L13_cross*M1 + L23_cross*M2)/(L1**2 * L2**2)
 
-    def build_M_spline(self, ellmax=10000, Nell=100):
+    def build_M_spline(self, ells_sample=None):
         """
         Generates and stores/replaces the spline for the mode-coupling matrix.
 
-        Parameters
-        ----------
-        ellmax : int
-            The maximum moment describing the range over which the spline will be calculated.
-        Nell : int
-            Number of sample moments to use in the interpolation in each direction. Nell * Nell samples in total for the 2D interpolation.
+        ells_sample: ndarray
+            1D array of the sample multipole moments that will used for generating the interpolator.
 
         Returns
         -------
-        None
+        RectBivariateSpline
+            Returns the resulting spline object of the mode coupling matrix. RectBivariateSpline(ells1,ells2) will produce matrix. RectBivariateSpline.ev(ells1,ells2) will calculate components of the matrix.
         """
-        return self._mode.spline(ellmax, Nell)
+        if ells_sample is None:
+            return self._mode.spline()
+        return self._mode.spline(ells_sample)
 
     def get_convergence_bispectrum(self, L1, L2, L3, M_spline=False):
         """

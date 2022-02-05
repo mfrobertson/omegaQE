@@ -49,7 +49,6 @@ class Modecoupling:
 
     def _components(self, ells1, ells2, Nchi, kmin, kmax, extended, recalc_weyl):
         zs, Chis, dChi, win = self._integral_prep(Nchi)
-        # zs = np.repeat(zs[np.newaxis, :], np.size(ells1), 0)
         Nells1 = np.size(ells1)
         ells1_vec = self._vectorise_ells(ells1, zs.ndim)
         zs = self._vectorise_zs(zs, Nells1)
@@ -58,23 +57,21 @@ class Modecoupling:
         if recalc_weyl:
             self.weyl_PK = self._powerspectra.weyl_PK
         if extended:
-            # ks = (ells1 +0.5)[:,None]*(1/Chis)
             ks = (ells1_vec + 0.5) / Chis
         else:
             ks = ells1_vec / Chis
-        step = self._cosmo.heaviside(ks, kmin, kmax)
+        step = self._cosmo.rectangular_pulse_steps(ks, kmin, kmax)
         weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=False, scaled=False)
         I = step * weyl_ps / Chis ** 2 * dChi * win ** 2 * Cl_kappa
         if extended:
             return I.sum(axis=1) * (ells1 + 0.5) ** 4
         return I.sum(axis=1) * ells1 ** 4
 
-    def _matrix(self, ellmax, Nell, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
-        ells2 = np.linspace(1, ellmax + 1, Nell)
-        M = np.ones((Nell, Nell))
-        for iii, ell1 in enumerate(ells2):
-            M[iii, :] = self._components(np.ones(Nell)*ell1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
-        return ells2, M
+    def _matrix(self, ells1, ells2, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
+        M = np.ones((np.size(ells1), np.size(ells2)))
+        for iii, ell1 in enumerate(ells1):
+            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
+        return M
 
     def components(self, ells1, ells2, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
@@ -104,16 +101,14 @@ class Modecoupling:
         """
         return self._components(ells1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
 
-    def spline(self, ellmax, Nell, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
+    def spline(self, ells_sample=None, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
         Produces 2D spline of the mode coupling matrix.
 
         Parameters
         ----------
-        ellmax : int
-            Maximim moment.
-        Nell : int
-            Number of sample moments to use in the interpolation in each direction. Nell * Nell samples in total for 2D interpolation.
+        ells_sample : ndarray
+            1D array of the sample multipole moments that will used for generating the interpolator.
         Nchi : int
             The number of steps in the integral during the calculation.
         kmin : int or float
@@ -131,5 +126,36 @@ class Modecoupling:
             Returns the resulting spline object of the mode coupling matrix. RectBivariateSpline(ells1,ells2) will produce matrix. RectBivariateSpline.ev(ells1,ells2) will calculate components of the matrix.
         """
         from scipy.interpolate import RectBivariateSpline
-        ells, M = self._matrix(ellmax, Nell, Nchi, kmin, kmax, extended, recalc_weyl)
-        return RectBivariateSpline(ells, ells, M)
+        if ells_sample is None:
+            ells_sample = self.generate_sample_ells()
+        M = self._matrix(ells_sample, ells_sample, Nchi, kmin, kmax, extended, recalc_weyl)
+        return RectBivariateSpline(ells_sample, ells_sample, M)
+
+    def generate_sample_ells(self, ellmax=10000, Nells=100):
+        """
+        Produces optimised sample of multipole moments for input into spline build.
+
+        Parameters
+        ----------
+        ellmax : int or float
+            The maximum multipole moment to be sampled during generation of the interpolator.
+        Nells : int
+            Number of sample multipole moments along one dimension. Total number of samples for the matrix will be Nells * Nells.
+
+        Returns
+        -------
+        ndarray
+            1D array of multipole momnets to be used as input for spline build.
+        """
+        if ellmax <= 400:
+            return np.linspace(1, 400, Nells)
+        if ellmax <= 1600:
+            ells_400 = np.linspace(1, 400, Nells // 2)
+            Nells_remaining = Nells - np.size(ells_400)
+            ells_remaining = np.linspace(401, ellmax, Nells_remaining)
+            return np.concatenate((ells_400, ells_remaining))
+        ells_400 = np.linspace(1, 400, Nells//3)
+        ells_1600 = np.linspace(401, 1600, Nells//3)
+        Nells_remaining = Nells - np.size(ells_400) - np.size(ells_1600)
+        ells_remaining = np.linspace(1601, ellmax, Nells_remaining)
+        return np.concatenate((ells_400, ells_1600, ells_remaining))
