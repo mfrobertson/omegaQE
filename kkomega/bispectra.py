@@ -56,7 +56,7 @@ class Bispectra:
         M1, M2, L12_dot = self._bispectra_prep(L1, L2, L3, M_spline)
         L13_cross = self._triangle_cross_product(L1, L3, L2)
         L23_cross = self._triangle_cross_product(L2, L3, L1)
-        return 2*L12_dot*(L13_cross*M1 + L23_cross*M2)/(L1**2 * L2**2)
+        return 2*L12_dot*(L13_cross*M1 - L23_cross*M2)/(L1**2 * L2**2)
 
     def build_M_spline(self, ells_sample=None):
         """
