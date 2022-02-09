@@ -101,14 +101,16 @@ class Modecoupling:
         """
         return self._components(ells1, ells2, Nchi, kmin, kmax, extended, recalc_weyl)
 
-    def spline(self, ells_sample=None, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
+    def spline(self, ells_sample=None, M_matrix=None, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
         Produces 2D spline of the mode coupling matrix.
 
         Parameters
         ----------
         ells_sample : ndarray
-            1D array of the sample multipole moments that will used for generating the interpolator.
+            1D array of sample multipole moments. If not M_matrix is supplied these will be used for generating the spline.
+        M_matrix : ndarray
+            2D array of the modecoupling matrix at calculated at the positions given by ells_sample.
         Nchi : int
             The number of steps in the integral during the calculation.
         kmin : int or float
@@ -126,6 +128,8 @@ class Modecoupling:
             Returns the resulting spline object of the mode coupling matrix. RectBivariateSpline(ells1,ells2) will produce matrix. RectBivariateSpline.ev(ells1,ells2) will calculate components of the matrix.
         """
         from scipy.interpolate import RectBivariateSpline
+        if ells_sample is not None and M_matrix is not None:
+            return RectBivariateSpline(ells_sample, ells_sample, M_matrix)
         if ells_sample is None:
             ells_sample = self.generate_sample_ells()
         M = self._matrix(ells_sample, ells_sample, Nchi, kmin, kmax, extended, recalc_weyl)

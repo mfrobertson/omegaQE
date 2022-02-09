@@ -8,7 +8,7 @@ class Bispectra:
 
     """
 
-    def __init__(self, M_spline=False, ells_sample=None):
+    def __init__(self, M_spline=False, ells_sample=None, M_matrix=None):
         """
         Constructor.
 
@@ -17,11 +17,13 @@ class Bispectra:
         M_spline : bool
             On instantiation, build a spline for estimation of the mode-coupling components whcih can be used for quicker calculation.
         ells_sample : ndarray
-            1D array of the sample multipole moments that will used for generating the interpolator.
+            1D array of sample multipole moments. If not M_matrix is supplied these will be used for generating the spline.
+        M_matrix : ndarray
+            2D array of the modecoupling matrix at calculated at the positions given by ells_sample.
         """
         self._mode = Modecoupling()
         if M_spline:
-            self._spline = self.build_M_spline(ells_sample)
+            self._spline = self.build_M_spline(ells_sample, M_matrix)
 
     def _triangle_dot_product(self, mag1, mag2, mag3):
         return (mag1**2 + mag2**2 - mag3**2)/2
@@ -58,18 +60,22 @@ class Bispectra:
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return 2*L12_dot*(L13_cross*M1 - L23_cross*M2)/(L1**2 * L2**2)
 
-    def build_M_spline(self, ells_sample=None):
+    def build_M_spline(self, ells_sample=None, M_matrix=None):
         """
         Generates and stores/replaces the spline for the mode-coupling matrix.
 
-        ells_sample: ndarray
-            1D array of the sample multipole moments that will used for generating the interpolator.
+        ells_sample : ndarray
+            1D array of sample multipole moments. If not M_matrix is supplied these will be used for generating the spline.
+        M_matrix : ndarray
+            2D array of the modecoupling matrix at calculated at the positions given by ells_sample.
 
         Returns
         -------
         RectBivariateSpline
             Returns the resulting spline object of the mode coupling matrix. RectBivariateSpline(ells1,ells2) will produce matrix. RectBivariateSpline.ev(ells1,ells2) will calculate components of the matrix.
         """
+        if ells_sample is not None and M_matrix is not None:
+            return self._mode.spline(ells_sample, M_matrix)
         if ells_sample is None:
             return self._mode.spline()
         return self._mode.spline(ells_sample)
