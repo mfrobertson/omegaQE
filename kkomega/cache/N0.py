@@ -1,7 +1,7 @@
 import lensit as li
 import os
 import sys
-import cache_tools as cache
+import tools
 
 
 def lensit_cache_dir_setup():
@@ -20,7 +20,7 @@ def main(exp, LDres, HDres, estimator):
 
     folder = '_N0'
     filename = f"N0_{exp}_{LDres}_{HDres}_{estimator}.npy"
-    cache.save_array(folder, filename, N0)
+    tools.save_array(folder, filename, N0)
 
 
 if __name__ == "__main__":

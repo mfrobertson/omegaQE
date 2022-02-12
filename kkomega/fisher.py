@@ -1,5 +1,7 @@
 import numpy as np
 from bispectra import Bispectra
+from powerspectra import Powerspectra
+from scipy.interpolate import InterpolatedUnivariateSpline
 
 class Fisher:
 
@@ -8,16 +10,6 @@ class Fisher:
         ells_sample = np.load(ell_file)
         M_matrix = np.load(M_file)
         self.bi = Bispectra(M_spline=True, ells_sample=ells_sample, M_matrix=M_matrix)
-
-    def _triangle_third_length(self, L1, L2, steps, Lmax):
-        Lmin = np.floor(np.abs(L1 - L2)) + 1
-        Lmax_triangle = np.ceil(L1 + L2)
-        if Lmax > Lmax_triangle:
-            Lmax = Lmax_triangle
-        return np.arange(Lmin, Lmax, steps, dtype=int)
-
-    def _L3_condensing_for_Fisher(self, L3s, Lmax):
-        return L3s[np.where(L3s <= Lmax)]
 
     def _get_N0_phi(self, ellmax):
         return self.N0[0][:ellmax + 1]
@@ -33,40 +25,91 @@ class Fisher:
         ells = np.arange(0, ellmax + 1)
         return self._get_N0_curl(ellmax) * 0.25 * (ells + 0.5) ** 4
 
-    def _interpolate_N0(self, N0):
+    def _replace_bad_Ls(self, N0):
         bad_Ls = np.where(N0 <= 0.)[0]
         for L in bad_Ls:
             if L > 1:
-                print(f"N0[{L}] = nan, replacing with mean of N[{L-1}] = {N0[L-1]} and N[{L+1}] = {N0[L+1]}")
+                #print(f"N0[{L}] = nan, replacing with mean of N[{L-1}] = {N0[L-1]} and N[{L+1}] = {N0[L+1]}")
                 N0[L] = 0.5 * (N0[L-1] + N0[L+1])
-        print("-------------------------------------")
+        #print("-------------------------------------")
         return N0
 
-    def convergence_rotation_bispectrum_SN(self, Lmax, dL=1, L3max=4000, f_sky=1):
-        N0_omega = self._interpolate_N0(self._get_N0_omega(L3max))
-        N0_kappa = self._interpolate_N0(self._get_N0_kappa(Lmax))
-        Ls = np.arange(2, Lmax + 1, dL)
+    def _get_Cl_kappa(self, ellmax):
+        power = Powerspectra()
+        ells = np.arange(0, ellmax + 1)
+        return power.get_kappa_ps(ells)
+
+    def _get_L3(self, L1, L2, theta):
+        return np.sqrt(L1**2 + L2**2 - (2*L1*L2*np.cos(theta)))
+
+    def _interpolate(self, arr):
+        ells_sample = np.arange(np.size(arr))
+        return InterpolatedUnivariateSpline(ells_sample, arr)
+
+    def get_convergence_rotation_bispectrum_Fisher(self, Lmax, dL=1, dTheta=0.3, L3max=4000, f_sky=1):
+        N0_omega_spline = self._interpolate(self._get_N0_omega(L3max))
+        N0_kappa = self._replace_bad_Ls(self._get_N0_kappa(Lmax))
+        Cl_kappa = self._get_Cl_kappa(Lmax)
+        C = Cl_kappa + N0_kappa
         I = 0
+        thetas = np.arange(dTheta, np.pi + dTheta, dTheta, dtype=float)
+        w = np.ones(np.size(thetas))
+        Ls = np.arange(2, Lmax + 1, dL)
         for L1 in Ls:
             for L2 in Ls:
-                L3 = self._triangle_third_length(L1, L2, dL, L3max)
+                L3 = self._get_L3(L1, L2, thetas)
+                w[L3>L3max] = 0
                 bi_rot_conv = self.bi.get_convergence_rotation_bispectrum(L1, L2, L3, M_spline=True)
-                N_L1 = N0_kappa[L1]
-                N_L2 = N0_kappa[L2]
-                N_L3 = N0_omega[L3]
-                I += dL * np.sum((bi_rot_conv**2)/(N_L1*N_L2*N_L3))
+                I += 2 * 2 * np.pi * dL * dL * L1 * L2 * dTheta * np.dot(w, (bi_rot_conv ** 2) / (C[L1] * C[L2] * N0_omega_spline(L3)))
         return I*f_sky/((2*np.pi)**3)
 
-    def convergence_bispectrum_SN(self, Lmax, dL=1, L3max=4000, f_sky=1):
-        N0_kappa = self._interpolate_N0(self._get_N0_kappa(L3max))
-        Ls = np.arange(2, Lmax + 1, dL)
+    def get_convergence_bispectrum_Fisher(self, Lmax, dL=1, dTheta=0.3, L3max=4000, f_sky=1):
+        N0_kappa = self._replace_bad_Ls(self._get_N0_kappa(L3max))
+        Cl_kappa = self._get_Cl_kappa(L3max)
+        C = Cl_kappa + N0_kappa
+        C_spline = self._interpolate(C)
         I = 0
+        thetas = np.arange(dTheta, np.pi + dTheta, dTheta, dtype=float)
+        w = np.ones(np.size(thetas))
+        Ls = np.arange(2, Lmax + 1, dL)
         for L1 in Ls:
             for L2 in Ls:
-                L3 = self._triangle_third_length(L1, L2, dL, L3max)
+                L3 = self._get_L3(L1, L2, thetas)
+                w[L3 > L3max] = 0
                 bi_conv = self.bi.get_convergence_bispectrum(L1, L2, L3, M_spline=True)
-                N_L1 = N0_kappa[L1]
-                N_L2 = N0_kappa[L2]
-                N_L3 = N0_kappa[L3]
-                I += dL * np.sum((bi_conv ** 2) / (N_L1 * N_L2 * N_L3))
+                I += 2 * 2 * np.pi * dL * dL * L1 * L2 * np.dot(w, dTheta * (bi_conv ** 2) / (C[L1] * C[L2] * C_spline(L3)))
         return I * f_sky / (3 * (2 * np.pi) ** 3)
+
+    def get_convergence_rotation_bispectrum_Fisher2(self, Lmax, dL=1, dTheta=0.3, L3max=4000, f_sky=1):
+        N0_omega_spline = self._interpolate(self._get_N0_omega(L3max))
+        N0_kappa = self._replace_bad_Ls(self._get_N0_kappa(Lmax))
+        Cl_kappa = self._get_Cl_kappa(Lmax)
+        C = Cl_kappa + N0_kappa
+        I = 0
+        thetas = np.arange(dTheta, np.pi, dTheta, dtype=float)
+        w = np.ones(np.size(thetas))
+        Ls = np.arange(2, Lmax + 1, dL)
+        for iii, L1 in enumerate(Ls):
+            for L2 in Ls[iii:]:
+                L3 = self._get_L3(L1, L2, thetas)
+                w[L3>L3max] = 0
+                bi_rot_conv = self.bi.get_convergence_rotation_bispectrum(L1, L2, L3, M_spline=True)
+                I += 2 * 2 * np.pi * dL * dL * L1 * L2 * dTheta * np.dot(w, (bi_rot_conv ** 2) / (C[L1] * C[L2] * N0_omega_spline(L3)))
+        return I*f_sky/(4*np.pi**3)
+
+    def get_convergence_bispectrum_Fisher2(self, Lmax, dL=1, dTheta=0.3, L3max=4000, f_sky=1):
+        N0_kappa = self._replace_bad_Ls(self._get_N0_kappa(L3max))
+        Cl_kappa = self._get_Cl_kappa(L3max)
+        C = Cl_kappa + N0_kappa
+        C_spline = self._interpolate(C)
+        I = 0
+        thetas = np.arange(dTheta, np.pi, dTheta, dtype=float)
+        w = np.ones(np.size(thetas))
+        Ls = np.arange(2, Lmax + 1, dL)
+        for iii, L1 in enumerate(Ls):
+            for L2 in Ls[iii:]:
+                L3 = self._get_L3(L1, L2, thetas)
+                w[L3 > L3max] = 0
+                bi_conv = self.bi.get_convergence_bispectrum(L1, L2, L3, M_spline=True)
+                I += 2 * 2 * np.pi * dL * dL * L1 * L2 * np.dot(w, dTheta * (bi_conv ** 2) / (C[L1] * C[L2] * C_spline(L3)))
+        return I * f_sky / (12 * np.pi ** 3)
