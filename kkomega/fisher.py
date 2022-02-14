@@ -2,6 +2,7 @@ import numpy as np
 from bispectra import Bispectra
 from powerspectra import Powerspectra
 from scipy.interpolate import InterpolatedUnivariateSpline
+import copy
 
 class Fisher:
 
@@ -53,12 +54,14 @@ class Fisher:
         C = Cl_kappa + N0_kappa
         I = 0
         thetas = np.arange(dTheta, np.pi + dTheta, dTheta, dtype=float)
-        w = np.ones(np.size(thetas))
+        weights = np.ones(np.size(thetas))
         Ls = np.arange(2, Lmax + 1, dL)
         for L1 in Ls:
             for L2 in Ls:
                 L3 = self._get_L3(L1, L2, thetas)
+                w = copy.deepcopy(weights)
                 w[L3>L3max] = 0
+                w[L3 < 2] = 0
                 bi_rot_conv = self.bi.get_convergence_rotation_bispectrum(L1, L2, L3, M_spline=True)
                 I += 2 * 2 * np.pi * dL * dL * L1 * L2 * dTheta * np.dot(w, (bi_rot_conv ** 2) / (C[L1] * C[L2] * N0_omega_spline(L3)))
         return I*f_sky/((2*np.pi)**3)
@@ -70,12 +73,14 @@ class Fisher:
         C_spline = self._interpolate(C)
         I = 0
         thetas = np.arange(dTheta, np.pi + dTheta, dTheta, dtype=float)
-        w = np.ones(np.size(thetas))
+        weights = np.ones(np.size(thetas))
         Ls = np.arange(2, Lmax + 1, dL)
         for L1 in Ls:
             for L2 in Ls:
                 L3 = self._get_L3(L1, L2, thetas)
+                w = copy.deepcopy(weights)
                 w[L3 > L3max] = 0
+                w[L3 < 2] = 0
                 bi_conv = self.bi.get_convergence_bispectrum(L1, L2, L3, M_spline=True)
                 I += 2 * 2 * np.pi * dL * dL * L1 * L2 * np.dot(w, dTheta * (bi_conv ** 2) / (C[L1] * C[L2] * C_spline(L3)))
         return I * f_sky / (3 * (2 * np.pi) ** 3)
@@ -87,15 +92,19 @@ class Fisher:
         C = Cl_kappa + N0_kappa
         I = 0
         thetas = np.arange(dTheta, np.pi, dTheta, dtype=float)
-        w = np.ones(np.size(thetas))
+        weights = np.ones(np.size(thetas))
         Ls = np.arange(2, Lmax + 1, dL)
         for iii, L1 in enumerate(Ls):
             for L2 in Ls[iii:]:
                 L3 = self._get_L3(L1, L2, thetas)
-                w[L3>L3max] = 0
+                w = copy.deepcopy(weights)
+                if L1 == L2:
+                    w[:] = 0.5
+                w[L3 > L3max] = 0
+                w[L3 < 2] = 0
                 bi_rot_conv = self.bi.get_convergence_rotation_bispectrum(L1, L2, L3, M_spline=True)
-                I += 2 * 2 * np.pi * dL * dL * L1 * L2 * dTheta * np.dot(w, (bi_rot_conv ** 2) / (C[L1] * C[L2] * N0_omega_spline(L3)))
-        return I*f_sky/(4*np.pi**3)
+                I += 2 * 2 * 2 * np.pi *dL * dL * L1 * L2 * dTheta * np.dot(w, (bi_rot_conv ** 2) / (C[L1] * C[L2] * N0_omega_spline(L3)))
+        return I*f_sky/((2*np.pi)**3)
 
     def get_convergence_bispectrum_Fisher2(self, Lmax, dL=1, dTheta=0.3, L3max=4000, f_sky=1):
         N0_kappa = self._replace_bad_Ls(self._get_N0_kappa(L3max))
@@ -104,12 +113,16 @@ class Fisher:
         C_spline = self._interpolate(C)
         I = 0
         thetas = np.arange(dTheta, np.pi, dTheta, dtype=float)
-        w = np.ones(np.size(thetas))
+        weights = np.ones(np.size(thetas))
         Ls = np.arange(2, Lmax + 1, dL)
         for iii, L1 in enumerate(Ls):
             for L2 in Ls[iii:]:
                 L3 = self._get_L3(L1, L2, thetas)
+                w = copy.deepcopy(weights)
+                if L1 == L2:
+                    w[:] = 0.5
                 w[L3 > L3max] = 0
+                w[L3 < 2] = 0
                 bi_conv = self.bi.get_convergence_bispectrum(L1, L2, L3, M_spline=True)
                 I += 2 * 2 * np.pi * dL * dL * L1 * L2 * np.dot(w, dTheta * (bi_conv ** 2) / (C[L1] * C[L2] * C_spline(L3)))
         return I * f_sky / (12 * np.pi ** 3)
