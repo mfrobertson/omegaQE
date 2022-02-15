@@ -10,8 +10,9 @@ def lensit_cache_dir_setup():
 
 
 def get_N0(exp, LDres, HDres, estimator):
+    print(f"Getting Noise from experiment {exp} at resolution LDres={LDres}, HDres={HDres} for QE={estimator}")
     isocov = li.get_isocov(exp, LDres, HDres)
-    return isocov.get_N0cls('TQU', isocov.lib_skyalm)
+    return isocov.get_N0cls(estimator, isocov.lib_skyalm)
 
 
 def main(exp, LDres, HDres, estimator):
@@ -20,6 +21,7 @@ def main(exp, LDres, HDres, estimator):
 
     folder = '_N0'
     filename = f"N0_{exp}_{LDres}_{HDres}_{estimator}.npy"
+    print(f"Saving {filename} in {folder}")
     tools.save_array(folder, filename, N0)
 
 
