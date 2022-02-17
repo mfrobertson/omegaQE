@@ -97,7 +97,7 @@ class Powerspectra:
             Chi_max = self._cosmo.z_to_Chi(zmax)
         Chis = np.linspace(Chi_min, Chi_max, Nchi)[1:]
         dChi = Chis[1] - Chis[0]
-        window = self._cosmo.window(Chis, Chi_max)
+        window = self._cosmo.window(Chis, self._cosmo.get_chi_star())
         Nells = np.size(ells)
         ells = self._vectorise_ells(ells, Chis.ndim)
         zs = self._vectorise_zs(Chis, Nells)

@@ -1,17 +1,20 @@
 import camb
 import numpy as np
+import os
+from cache import tools
 
 class Cosmology:
     """
-    Container for useful cosmological functionality.
+    Container for useful cosmological functionality. All CAMB functionality is initialised with parameters from Lensit.
     """
 
     def __init__(self):
         """
         Constructor.
         """
-        self._pars = camb.CAMBparams()
-        self._pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122)
+        dir_current = os.path.dirname(os.path.realpath(__file__))
+        sep = tools.getFileSep()
+        self._pars = camb.read_ini(rf"{dir_current}{sep}data{sep}Lensit_fiducial_flatsky_params.ini")
         self._results = camb.get_background(self._pars)
 
 
@@ -152,7 +155,7 @@ class Cosmology:
             Returns a RectBivariateSpline PK object.
         """
         if zmax is None:
-            zmax = self.eta_to_z(self.get_eta0() - self.get_chi_star())
+            zmax = self.eta_to_z(self.get_eta0() - self.get_chi_star()) + 100
         if kmax is None:
             kmax = 100
         PK_weyl = camb.get_matter_power_interpolator(self._pars, hubble_units=False, zmin=0, zmax=zmax, kmax=kmax,

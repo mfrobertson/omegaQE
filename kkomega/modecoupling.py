@@ -37,21 +37,20 @@ class Modecoupling:
         if ndim == 2:
             return np.repeat(zs[np.newaxis, :, :], Nells, 0)
 
-    def _integral_prep(self, Nchi, zmax):
+    def _integral_prep(self, Nchi, zmin, zmax):
+        Chi_min = self._cosmo.z_to_Chi(zmin)
         if zmax is not None:
             Chi_max = self._cosmo.z_to_Chi(zmax)
         else:
             Chi_max = self._cosmo.get_chi_star()
-        Chis = np.linspace(0, Chi_max, Nchi)
+        Chis = np.linspace(Chi_min, Chi_max, Nchi)[1:]
         dChi = Chis[1] - Chis[0]
         zs = self._cosmo.Chi_to_z(Chis)
-        zs = zs[1:]
-        Chis = Chis[1:]
-        window = self._cosmo.window(Chis, Chi_max)
+        window = self._cosmo.window(Chis, self._cosmo.get_chi_star())
         return zs, Chis, dChi, window
 
-    def _components(self, ells1, ells2, Nchi, kmin, kmax, zmax, extended, recalc_weyl):
-        zs, Chis, dChi, win = self._integral_prep(Nchi, zmax)
+    def _components(self, ells1, ells2, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl):
+        zs, Chis, dChi, win = self._integral_prep(Nchi, zmin, zmax)
         Nells1 = np.size(ells1)
         ells1_vec = self._vectorise_ells(ells1, zs.ndim)
         zs = self._vectorise_zs(zs, Nells1)
@@ -70,13 +69,13 @@ class Modecoupling:
             return I.sum(axis=1) * (ells1 + 0.5) ** 4
         return I.sum(axis=1) * ells1 ** 4
 
-    def _matrix(self, ells1, ells2, Nchi, kmin, kmax, zmax, extended, recalc_weyl):
+    def _matrix(self, ells1, ells2, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl):
         M = np.ones((np.size(ells1), np.size(ells2)))
         for iii, ell1 in enumerate(ells1):
-            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, Nchi, kmin, kmax, zmax, extended, recalc_weyl)
+            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
         return M
 
-    def components(self, ells1, ells2, Nchi=100, kmin=0, kmax=100, zmax=None, extended=True, recalc_weyl=False):
+    def components(self, ells1, ells2, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_weyl=False):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
 
@@ -102,9 +101,9 @@ class Modecoupling:
         ndarray
             1D array of the matrix components at [ells, ells2].
         """
-        return self._components(ells1, ells2, Nchi, kmin, kmax, zmax, extended, recalc_weyl)
+        return self._components(ells1, ells2, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
 
-    def spline(self, ells_sample=None, M_matrix=None, Nchi=100, kmin=0, kmax=100, zmax=None, extended=True, recalc_weyl=False):
+    def spline(self, ells_sample=None, M_matrix=None, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_weyl=False):
         """
         Produces 2D spline of the mode coupling matrix.
 
@@ -135,7 +134,7 @@ class Modecoupling:
             return RectBivariateSpline(ells_sample, ells_sample, M_matrix)
         if ells_sample is None:
             ells_sample = self.generate_sample_ells()
-        M = self._matrix(ells_sample, ells_sample, Nchi, kmin, kmax, zmax, extended, recalc_weyl)
+        M = self._matrix(ells_sample, ells_sample, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
         return RectBivariateSpline(ells_sample, ells_sample, M)
 
     def generate_sample_ells(self, ellmax=10000, Nells=100):
