@@ -32,15 +32,17 @@ class Bispectra:
         s = (mag1 + mag2 + mag3)/2
         return 2 * np.sqrt(s*(s-mag1)*(s-mag2)*(s-mag3))
 
-    def _bispectra_prep(self, L1, L2, L3, M_spline, zmin, zmax):
+    def _bispectra_prep(self, L1, L2, L3=None, M_spline=False, zmin=0, zmax=None):
         if M_spline:
             M1 = self._spline.ev(L1, L2)
             M2 = self._spline.ev(L2, L1)
         else:
             M1 = self._mode.components(L1, L2, zmin=zmin, zmax=zmax)
             M2 = self._mode.components(L2, L1, zmin=zmin, zmax=zmax)
-        L12_dot = self._triangle_dot_product(L1, L2, L3)
-        return M1, M2, L12_dot
+        if L3 is not None:
+            L12_dot = self._triangle_dot_product(L1, L2, L3)
+            return M1, M2, L12_dot
+        return M1, M2
 
     def _kappa1_kappa1_kappa2(self, L1, L2, L3, M_spline, zmin, zmax):
         M1, M2, L12_dot = self._bispectra_prep(L1, L2, L3, M_spline, zmin, zmax)
@@ -59,6 +61,10 @@ class Bispectra:
         L13_cross = self._triangle_cross_product(L1, L3, L2)
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return 2*L12_dot*(L13_cross*M1 - L23_cross*M2)/(L1**2 * L2**2)
+
+    def _kappa1_kappa1_omega2_angle(self, L1, L2, theta, M_spline, zmin, zmax):
+        M1, M2 = self._bispectra_prep(L1, L2, None, M_spline, zmin, zmax)
+        return np.sin(2 * theta) * (M1 - M2)
 
     def build_M_spline(self, ells_sample=None, M_matrix=None, zmin=0, zmax=None):
         """
@@ -109,7 +115,7 @@ class Bispectra:
         b3 = self._kappa1_kappa1_kappa2(L1, L2, L3, M_spline, zmin, zmax)
         return b1 + b2 + b3
 
-    def get_convergence_rotation_bispectrum(self, L1, L2, L3, M_spline=False, zmin=0, zmax=None):
+    def get_convergence_rotation_bispectrum(self, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None):
         """
         Calculates the convergence-rotation bispectrum 'kappa kappa omega' for the leading order rotation term.
 
@@ -131,4 +137,6 @@ class Bispectra:
         """
         if M_spline and self._spline is None:
             self._spline = self.build_M_spline()
-        return self._kappa1_kappa1_omega2(L1, L2, L3, M_spline, zmin, zmax)
+        if L3 is not None:
+            return self._kappa1_kappa1_omega2(L1, L2, L3, M_spline, zmin, zmax)
+        return self._kappa1_kappa1_omega2_angle(L1, L2, theta, M_spline, zmin, zmax)
