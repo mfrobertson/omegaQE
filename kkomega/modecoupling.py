@@ -91,6 +91,10 @@ class Modecoupling:
             Minimum wavelength to be used in the calculation.
         kmax : int or float
             Minimum wavelength to be used in the calculation.
+        zmin :
+
+        zmax :
+
         extended : bool
             Use extended Limber approximation.
         recalc_weyl : bool
@@ -119,6 +123,10 @@ class Modecoupling:
             Minimum wavelength to be used in the calculation.
         kmax : int or float
             Minimum wavelength to be used in the calculation.
+        zmin :
+
+        zmax :
+
         extended : bool
             Use extended Limber approximation.
         recalc_weyl : bool

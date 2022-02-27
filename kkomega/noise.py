@@ -2,8 +2,28 @@ import numpy as np
 
 
 class Noise:
+    """
+    Handles CMB experimental noise.
+
+    Attributes
+    ----------
+    N0 : ndarray
+        2D array containing the convergence noise in row 0, and the curl noise in row 1. (The same format as Lensit)
+    offset : int
+        Essentially the value of ellmin of the N0 array.
+    """
 
     def __init__(self, file, offset=0):
+        """
+        Constructor
+
+        Parameters
+        ----------
+        file : str
+            Path to .npy file containing the convergence noise in row 0, and the curl noise in row 1. (The same format as Lensit)
+        offset : int
+            Essentially the value of ellmin in the file. If the first column represents ell = 2, set offset to 2.
+        """
         self.N0 = np.load(file)
         self.offset = offset
 
@@ -30,16 +50,23 @@ class Noise:
 
     def get_N0(self, typ="phi", ellmax=4000, tidy=False, ell_factors=False):
         """
+        Extracts the noise from the supplied input file.
 
         Parameters
         ----------
-        typ
-        ellmax
-        tidy
+        typ : str
+            'phi' or 'curl'.
+        ellmax : int
+            The maximum multipole moment to return.
+        tidy : bool
+            Whether to interpole values less than zero.
+        ell_factors : bool
+            Whether to multiply the noise by (1/4)(ell + 1/2)^4
 
         Returns
         -------
-
+        ndarray
+            1D array of the noise up to desired ellmax, the indices representing ell - offset.
         """
         if typ == "phi":
             if ell_factors:

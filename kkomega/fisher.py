@@ -7,17 +7,34 @@ import copy
 
 class Fisher:
     """
+    Calculates the Fisher information of post born lensing bispectra.
 
+    Attributes
+    ----------
+    noise : Noise
+        Instance of Noise, instantiated with the supplied  N0_file and offset.
+    N0_ell_factors : bool
+        Whether the noise is required to be multiplied by (1/4)(ell + 1/2)^4 during calculations. Note this should be False if the noise supplied is already in the form of N_kappa and N_omega.
+    bi : Bispetrum
+        Instance of Bispectrum, this instantiation will spline the supplied modecoupling matrix.
     """
 
-    def __init__(self, N0_file, ell_file, M_file, N0_offset=0, N0_ell_factors=True):
+    def __init__(self, ell_file, M_file, N0_file, N0_offset=0, N0_ell_factors=True):
         """
+        Constructor
 
         Parameters
         ----------
-        N0_file
-        ell_file
-        M_file
+        ell_file : str
+            Path to .npy file containing multipole moments for the correcponding mode coupling matrix.
+        M_file : str
+            Path to .npy file containing mode coupling matrix.
+        N0_file : str
+            Path to .npy file containing the convergence noise in row 0, and the curl noise in row 1. (The same format as Lensit)
+        N0_offset : int
+            Essentially the value of ellmin in the N0_file. If the first column represents ell = 2, set offset to 2.
+        N0_ell_factors : bool
+            Whether to multiply the noise by (1/4)(ell + 1/2)^4
         """
         self.noise = Noise(N0_file, N0_offset)
         self.N0_ell_factors = N0_ell_factors
@@ -197,19 +214,29 @@ class Fisher:
 
     def get_convergence_rotation_bispectrum_Fisher(self, Lmax=4000, dL=1, Ls=None, Ntheta=10, f_sky=1, arr=False, include_N0_kappa="both"):
         """
+        Computes the Fisher information for the kappa kappa omega bispectrum.
 
         Parameters
         ----------
-        Lmax
-        dL
-        Ls
-        Ntheta
-        f_sky
-        arr
+        Lmax : int
+            Maximum multipole moment limit in the integrals.
+        dL : int
+            Step size of the integrals.
+        Ls : ndarray
+            Alternative to supplying Lmax and dL; 1D array of the sampled multipole moments wished to be integrated over.
+        Ntheta : int
+            Number of steps to use in the angular integral.
+        f_sky : int or float
+            Fraction of sky.
+        arr : bool
+            Return an array of Fisher value for each step in the first integral.
+        include_N0_kappa : bool
+            'both' = keep both convegence noise terms, 'one' = keep only one convergnce noise term, 'none' = no convergence noise terms.
 
         Returns
         -------
-
+            float or 2-tuple
+        If arr = False then the Fisher information is returned as float. If True then a 1D array of multipole moment steps are returned as the first part of the tuple, the second is the corresponding Fisher values at each moment.
         """
         if Ls is None:
             if arr:
@@ -221,19 +248,29 @@ class Fisher:
 
     def get_convergence_bispectrum_Fisher(self, Lmax=4000, dL=1, Ls=None, Ntheta=10, f_sky=1, arr=False, include_N0_kappa="both"):
         """
+        Computes the Fisher information for the leading order post born kappa kappa kappa bispectrum.
 
         Parameters
         ----------
-        Lmax
-        dL
-        Ls
-        Ntheta
-        f_sky
-        arr
+        Lmax : int
+            Maximum multipole moment limit in the integrals.
+        dL : int
+            Step size of the integrals.
+        Ls : ndarray
+            Alternative to supplying Lmax and dL; 1D array of the sampled multipole moments wished to be integrated over.
+        Ntheta : int
+            Number of steps to use in the angular integral.
+        f_sky : int or float
+            Fraction of sky.
+        arr : bool
+            Return an array of Fisher value for each step in the first integral.
+        include_N0_kappa : bool
+            'both' = keep both convegence noise terms, 'one' = keep only one convergnce noise term, 'none' = no convergence noise terms.
 
         Returns
         -------
-
+            float or 2-tuple
+        If arr = False then the Fisher information is returned as float. If True then a 1D array of multipole moment steps are returned as the first part of the tuple, the second is the corresponding Fisher values at each moment.
         """
         if Ls is None:
             if arr:
