@@ -1,5 +1,6 @@
 import numpy as np
 from cosmology import Cosmology
+from scipy.interpolate import InterpolatedUnivariateSpline
 
 class Powerspectra:
     """
@@ -229,6 +230,37 @@ class Powerspectra:
         if recalc_weyl:
             self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
         return self._Cl_kappa_2source(ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended)
+
+    def get_camb_omega_ps(self, ellmax=10000):
+        """
+
+        Parameters
+        ----------
+        ellmax
+
+        Returns
+        -------
+
+        """
+        return self._cosmo.get_omega_ps(2*ellmax)
+
+    def get_ps_variance(self, ells, Cl, N0, auto=True):
+        """
+
+        Parameters
+        ----------
+        ells
+        Cl
+        N0
+        auto
+
+        Returns
+        -------
+
+        """
+        if auto:
+            return 2 / (2 * ells + 1) * (Cl + N0) ** 2
+        return 2 / (2 * ells + 1) * (Cl**2 + (N0 * Cl))
 
 
 if __name__ == "__main__":

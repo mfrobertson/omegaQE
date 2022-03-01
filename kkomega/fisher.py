@@ -17,9 +17,10 @@ class Fisher:
         Whether the noise is required to be multiplied by (1/4)(ell + 1/2)^4 during calculations. Note this should be False if the noise supplied is already in the form of N_kappa and N_omega.
     bi : Bispetrum
         Instance of Bispectrum, this instantiation will spline the supplied modecoupling matrix.
+    power : Powerspectra
     """
 
-    def __init__(self, ell_file, M_file, N0_file, N0_offset=0, N0_ell_factors=True):
+    def __init__(self, N0_file, N0_offset=0, N0_ell_factors=True, ell_file=None, M_file=None):
         """
         Constructor
 
@@ -38,9 +39,11 @@ class Fisher:
         """
         self.noise = Noise(N0_file, N0_offset)
         self.N0_ell_factors = N0_ell_factors
-        ells_sample = np.load(ell_file)
-        M_matrix = np.load(M_file)
-        self.bi = Bispectra(M_spline=True, ells_sample=ells_sample, M_matrix=M_matrix)
+        if ell_file is not None and M_file is not None:
+            ells_sample = np.load(ell_file)
+            M_matrix = np.load(M_file)
+            self.bi = Bispectra(M_spline=True, ells_sample=ells_sample, M_matrix=M_matrix)
+        self.power = Powerspectra()
 
     def _replace_bad_Ls(self, N0):
         bad_Ls = np.where(N0 <= 0.)[0]
@@ -50,9 +53,8 @@ class Fisher:
         return N0
 
     def _get_Cl_kappa(self,ellmax):
-        power = Powerspectra()
         ells = np.arange(ellmax + 1)
-        return power.get_kappa_ps(ells)
+        return self.power.get_kappa_ps(ells)
 
     def _get_L3(self, L1, L2, theta):
         return np.sqrt(L1**2 + L2**2 - (2*L1*L2*np.cos(theta).astype("double"))).astype("double")
@@ -278,3 +280,22 @@ class Fisher:
             else:
                 return self._get_convergence_bispectrum_Fisher_vec(Lmax, dL, Ntheta, f_sky, include_N0_kappa)
         return self._get_convergence_bispectrum_Fisher_sample(Ls, Ntheta, f_sky, arr, include_N0_kappa)
+
+    def get_rotation_ps_Fisher(self, Lmax, f_sky=1, auto=True):
+        """
+
+        Parameters
+        ----------
+        Lmax
+        f_sky
+        auto
+
+        Returns
+        -------
+
+        """
+        ells, Cl = self.power.get_camb_omega_ps(Lmax)
+        Cl_spline = InterpolatedUnivariateSpline(ells, Cl)
+        ells = np.arange(2, Lmax + 1)
+        N0 = self.noise.get_N0("curl", Lmax, True, self.N0_ell_factors)
+        return f_sky * np.sum(Cl_spline(ells) ** 2 / self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto))

@@ -1,4 +1,5 @@
 import camb
+from camb import postborn
 import numpy as np
 import os
 from cache import tools
@@ -191,3 +192,16 @@ class Cosmology:
         if curly:
             return ps * k** 3 / (2 * np.pi ** 2)
         return ps
+
+    def get_omega_ps(self, ellmax=20000):
+        """
+
+        Parameters
+        ----------
+        ellmax
+
+        Returns
+        -------
+
+        """
+        return postborn.get_field_rotation_power(self._pars, lmax=ellmax)
