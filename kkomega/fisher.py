@@ -37,13 +37,19 @@ class Fisher:
         N0_ell_factors : bool
             Whether to multiply the noise by (1/4)(ell + 1/2)^4
         """
+        self._setup_noise(N0_file, N0_offset, N0_ell_factors)
+        self._setup_bispectra(ell_file, M_file)
+        self.power = Powerspectra()
+
+    def _setup_noise(self, N0_file, N0_offset, N0_ell_factors):
         self.noise = Noise(N0_file, N0_offset)
         self.N0_ell_factors = N0_ell_factors
+
+    def _setup_bispectra(self, ell_file, M_file):
         if ell_file is not None and M_file is not None:
             ells_sample = np.load(ell_file)
             M_matrix = np.load(M_file)
             self.bi = Bispectra(M_spline=True, ells_sample=ells_sample, M_matrix=M_matrix)
-        self.power = Powerspectra()
 
     def _replace_bad_Ls(self, N0):
         bad_Ls = np.where(N0 <= 0.)[0]
@@ -299,3 +305,32 @@ class Fisher:
         ells = np.arange(2, Lmax + 1)
         N0 = self.noise.get_N0("curl", Lmax, True, self.N0_ell_factors)
         return f_sky * np.sum(Cl_spline(ells) ** 2 / self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto))
+
+    def reset_noise(self, N0_file, N0_offset=0, N0_ell_factors=True):
+        """
+
+        Parameters
+        ----------
+        N0_file
+        N0_offset
+        N0_ell_factors
+
+        Returns
+        -------
+
+        """
+        self._setup_noise(N0_file, N0_offset, N0_ell_factors)
+
+    def reset_M_spline(self, ell_file, M_file):
+        """
+
+        Parameters
+        ----------
+        ell_file
+        M_file
+
+        Returns
+        -------
+
+        """
+        self._setup_bispectra(ell_file, M_file)
