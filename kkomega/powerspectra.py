@@ -1,6 +1,7 @@
 import numpy as np
 from cosmology import Cosmology
-from scipy.interpolate import InterpolatedUnivariateSpline
+import modecoupling
+from maths import Maths
 
 class Powerspectra:
     """
@@ -18,6 +19,7 @@ class Powerspectra:
 
         """
         self._cosmo = Cosmology()
+        self._maths = Maths()
         self.weyl_PK = self._get_weyl_PK()
 
     def _get_weyl_PK(self, ellmax=None, Nchi=None):
@@ -106,7 +108,7 @@ class Powerspectra:
             ks = (ells + 0.5)/Chis
         else:
             ks = ells/Chis
-        step = self._cosmo.rectangular_pulse_steps(ks, kmin, kmax)
+        step = self._maths.rectangular_pulse_steps(ks, kmin, kmax)
         weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=curly, scaled=False)
         return step, Chis, weyl_ps, dChi, window
 
@@ -124,17 +126,46 @@ class Powerspectra:
             return I.sum(axis=1) * (ells + 0.5)** 4
         return I.sum(axis=1) * ells** 4
 
-    def _Cl_kappa_2source(self, ells, Chi_source1, Chi_source2, Nchi, kmin=0, kmax=100, extended=True):
+    def _Cl_kappa_2source(self, ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended):
         zmax = self._cosmo.Chi_to_z(Chi_source1)
         step, Chis, weyl_ps, dChi, _ = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False)
         win1 = self._cosmo.window(Chis, Chi_source1)
-        win2 = self._cosmo.window(Chis, Chi_source2)
+        if Chi_source2 is not None:
+            win2 = self._cosmo.window(Chis, Chi_source2)
+        else:
+            win2 = win1
         I = step * weyl_ps / Chis ** 2 * dChi * win1 * win2
         if np.size(Chi_source1) > 1:
             ells = self._vectorise_ells(ells, 1)
         if extended:
             return I.sum(axis=1) * (ells + 0.5) ** 4
         return I.sum(axis=1) * ells ** 4
+
+    def _get_ell_prim_prim(self, ell, ell_prim, theta):
+        #Lprimprim = np.sqrt(ell ** 2 + Lprim ** 2 - (2 * ell * Lprim * np.cos(theta)))
+        ell_prim_prim = self._maths.cosine_rule(ell, ell_prim, theta)
+        #theta_prims = np.arcsin(ell * np.sin(theta) / Lprimprim)
+        theta_prim = self._maths.sine_rule(ell_prim_prim, theta, b=ell)
+        return theta_prim, ell_prim_prim
+
+    def _get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta):
+        mode = modecoupling.Modecoupling()
+        ells_sample = np.load(ell_file)
+        M = np.load(M_file)
+        M_spline = mode.spline(ells_sample, M)
+        dTheta = np.pi / Ntheta
+        thetas = np.arange(dTheta, np.pi, dTheta, dtype=float)
+        Lmax = max(ell_prim_max, 2 * ells[-1])
+        dL = Lmax / Nell_prim
+        Lprims = np.arange(2, Lmax + 1, dL)
+        ells = ells[:, None]
+        thetas = thetas[None, :]
+        I = 0
+        for Lprim in Lprims:
+            theta_prims, Lprimprims = self._get_ell_prim_prim(ells, Lprim, thetas)
+            I_tmp = 2 * Lprim * dL * dTheta * self._maths.cross(ells, Lprim, thetas) ** 2 * self._maths.dot(Lprim, Lprimprims,theta_prims) ** 2 / (Lprim ** 4 * Lprimprims ** 4) * M_spline.ev(Lprim, Lprimprims)
+            I += I_tmp.sum(axis=1)
+        return 4 * I / ((2 * np.pi) ** 2)
 
     def get_phi_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
@@ -200,7 +231,7 @@ class Powerspectra:
             self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
         return self._Cl_kappa(ells, Nchi, zmin, zmax, kmin, kmax, extended)
 
-    def get_kappa_ps_2source(self, ells, Chi_source1, Chi_source2, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
+    def get_kappa_ps_2source(self, ells, Chi_source1, Chi_source2=None, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
         Returns the Limber approximated lensing convergence power spectrum for two source planes.
 
@@ -210,8 +241,8 @@ class Powerspectra:
             Multipole moments at which to calculate the power spectrum.
         Chi_source1 : int or float or ndarray
             Comoving radial distance(s) of the first source plane(s) [Mpc]. Will be used for the first window function, and as the integral limit.
-        Chi_source2 : int or float
-            Comoving radial distance of the second source plane [Mpc]. Will be used for the second window function.
+        Chi_source2 : None or int or float
+            Comoving radial distance of the second source plane [Mpc]. Will be used for the second window function. If None, source plabe 1 will be used.
         Nchi : int
             Number of steps in the integral over Chi.
         kmin : int or float
@@ -231,7 +262,25 @@ class Powerspectra:
             self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
         return self._Cl_kappa_2source(ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended)
 
-    def get_camb_omega_ps(self, ellmax=10000):
+    def get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max=8000, Nell_prim=2000, Ntheta=100):
+        """
+
+        Parameters
+        ----------
+        ells
+        ell_file
+        M_file
+        ell_prim_max
+        Nell_prim
+        Ntheta
+
+        Returns
+        -------
+
+        """
+        return self._get_postborn_omega_ps(ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta)
+
+    def get_camb_postborn_omega_ps(self, ellmax=10000):
         """
 
         Parameters
@@ -242,7 +291,7 @@ class Powerspectra:
         -------
 
         """
-        return self._cosmo.get_omega_ps(2*ellmax)
+        return self._cosmo.get_postborn_omega_ps(2*ellmax)
 
     def get_ps_variance(self, ells, Cl, N0, auto=True):
         """
@@ -260,7 +309,7 @@ class Powerspectra:
         """
         if auto:
             return 2 / (2 * ells + 1) * (Cl + N0) ** 2
-        return 2 / (2 * ells + 1) * (Cl**2 + (N0 * Cl))
+        return 2 / (2 * ells + 1) * (Cl**2 + 0.5*(N0 * Cl))
 
 
 if __name__ == "__main__":

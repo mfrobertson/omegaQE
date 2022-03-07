@@ -45,31 +45,6 @@ class Cosmology:
         return win
 
 
-    def rectangular_pulse_steps(self, arr, min, max):
-        """
-        Produces the steps of a rectangular pulse function for given boundaries acting on the input array.
-
-        Parameters
-        ----------
-        arr : ndarray
-            Array for which the steps will be calculated.
-        min : int or float
-            Minimum boundary.
-        max : int or float
-            Maximum boundary.
-
-        Returns
-        -------
-        ndarray
-            The steps of same dimensions as the input array, containing the steps resulting from a rectangular pulse given the boundaries.
-        """
-        step = np.ones(arr.shape)
-        step[:] = 1
-        step[arr < min] = 0
-        step[arr > max] = 0
-        return step
-
-
     def get_chi_star(self):
         """
 
@@ -193,7 +168,7 @@ class Cosmology:
             return ps * k** 3 / (2 * np.pi ** 2)
         return ps
 
-    def get_omega_ps(self, ellmax=20000):
+    def get_postborn_omega_ps(self, ellmax=20000):
         """
 
         Parameters

@@ -1,5 +1,6 @@
 from powerspectra import Powerspectra
 from cosmology import Cosmology
+from maths import Maths
 import numpy as np
 
 
@@ -20,6 +21,7 @@ class Modecoupling:
         """
         self._cosmo = Cosmology()
         self._powerspectra = Powerspectra()
+        self._maths = Maths()
         self.weyl_PK = self._powerspectra.weyl_PK
 
     def _vectorise_ells(self, ells, ndim):
@@ -49,12 +51,16 @@ class Modecoupling:
         window = self._cosmo.window(Chis, self._cosmo.get_chi_star())
         return zs, Chis, dChi, window
 
-    def _components(self, ells1, ells2, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl):
+    def _components(self, ells1, ells2, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl):
         zs, Chis, dChi, win = self._integral_prep(Nchi, zmin, zmax)
         Nells1 = np.size(ells1)
         ells1_vec = self._vectorise_ells(ells1, zs.ndim)
         zs = self._vectorise_zs(zs, Nells1)
-        Cl_kappa = self._powerspectra.get_kappa_ps_2source(ells2, Chis, self._cosmo.get_chi_star(),
+        if star:
+            Chi_source2 = self._cosmo.get_chi_star()
+        else:
+            Chi_source2 = None
+        Cl_kappa = self._powerspectra.get_kappa_ps_2source(ells2, Chis, Chi_source2,
                                                            recalc_weyl=recalc_weyl)
         if recalc_weyl:
             self.weyl_PK = self._powerspectra.weyl_PK
@@ -62,20 +68,20 @@ class Modecoupling:
             ks = (ells1_vec + 0.5) / Chis
         else:
             ks = ells1_vec / Chis
-        step = self._cosmo.rectangular_pulse_steps(ks, kmin, kmax)
+        step = self._maths.rectangular_pulse_steps(ks, kmin, kmax)
         weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=False, scaled=False)
         I = step * weyl_ps / Chis ** 2 * dChi * win ** 2 * Cl_kappa
         if extended:
             return I.sum(axis=1) * (ells1 + 0.5) ** 4
         return I.sum(axis=1) * ells1 ** 4
 
-    def _matrix(self, ells1, ells2, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl):
+    def _matrix(self, ells1, ells2, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl):
         M = np.ones((np.size(ells1), np.size(ells2)))
         for iii, ell1 in enumerate(ells1):
-            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
+            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
         return M
 
-    def components(self, ells1, ells2, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_weyl=False):
+    def components(self, ells1, ells2, star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_weyl=False):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
 
@@ -105,9 +111,9 @@ class Modecoupling:
         ndarray
             1D array of the matrix components at [ells, ells2].
         """
-        return self._components(ells1, ells2, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
+        return self._components(ells1, ells2, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
 
-    def spline(self, ells_sample=None, M_matrix=None, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_weyl=False):
+    def spline(self, ells_sample=None, M_matrix=None, star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_weyl=False):
         """
         Produces 2D spline of the mode coupling matrix.
 
@@ -142,7 +148,7 @@ class Modecoupling:
             return RectBivariateSpline(ells_sample, ells_sample, M_matrix)
         if ells_sample is None:
             ells_sample = self.generate_sample_ells()
-        M = self._matrix(ells_sample, ells_sample, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
+        M = self._matrix(ells_sample, ells_sample, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
         return RectBivariateSpline(ells_sample, ells_sample, M)
 
     def generate_sample_ells(self, ellmax=10000, Nells=100):

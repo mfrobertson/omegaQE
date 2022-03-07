@@ -45,8 +45,17 @@ class Fisher:
         self.noise = Noise(N0_file, N0_offset)
         self.N0_ell_factors = N0_ell_factors
 
+    def _files_match(self, ell_file, M_file):
+        if ell_file[:-8] == M_file[:-5]:
+            return True
+        return False
+
     def _setup_bispectra(self, ell_file, M_file):
         if ell_file is not None and M_file is not None:
+            if not self._files_match(ell_file, M_file):
+                print(f"ell_file: {ell_file} does not match M_file: {M_file}")
+                return
+            self.mode_path = M_file[:-5]
             ells_sample = np.load(ell_file)
             M_matrix = np.load(M_file)
             self.bi = Bispectra(M_spline=True, ells_sample=ells_sample, M_matrix=M_matrix)
@@ -287,7 +296,7 @@ class Fisher:
                 return self._get_convergence_bispectrum_Fisher_vec(Lmax, dL, Ntheta, f_sky, include_N0_kappa)
         return self._get_convergence_bispectrum_Fisher_sample(Ls, Ntheta, f_sky, arr, include_N0_kappa)
 
-    def get_rotation_ps_Fisher(self, Lmax, f_sky=1, auto=True):
+    def get_rotation_ps_Fisher(self, Lmax, f_sky=1, auto=True, camb=False):
         """
 
         Parameters
@@ -300,11 +309,16 @@ class Fisher:
         -------
 
         """
-        ells, Cl = self.power.get_camb_omega_ps(Lmax)
+        if camb:
+            ells, Cl = self.power.get_camb_postborn_omega_ps(Lmax)
+        else:
+            ells = np.arange(2, Lmax + 3, 50)
+            Cl = self.power.get_postborn_omega_ps(ells, self.mode_path+"ells.npy", self.mode_path+"M.npy")
         Cl_spline = InterpolatedUnivariateSpline(ells, Cl)
         ells = np.arange(2, Lmax + 1)
         N0 = self.noise.get_N0("curl", Lmax, True, self.N0_ell_factors)
-        return f_sky * np.sum(Cl_spline(ells) ** 2 / self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto))
+        var = self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto)
+        return f_sky * np.sum(Cl_spline(ells) ** 2 / var)
 
     def reset_noise(self, N0_file, N0_offset=0, N0_ell_factors=True):
         """

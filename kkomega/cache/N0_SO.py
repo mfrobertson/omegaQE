@@ -12,9 +12,6 @@ def get_N0(key1, key2, key3, field):
     df = pd.read_csv(N0_file, sep="\s+", header=None)
     return np.array(df[phi_index]), np.array(df[curl_index])
 
-def parse_boolean(string):
-    return string == "True" or string == "true"
-
 def main(projection, sensitivity, iterative, typ):
 
     if projection == "all":
@@ -47,6 +44,6 @@ if __name__ == "__main__":
         print("Must supply arguments: projection sensitivity iterative typ")
     projection = args[0]
     sensitivity = args[1]
-    iterative = parse_boolean(args[2])
+    iterative = tools.parse_boolean(args[2])
     typ = args[3]
     main(projection, sensitivity, iterative, typ)
