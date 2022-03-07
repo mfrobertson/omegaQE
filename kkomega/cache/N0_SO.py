@@ -12,7 +12,7 @@ def get_N0(key1, key2, key3, field):
     df = pd.read_csv(N0_file, sep="\s+", header=None)
     return np.array(df[phi_index]), np.array(df[curl_index])
 
-def main(projection, sensitivity, iterative, typ):
+def main(projection, sensitivity, iterative, field):
 
     if projection == "all":
         key1 = "deproj0"
@@ -25,10 +25,10 @@ def main(projection, sensitivity, iterative, typ):
     else:
         key3 = "qe"
 
-    N0 = get_N0(key1, key2, key3, typ)
+    N0 = get_N0(key1, key2, key3, field)
 
     folder = '_N0'
-    filename = f"N0_foreground_SO_{projection}_{sensitivity}_{key3}_{typ}.npy"
+    filename = f"N0_foreground_SO_{projection}_{sensitivity}_{key3}_{field}.npy"
     print(f"Saving {filename} in {folder}")
     tools.save_array(folder, filename, N0)
 
@@ -37,13 +37,13 @@ if __name__ == "__main__":
     # projection: all
     # sensitivity: base, goal
     # iterative: True, False
-    # typ: TT, TE, EE, TB, EB, Pol, MV
+    # field: TT, TE, EE, TB, EB, Pol, MV
 
     args = sys.argv[1:]
     if len(args) != 4:
-        print("Must supply arguments: projection sensitivity iterative typ")
+        print("Must supply arguments: projection sensitivity iterative field(s)")
     projection = args[0]
     sensitivity = args[1]
     iterative = tools.parse_boolean(args[2])
-    typ = args[3]
-    main(projection, sensitivity, iterative, typ)
+    field = args[3]
+    main(projection, sensitivity, iterative, field)
