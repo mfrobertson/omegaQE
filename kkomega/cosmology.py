@@ -3,6 +3,8 @@ from camb import postborn
 import numpy as np
 import os
 from cache import tools
+from scipy.stats import norm
+from maths import Maths
 
 class Cosmology:
     """
@@ -13,15 +15,16 @@ class Cosmology:
         """
         Constructor.
         """
+        self._maths = Maths()
         dir_current = os.path.dirname(os.path.realpath(__file__))
         sep = tools.getFileSep()
         self._pars = camb.read_ini(rf"{dir_current}{sep}data{sep}Lensit_fiducial_flatsky_params.ini")
         self._results = camb.get_background(self._pars)
 
 
-    def window(self, Chi1, Chi2, heaviside=True):
+    def cmb_lens_window(self, Chi1, Chi2, heaviside=True):
         """
-        Computes the Window function.
+        Computes the Window function for CMB lensing.
 
         Parameters
         ----------
@@ -41,9 +44,40 @@ class Cosmology:
         if np.size(Chi1) == 1 and heaviside and Chi1 > Chi2:
             return 0
         if heaviside:
-            win[win < 0] = 0
+            # win[win < 0] = 0
+            return self._maths.heaviside_steps(win) * win
         return win
 
+    def _gal_z_distribution(self, z):
+        z0 = 0.311
+        return 1/(2*z0) * (z/z0)**2 * np.exp(-z/z0)
+
+
+    def gal_cluster_window(self, Chi, heaviside=False, Chi_edge1=None, Chi_edge2=None):
+        """
+        1705.02332 equation 14 and B1
+        Parameters
+        ----------
+        Chi
+        heaviside
+        Chi_edge1
+        Chi_edge2
+
+        Returns
+        -------
+
+        """
+        z = self.Chi_to_z(Chi)
+        z0 = 0.311
+        n = self._gal_z_distribution(z)
+        b = 1 + 0.84*z
+        zs = np.linspace(0, 100, 2000)
+        dz = zs[1] - zs[0]
+        norm = np.sum(dz*self._gal_z_distribution(zs))
+        window = (n * b)/norm
+        if heaviside:
+            return self._maths.rectangular_pulse_steps(Chi, Chi_edge1, Chi_edge2) * window
+        return window
 
     def get_chi_star(self):
         """
@@ -97,7 +131,6 @@ class Cosmology:
         """
         return self._results.redshift_at_comoving_radial_distance(Chi)
 
-
     def z_to_Chi(self, z):
         """
 
@@ -113,17 +146,26 @@ class Cosmology:
         """
         return self._results.comoving_radial_distance(z)
 
+    def _get_ps_variables(self, typ):
+        weyl = "Weyl"
+        matter = "delta_tot"
+        if typ.lower() == "weyl":
+            return weyl, weyl
+        if typ.lower() == "matter":
+            return matter, matter
+        if typ.lower() == "weyl-matter" or typ.lower() == "matter-weyl":
+            return matter, weyl
 
-    def get_weyl_PK(self, kmax=None, zmax=None):
+    def get_matter_PK(self, kmax=None, zmax=None, typ="Weyl"):
         """
-        Gets an interpolated Weyl potential from CAMB.
+        Gets an interpolated matter power spectrum from CAMB.
 
         Parameters
         ----------
         kmax : int or float
-            Maximum wavenumber [Mpc] from which to extract the Weyl potential interpolator.
+            Maximum wavenumber [Mpc] from which to extract the matter power spectrum interpolator.
         zmax : int or float
-            Maximum redshift from which to extract the Weyl potential interpolator.
+            Maximum redshift from which to extract the matter power spectrum interpolator.
 
         Returns
         -------
@@ -134,19 +176,19 @@ class Cosmology:
             zmax = self.eta_to_z(self.get_eta0() - self.get_chi_star()) + 100
         if kmax is None:
             kmax = 100
-        PK_weyl = camb.get_matter_power_interpolator(self._pars, hubble_units=False, zmin=0, zmax=zmax, kmax=kmax,
-                                                     k_hunit=False, var1="Weyl", var2="Weyl")
-        return PK_weyl
+        var1, var2 = self._get_ps_variables(typ)
+        PK = camb.get_matter_power_interpolator(self._pars, hubble_units=False, zmin=0, zmax=zmax, kmax=kmax,
+                                                k_hunit=False, var1=var1, var2=var2)
+        return PK
 
-
-    def get_weyl_ps(self, weylPK, z, k, curly=False, scaled=True):
+    def get_matter_ps(self, PK, z, k, curly=False, weyl_scaled=True, typ="weyl"):
         """
-        Returns the Weyl power spectrum.
+        Returns the matter power spectrum spectrum.
 
         Parameters
         ----------
         weylPK : object
-            The weyl interpolator in the form of a RectBivariateSpline PK object.
+            The matter power spectrum interpolator in the form of a RectBivariateSpline PK object.
         z : int or float or ndarray
             Redshift.
         k : int or float or ndarray
@@ -161,11 +203,14 @@ class Cosmology:
         ndarray
             Weyl power spectrum calculated at specific points z and k.
         """
-        ps = weylPK.P(z, k, grid=False)
-        if not scaled:
-            ps *= k**-4
+        ps = PK.P(z, k, grid=False)
+        if not weyl_scaled:
+            if typ.lower() == "weyl":
+                ps *= k**-4
+            else:
+                ps *= k**-2
         if curly:
-            return ps * k** 3 / (2 * np.pi ** 2)
+            return ps * k ** 3 / (2 * np.pi ** 2)
         return ps
 
     def get_postborn_omega_ps(self, ellmax=20000):

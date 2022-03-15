@@ -24,11 +24,40 @@ class Maths:
         ndarray
             The steps of same dimensions as the input array, containing the steps resulting from a rectangular pulse given the boundaries.
         """
-        step = np.ones(arr.shape)
+        shape = np.shape(arr)
+        if shape == ():
+            shape = (1,)
+        step = np.ones(shape)
         step[:] = 1
         step[arr < min] = 0
         step[arr > max] = 0
         return step
+
+    def heaviside_steps(self, arr, x=0, reverse=False):
+        """
+        Produces the steps of a heaviside function for a given boundary acting on the input array.
+
+        Parameters
+        ----------
+        arr : ndarray
+            Array for which the steps will be calculated.
+        x : int or float
+            Step point.
+        reverse : bool
+            Reverse Heaviside function.
+
+        Returns
+        -------
+        ndarray
+            The steps of same dimensions as the input array, containing the steps resulting from the heaviside location of the step.
+        """
+        steps = np.ones(arr.shape)
+        steps[:] = 1
+        if reverse:
+            steps[arr > x] = 0
+        else:
+            steps[arr < x] = 0
+        return steps
 
     def cross(self, mag1, mag2, theta):
         """
@@ -95,4 +124,3 @@ class Maths:
         if b is not None:
             return np.arcsin(b*np.sin(theta_a)/a)
         return a*np.sin(theta_b)/np.sin(theta_a)
-

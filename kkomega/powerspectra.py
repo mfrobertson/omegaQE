@@ -1,7 +1,9 @@
 import numpy as np
 from cosmology import Cosmology
-import modecoupling
 from maths import Maths
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from modecoupling import Modecoupling
 
 class Powerspectra:
     """
@@ -20,16 +22,17 @@ class Powerspectra:
         """
         self._cosmo = Cosmology()
         self._maths = Maths()
-        self.weyl_PK = self._get_weyl_PK()
+        self.weyl_PK = self._get_PK("Weyl")
+        self.matter_weyl_PK = self._get_PK("matter-weyl")
 
-    def _get_weyl_PK(self, ellmax=None, Nchi=None):
+    def _get_PK(self, typ, ellmax=None, Nchi=None):
         if ellmax is None and Nchi is None:
-            return self._cosmo.get_weyl_PK()
+            return self._cosmo.get_matter_PK(typ=typ)
         zbuffer = 100
         zmax = self._cosmo.eta_to_z(self._cosmo.get_eta0() - self._cosmo.get_chi_star()) + zbuffer
         kbuffer = 10
         kmax = ellmax * Nchi/self._cosmo.get_chi_star() + kbuffer
-        return self._cosmo.get_weyl_PK(kmax, zmax)
+        return self._cosmo.get_matter_PK(kmax, zmax, typ=typ)
 
     def recalculate_weyl(self, ellmax,  Nchi):
         """
@@ -45,11 +48,23 @@ class Powerspectra:
         -------
         None
         """
-        zbuffer = 100
-        zmax = self._cosmo.eta_to_z(self._cosmo.get_eta0() - self._cosmo.get_chi_star()) + zbuffer
-        kbuffer = 10
-        kmax = ellmax * Nchi / self._cosmo.get_chi_star() + kbuffer
-        self.weyl_PK = self._cosmo.get_weyl_PK(kmax, zmax)
+        self.weyl_PK = self._get_PK("Weyl", ellmax, Nchi)
+
+    def recalculate_matter_weyl(self, ellmax,  Nchi):
+        """
+        Force recalculation of matter-Weyl power spectrum interpolator, self.matter_weyl_PK. This recalculation is optimised for power spectra calculations where ellmax and Nchi will be supplied as input parameters.
+
+        Parameters
+        ----------
+        ellmax : float or int
+            The maximum moment the power spectra will be calculated over.
+        Nchi : int
+            The number of steps in the integral during the power spectra calculation.
+        Returns
+        -------
+        None
+        """
+        self.matter_weyl_PK = self._get_PK("matter-weyl", ellmax, Nchi)
 
     def get_weyl_ps(self, z, k, curly=False, scaled=True):
         """
@@ -71,7 +86,27 @@ class Powerspectra:
         ndarray
             Weyl power spectrum calculated at specific points z and k.
         """
-        return self._cosmo.get_weyl_ps(self.weyl_PK, z, k, curly, scaled)
+        return self._cosmo.get_matter_ps(self.weyl_PK, z, k, curly, scaled)
+
+    def get_matter_weyl_ps(self, z, k, curly=False, scaled=True):
+        """
+        Returns the matter Weyl power spectrum, calculated from the interpolator self.matter_weyl_PK.
+
+        Parameters
+        ----------
+        z : int or float or ndarray
+            Redshift.
+        k : int or float or ndarray
+            [Mpc^-1].
+        curly : bool
+            Return dimensionless power spectrum.
+
+        Returns
+        -------
+        ndarray
+            Matter Weyl power spectrum calculated at specific points z and k.
+        """
+        return self._cosmo.get_matter_ps(self.matter_weyl_PK, z, k, curly, scaled, typ="matter-weyl")
 
     def _vectorise_ells(self, ells, ndim):
         if np.size(ells) == 1:
@@ -92,7 +127,7 @@ class Powerspectra:
                 zs[row] = self._cosmo.Chi_to_z(Chis[row])
             return np.repeat(zs[np.newaxis, :, :], Nells, 0)
 
-    def _integral_prep(self, ells, Nchi, zmin, zmax, kmin, kmax, extended, curly):
+    def _integral_prep(self, ells, Nchi, zmin, zmax, kmin, kmax, extended, curly, get_weyl_ps=True):
         Chi_min = self._cosmo.z_to_Chi(zmin)
         if zmax is None:
             Chi_max = self._cosmo.get_chi_star()
@@ -100,7 +135,7 @@ class Powerspectra:
             Chi_max = self._cosmo.z_to_Chi(zmax)
         Chis = np.linspace(Chi_min, Chi_max, Nchi)[1:]
         dChi = Chis[1] - Chis[0]
-        window = self._cosmo.window(Chis, self._cosmo.get_chi_star())
+        window = self._cosmo.cmb_lens_window(Chis, self._cosmo.get_chi_star())
         Nells = np.size(ells)
         ells = self._vectorise_ells(ells, Chis.ndim)
         zs = self._vectorise_zs(Chis, Nells)
@@ -109,8 +144,11 @@ class Powerspectra:
         else:
             ks = ells/Chis
         step = self._maths.rectangular_pulse_steps(ks, kmin, kmax)
-        weyl_ps = self._cosmo.get_weyl_ps(self.weyl_PK, zs, ks, curly=curly, scaled=False)
-        return step, Chis, weyl_ps, dChi, window
+        if get_weyl_ps:
+            matter_ps = self._cosmo.get_matter_ps(self.weyl_PK, zs, ks, curly=curly, weyl_scaled=False)
+        else:
+            matter_ps = self._cosmo.get_matter_ps(self.matter_weyl_PK, zs, ks, curly=curly, weyl_scaled=False, typ="matter-weyl")
+        return step, Chis, matter_ps, dChi, window
 
     def _Cl_phi(self, ells, Nchi, zmin=0, zmax=None, kmin=0, kmax=100, extended=False):
         step, Chis, weyl_ps, dChi, win = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=True)
@@ -129,9 +167,9 @@ class Powerspectra:
     def _Cl_kappa_2source(self, ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended):
         zmax = self._cosmo.Chi_to_z(Chi_source1)
         step, Chis, weyl_ps, dChi, _ = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False)
-        win1 = self._cosmo.window(Chis, Chi_source1)
+        win1 = self._cosmo.cmb_lens_window(Chis, Chi_source1)
         if Chi_source2 is not None:
-            win2 = self._cosmo.window(Chis, Chi_source2)
+            win2 = self._cosmo.cmb_lens_window(Chis, Chi_source2)
         else:
             win2 = win1
         I = step * weyl_ps / Chis ** 2 * dChi * win1 * win2
@@ -141,15 +179,21 @@ class Powerspectra:
             return I.sum(axis=1) * (ells + 0.5) ** 4
         return I.sum(axis=1) * ells ** 4
 
+    def _get_gal_kappa_ps(self, ells, Chi_source1, Nchi, kmin, kmax, extended):
+        zmax = self._cosmo.Chi_to_z(Chi_source1)
+        step, Chis, matter_weyl_ps, dChi, _ = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, get_weyl_ps=False)
+        win1 = self._cosmo.cmb_lens_window(Chis, Chi_source1)
+        win2 = self._cosmo.gal_cluster_window(Chis)
+        I = step * matter_weyl_ps / Chis ** 2 * dChi * win1 * win2
+        return I.sum(axis=1)
+
     def _get_ell_prim_prim(self, ell, ell_prim, theta):
-        #Lprimprim = np.sqrt(ell ** 2 + Lprim ** 2 - (2 * ell * Lprim * np.cos(theta)))
         ell_prim_prim = self._maths.cosine_rule(ell, ell_prim, theta)
-        #theta_prims = np.arcsin(ell * np.sin(theta) / Lprimprim)
         theta_prim = self._maths.sine_rule(ell_prim_prim, theta, b=ell)
         return theta_prim, ell_prim_prim
 
     def _get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta):
-        mode = modecoupling.Modecoupling()
+        mode = Modecoupling()
         ells_sample = np.load(ell_file)
         M = np.load(M_file)
         M_spline = mode.spline(ells_sample, M)
@@ -196,7 +240,7 @@ class Powerspectra:
             1D ndarray of the lensing potential power spectrum calculated at the supplied ell values.
         """
         if recalc_weyl:
-            self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
+            self.weyl_PK = self._get_PK("Weyl", np.max(ells), Nchi)
         return self._Cl_phi(ells, Nchi, zmin, zmax, kmin, kmax, extended)
 
     def get_kappa_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_weyl=False):
@@ -228,7 +272,7 @@ class Powerspectra:
             1D ndarray of the lensing convergence power spectrum calculated at the supplied ell values.
         """
         if recalc_weyl:
-            self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
+            self.weyl_PK = self._get_PK("Weyl", np.max(ells), Nchi)
         return self._Cl_kappa(ells, Nchi, zmin, zmax, kmin, kmax, extended)
 
     def get_kappa_ps_2source(self, ells, Chi_source1, Chi_source2=None, Nchi=100, kmin=0, kmax=100, extended=True, recalc_weyl=False):
@@ -259,8 +303,29 @@ class Powerspectra:
         ndarray
             2D ndarray of the lensing convergence power spectrum calculated at the supplied ell and Chi_source1 values. Indexed by [ell, Chi_source1].         """
         if recalc_weyl:
-            self.weyl_PK = self._get_weyl_PK(np.max(ells), Nchi)
+            self.weyl_PK = self._get_PK("Weyl", np.max(ells), Nchi)
         return self._Cl_kappa_2source(ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended)
+
+    def get_gal_kappa_ps(self, ells, Chi_source1, Nchi=100, kmin=0, kmax=100, extended=True, recalc_matter_weyl=False):
+        """
+
+        Parameters
+        ----------
+        ells
+        Chi_source1
+        Nchi
+        kmin
+        kmax
+        extended
+        recalc_matter_weyl
+
+        Returns
+        -------
+
+        """
+        if recalc_matter_weyl:
+            self.matter_weyl_PK = self._get_PK("matter-weyl", np.max(ells), Nchi)
+        return self._get_gal_kappa_ps(ells, Chi_source1, Nchi, kmin, kmax, extended)
 
     def get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max=8000, Nell_prim=2000, Ntheta=100):
         """

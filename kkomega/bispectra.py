@@ -140,3 +140,7 @@ class Bispectra:
         if L3 is not None:
             return self._kappa1_kappa1_omega2(L1, L2, L3, M_spline, zmin, zmax)
         return self._kappa1_kappa1_omega2_angle(L1, L2, theta, M_spline, zmin, zmax)
+
+    def get_gal_rotation_bispectrum(self): pass
+
+    def get_gal_convergence_rotation_bispectrum(self): pass
