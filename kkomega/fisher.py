@@ -85,7 +85,7 @@ class Fisher:
             C1 = Cl_kappa + N0_kappa
             C2 = Cl_kappa + N0_kappa
         elif include_N0_kappa == "one":
-            C1 = Cl_kappa + N0_kappa
+            C1 = Cl_kappa + (0.5 * N0_kappa)
             C2 = Cl_kappa
         else:
             C1 = Cl_kappa
