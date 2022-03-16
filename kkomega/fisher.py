@@ -2,6 +2,8 @@ import numpy as np
 from bispectra import Bispectra
 from powerspectra import Powerspectra
 from noise import Noise
+from maths import Maths
+from modecoupling import Modecoupling
 from scipy.interpolate import InterpolatedUnivariateSpline
 import copy
 
@@ -40,6 +42,7 @@ class Fisher:
         self._setup_noise(N0_file, N0_offset, N0_ell_factors)
         self._setup_bispectra(ell_file, M_file)
         self.power = Powerspectra()
+        self._maths = Maths()
 
     def _setup_noise(self, N0_file, N0_offset, N0_ell_factors):
         self.noise = Noise(N0_file, N0_offset)
@@ -296,6 +299,48 @@ class Fisher:
                 return self._get_convergence_bispectrum_Fisher_vec(Lmax, dL, Ntheta, f_sky, include_N0_kappa)
         return self._get_convergence_bispectrum_Fisher_sample(Ls, Ntheta, f_sky, arr, include_N0_kappa)
 
+    def _get_ell_prim_prim(self, ell, ell_prim, theta):
+        ell_prim_prim = self._maths.cosine_rule(ell, ell_prim, theta)
+        theta_prim = self._maths.sine_rule(ell_prim_prim, theta, b=ell)
+        return theta_prim, ell_prim_prim
+
+    def _get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta):
+        mode = Modecoupling()
+        ells_sample = np.load(ell_file)
+        M = np.load(M_file)
+        M_spline = mode.spline(ells_sample, M)
+        dTheta = np.pi / Ntheta
+        thetas = np.arange(dTheta, np.pi, dTheta, dtype=float)
+        Lmax = max(ell_prim_max, 2 * ells[-1])
+        dL = Lmax / Nell_prim
+        Lprims = np.arange(2, Lmax + 1, dL)
+        ells = ells[:, None]
+        thetas = thetas[None, :]
+        I = 0
+        for Lprim in Lprims:
+            theta_prims, Lprimprims = self._get_ell_prim_prim(ells, Lprim, thetas)
+            I_tmp = 2 * Lprim * dL * dTheta * self._maths.cross(ells, Lprim, thetas) ** 2 * self._maths.dot(Lprim, Lprimprims,theta_prims) ** 2 / (Lprim ** 4 * Lprimprims ** 4) * M_spline.ev(Lprim, Lprimprims)
+            I += I_tmp.sum(axis=1)
+        return 4 * I / ((2 * np.pi) ** 2)
+
+    def get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max=8000, Nell_prim=2000, Ntheta=100):
+        """
+
+        Parameters
+        ----------
+        ells
+        ell_file
+        M_file
+        ell_prim_max
+        Nell_prim
+        Ntheta
+
+        Returns
+        -------
+
+        """
+        return self._get_postborn_omega_ps(ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta)
+
     def get_rotation_ps_Fisher(self, Lmax, f_sky=1, auto=True, camb=False):
         """
 
@@ -313,7 +358,7 @@ class Fisher:
             ells, Cl = self.power.get_camb_postborn_omega_ps(Lmax)
         else:
             ells = np.arange(2, Lmax + 3, 50)
-            Cl = self.power.get_postborn_omega_ps(ells, self.mode_path+"ells.npy", self.mode_path+"M.npy")
+            Cl = self.get_postborn_omega_ps(ells, self.mode_path+"ells.npy", self.mode_path+"M.npy")
         Cl_spline = InterpolatedUnivariateSpline(ells, Cl)
         ells = np.arange(2, Lmax + 1)
         N0 = self.noise.get_N0("curl", Lmax, True, self.N0_ell_factors)

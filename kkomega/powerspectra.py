@@ -1,9 +1,6 @@
 import numpy as np
 from cosmology import Cosmology
 from maths import Maths
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from modecoupling import Modecoupling
 
 class Powerspectra:
     """
@@ -187,30 +184,6 @@ class Powerspectra:
         I = step * matter_weyl_ps / Chis ** 2 * dChi * win1 * win2
         return I.sum(axis=1)
 
-    def _get_ell_prim_prim(self, ell, ell_prim, theta):
-        ell_prim_prim = self._maths.cosine_rule(ell, ell_prim, theta)
-        theta_prim = self._maths.sine_rule(ell_prim_prim, theta, b=ell)
-        return theta_prim, ell_prim_prim
-
-    def _get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta):
-        mode = Modecoupling()
-        ells_sample = np.load(ell_file)
-        M = np.load(M_file)
-        M_spline = mode.spline(ells_sample, M)
-        dTheta = np.pi / Ntheta
-        thetas = np.arange(dTheta, np.pi, dTheta, dtype=float)
-        Lmax = max(ell_prim_max, 2 * ells[-1])
-        dL = Lmax / Nell_prim
-        Lprims = np.arange(2, Lmax + 1, dL)
-        ells = ells[:, None]
-        thetas = thetas[None, :]
-        I = 0
-        for Lprim in Lprims:
-            theta_prims, Lprimprims = self._get_ell_prim_prim(ells, Lprim, thetas)
-            I_tmp = 2 * Lprim * dL * dTheta * self._maths.cross(ells, Lprim, thetas) ** 2 * self._maths.dot(Lprim, Lprimprims,theta_prims) ** 2 / (Lprim ** 4 * Lprimprims ** 4) * M_spline.ev(Lprim, Lprimprims)
-            I += I_tmp.sum(axis=1)
-        return 4 * I / ((2 * np.pi) ** 2)
-
     def get_phi_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """
         Return the Limber approximated lensing potential power spectrum.
@@ -326,24 +299,6 @@ class Powerspectra:
         if recalc_matter_weyl:
             self.matter_weyl_PK = self._get_PK("matter-weyl", np.max(ells), Nchi)
         return self._get_gal_kappa_ps(ells, Chi_source1, Nchi, kmin, kmax, extended)
-
-    def get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max=8000, Nell_prim=2000, Ntheta=100):
-        """
-
-        Parameters
-        ----------
-        ells
-        ell_file
-        M_file
-        ell_prim_max
-        Nell_prim
-        Ntheta
-
-        Returns
-        -------
-
-        """
-        return self._get_postborn_omega_ps(ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta)
 
     def get_camb_postborn_omega_ps(self, ellmax=10000):
         """

@@ -102,6 +102,11 @@ class Modecoupling:
             M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl)
         return M
 
+    def _check_type(self, typ):
+        typs = ["kappa-kappa", "kappa-gal", "gal-kappa", "gal-gal"]
+        if typ not in typs:
+            raise ValueError(f"Modecoupling type {typ} not from accepted types: {typs}")
+
     def components(self, ells1, ells2, typ="kappa-kappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_PK=False):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
@@ -132,9 +137,10 @@ class Modecoupling:
         ndarray
             1D array of the matrix components at [ells, ells2].
         """
+        self._check_type(typ)
         return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_PK)
 
-    def spline(self, ells_sample=None, M_matrix=None, typ = "kappakappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_PK=False):
+    def spline(self, ells_sample=None, M_matrix=None, typ = "kappa-kappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_PK=False):
         """
         Produces 2D spline of the mode coupling matrix.
 
@@ -169,6 +175,7 @@ class Modecoupling:
             return RectBivariateSpline(ells_sample, ells_sample, M_matrix)
         if ells_sample is None:
             ells_sample = self.generate_sample_ells()
+        self._check_type(typ)
         M = self._matrix(ells_sample, ells_sample, typ, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_PK)
         return RectBivariateSpline(ells_sample, ells_sample, M)
 
