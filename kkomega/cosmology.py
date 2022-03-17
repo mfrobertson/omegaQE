@@ -233,7 +233,7 @@ class Cosmology:
         if not weyl_scaled:
             if typ.lower() == "weyl":
                 ps *= k**-4
-            else:
+            elif typ.lower() == "matter-weyl" or typ.lower() == "weyl-matter":
                 ps *= k**-2
         if curly:
             return ps * k ** 3 / (2 * np.pi ** 2)

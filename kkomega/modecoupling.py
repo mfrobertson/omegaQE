@@ -22,8 +22,8 @@ class Modecoupling:
         self._cosmo = Cosmology()
         self._powerspectra = Powerspectra()
         self._maths = Maths()
-        self.weyl_PK = self._powerspectra.weyl_PK
-        self.matter_weyl_PK = self._powerspectra.matter_weyl_PK
+        self.weyl_PK = self._cosmo.get_matter_PK(typ="weyl")
+        self.matter_weyl_PK = self._cosmo.get_matter_PK(typ="matter-weyl")
 
     def _vectorise_ells(self, ells, ndim):
         if np.size(ells) == 1:
@@ -60,9 +60,9 @@ class Modecoupling:
 
     def _get_ps(self, ells, Chis, Chi_source2, typ, recalc_PK):
         if typ == "kappa-kappa" or typ == "gal-kappa":
-            return self._powerspectra.get_kappa_ps_2source(ells, Chis, Chi_source2, recalc_weyl=recalc_PK)
+            return self._powerspectra.get_kappa_ps_2source(ells, Chis, Chi_source2, recalc_PK=recalc_PK)
         if typ == "gal-gal" or typ == "kappa-gal":
-            return self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_matter_weyl=recalc_PK)
+            return self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK)
 
     def _get_matter_ps(self, typ, zs, ks):
         if typ == "kappa-kappa" or typ == "kappa-gal":
