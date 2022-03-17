@@ -3,7 +3,6 @@ from camb import postborn
 import numpy as np
 import os
 from cache import tools
-from scipy.stats import norm
 from maths import Maths
 
 class Cosmology:
@@ -101,6 +100,12 @@ class Cosmology:
         return self._results.conformal_time(0)
 
 
+    def _eta_to_z_2dim(self, eta):
+        z = np.zeros(np.shape(eta))
+        for iii in range(np.shape(z)[0]):
+            z[iii] = self.eta_to_z(eta[iii])
+        return z
+
     def eta_to_z(self, eta):
         """
 
@@ -114,7 +119,16 @@ class Cosmology:
         float or ndarray
             The redhsift at the corresponding conformal time(s).
         """
+        if np.shape(eta) != ():
+            if eta.ndim == 2:
+                return self._eta_to_z_2dim(eta)
         return self._results.redshift_at_conformal_time(eta)
+
+    def _Chi_to_z_2dim(self, Chi):
+        z = np.zeros(np.shape(Chi))
+        for iii in range(np.shape(z)[0]):
+            z[iii] = self.Chi_to_z(Chi[iii])
+        return z
 
     def Chi_to_z(self, Chi):
         """
@@ -129,7 +143,16 @@ class Cosmology:
         float or ndarray
             The redhsift at the corresponding Chi(s).
         """
+        if np.shape(Chi) != ():
+            if Chi.ndim == 2:
+                return self._Chi_to_z_2dim(Chi)
         return self._results.redshift_at_comoving_radial_distance(Chi)
+
+    def _z_to_Chi_2dim(self, z):
+        Chi = np.zeros(np.shape(z))
+        for iii in range(np.shape(Chi)[0]):
+            Chi[iii] = self.z_to_Chi(z[iii])
+        return Chi
 
     def z_to_Chi(self, z):
         """
@@ -144,6 +167,9 @@ class Cosmology:
         float
             The comoving radial distance [Mpc] of the corresponding redshifts.
         """
+        if np.shape(z) != ():
+            if z.ndim == 2:
+                return self._z_to_Chi_2dim(z)
         return self._results.comoving_radial_distance(z)
 
     def _get_ps_variables(self, typ):
