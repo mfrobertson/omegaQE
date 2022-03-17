@@ -181,8 +181,12 @@ class Powerspectra:
         step, Chis, matter_weyl_ps, dChi, _ = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, get_weyl_ps=False)
         win1 = self._cosmo.cmb_lens_window(Chis, Chi_source1)
         win2 = self._cosmo.gal_cluster_window(Chis)
-        I = step * matter_weyl_ps / Chis ** 2 * dChi * win1 * win2
-        return I.sum(axis=1)
+        I = step * matter_weyl_ps / (Chis ** 2) * dChi * win1 * win2
+        if np.size(Chi_source1) > 1:
+            ells = self._vectorise_ells(ells, 1)
+        if extended:
+            return I.sum(axis=1) * (ells + 0.5) ** 2
+        return I.sum(axis=1) * ells ** 2
 
     def get_phi_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_weyl=False):
         """

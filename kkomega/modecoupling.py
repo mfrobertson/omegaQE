@@ -90,11 +90,13 @@ class Modecoupling:
         step = self._maths.rectangular_pulse_steps(ks, kmin, kmax)
         matter_ps = self._get_matter_ps(typ, zs, ks)
         I = step * matter_ps / Chis ** 2 * dChi * win1 * win2 * Cl_kappa
-        if typ == "kappa-kappa":
-            if extended:
-                return I.sum(axis=1) * (ells1 + 0.5) ** 4
-            return I.sum(axis=1) * ells1 ** 4
-        return I.sum(axis=1)
+        if typ == "kappa-kappa" or typ == "kappa-gal":
+            ell_power = 4
+        elif typ == "gal-gal" or typ == "gal-kappa":
+            ell_power = 2
+        if extended:
+            return I.sum(axis=1) * (ells1 + 0.5) ** ell_power
+        return I.sum(axis=1) * ells1 ** ell_power
 
     def _matrix(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_weyl):
         M = np.ones((np.size(ells1), np.size(ells2)))
@@ -106,6 +108,14 @@ class Modecoupling:
         typs = ["kappa-kappa", "kappa-gal", "gal-kappa", "gal-gal"]
         if typ not in typs:
             raise ValueError(f"Modecoupling type {typ} not from accepted types: {typs}")
+
+    def check_type(self, typ):
+        try:
+            self._check_type(typ)
+        except:
+            return False
+        return True
+
 
     def components(self, ells1, ells2, typ="kappa-kappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, extended=True, recalc_PK=False):
         """
