@@ -553,7 +553,7 @@ class Fisher:
         """
         return self._get_postborn_omega_ps(ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta)
 
-    def get_rotation_ps_Fisher(self, Lmax, ell_file, M_file, f_sky=1, auto=True, camb=False):
+    def get_rotation_ps_Fisher(self, Lmax, ell_file=None, M_file=None, f_sky=1, auto=True, camb=False):
         """
 
         Parameters
