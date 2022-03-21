@@ -1,4 +1,4 @@
-declare -a arr=("kappa-kappa","gal-gal" "gal-kappa" "kappa-gal")
+declare -a arr=("kappa-kappa" "gal-gal" "gal-kappa" "kappa-gal")
 for typ in "${arr[@]}"
 do
 echo "$typ"
