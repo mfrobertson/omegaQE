@@ -53,7 +53,7 @@ class Modecoupling:
         if typ == "kappa-kappa" or typ == "kappa-gal":
             win1 = win2 = cmb_lens_window
         elif typ == "gal-gal" or typ == "gal-kappa":
-            gal_cluster_window = self._cosmo.gal_cluster_window(Chis)
+            gal_cluster_window = self._cosmo.gal_cluster_window_Chi(Chis)
             win1 = cmb_lens_window
             win2 = gal_cluster_window
         return zs, Chis, dChi, win1, win2

@@ -158,10 +158,12 @@ class Powerspectra:
         return I.sum(axis=1) * ells ** 4
 
     def _Cl_gal_kappa(self, ells, Chi_source1, Nchi, kmin, kmax, extended):
+        if Chi_source1 is None:
+            Chi_source1 = self._cosmo.get_chi_star()
         zmax = self._cosmo.Chi_to_z(Chi_source1)
         step, Chis, matter_weyl_ps, dChi = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter-weyl")
         window1 = self._cosmo.cmb_lens_window(Chis, Chi_source1)
-        window2 = self._cosmo.gal_cluster_window(Chis)
+        window2 = self._cosmo.gal_cluster_window_Chi(Chis)
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
         if np.size(Chi_source1) > 1:
             ells = self._vectorise_ells(ells, 1)
@@ -171,7 +173,7 @@ class Powerspectra:
 
     def _Cl_gal(self, ells, Nchi, zmin, zmax, kmin, kmax, extended):
         step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window = self._cosmo.gal_cluster_window(Chis)
+        window = self._cosmo.gal_cluster_window_Chi(Chis)
         I = step * matter_ps/(Chis)**2 * dChi * window ** 2
         return I.sum(axis=1)
 
@@ -270,7 +272,7 @@ class Powerspectra:
             self.weyl_PK = self._get_PK("weyl", np.max(ells), Nchi)
         return self._Cl_kappa_2source(ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended)
 
-    def get_gal_kappa_ps(self, ells, Chi_source1, Nchi=100, kmin=0, kmax=100, extended=True, recalc_PK=False):
+    def get_gal_kappa_ps(self, ells, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=True, recalc_PK=False):
         """
 
         Parameters

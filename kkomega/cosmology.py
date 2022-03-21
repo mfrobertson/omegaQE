@@ -48,13 +48,34 @@ class Cosmology:
         return win
 
     def _gal_z_distribution(self, z):
+        # 1705.02332 equation 14 and B1
         z0 = 0.311
         return 1/(2*z0) * (z/z0)**2 * np.exp(-z/z0)
 
 
-    def gal_cluster_window(self, Chi, heaviside=False, Chi_edge1=None, Chi_edge2=None):
+    def gal_cluster_window_z(self, z):
         """
         1705.02332 equation 14 and B1
+        Parameters
+        ----------
+        z
+
+        Returns
+        -------
+
+        """
+        z0 = 0.311
+        dn_dz = self._gal_z_distribution(z)
+        b = 1 + 0.84*z
+        zs = np.linspace(0, 100, 2000)
+        dz = zs[1] - zs[0]
+        norm = np.sum(dz*self._gal_z_distribution(zs))
+        window = (dn_dz * b)/norm
+        return window
+
+    def gal_cluster_window_Chi(self, Chi, heaviside=False, Chi_edge1=None, Chi_edge2=None):
+        """
+        1906.08760 eq 2.7
         Parameters
         ----------
         Chi
@@ -67,13 +88,8 @@ class Cosmology:
 
         """
         z = self.Chi_to_z(Chi)
-        z0 = 0.311
-        n = self._gal_z_distribution(z)
-        b = 1 + 0.84*z
-        zs = np.linspace(0, 100, 2000)
-        dz = zs[1] - zs[0]
-        norm = np.sum(dz*self._gal_z_distribution(zs))
-        window = (n * b)/norm
+        window_z = self.gal_cluster_window_z(z)
+        window = window_z * self.get_hubble(z)
         if heaviside:
             return self._maths.rectangular_pulse_steps(Chi, Chi_edge1, Chi_edge2) * window
         return window
@@ -99,6 +115,17 @@ class Cosmology:
         """
         return self._results.conformal_time(0)
 
+    def _hubble_2dim(self, z):
+        H = np.zeros(np.shape(z))
+        for iii in range(np.shape(H)[0]):
+            H[iii] = self.get_hubble(z[iii])
+        return H
+
+    def get_hubble(self, z):
+        if np.shape(z) != ():
+            if z.ndim == 2:
+                return self._hubble_2dim(z)
+        return self._results.h_of_z(z)
 
     def _eta_to_z_2dim(self, eta):
         z = np.zeros(np.shape(eta))
