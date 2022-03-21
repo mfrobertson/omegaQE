@@ -3,6 +3,9 @@ import platform
 import numpy as np
 
 
+def path_exists(path):
+    return os.path.isdir(path)
+
 def getFileSep():
     if platform.system() == "Windows":
         return r"\\"
