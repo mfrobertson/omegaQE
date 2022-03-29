@@ -2,6 +2,7 @@ import camb
 from camb import postborn
 import numpy as np
 import os
+from scipy.constants import Planck, physical_constants, speed_of_light
 from cache import tools
 from maths import Maths
 
@@ -47,15 +48,24 @@ class Cosmology:
             return self._maths.heaviside_steps(win) * win
         return win
 
-    def _gal_z_distribution(self, z):
+    def _gal_z_LSST_distribution(self, z):
         # 1705.02332 equation 14 and B1
         z0 = 0.311
         return 1/(2*z0) * (z/z0)**2 * np.exp(-z/z0)
 
+    def _check_z_distr_typ(self, typ):
+        typs = ["LSST_gold"]
+        if typ not in typs:
+            raise ValueError(f"Redshift distribution type {typ} not from accepted types: {typs}")
 
-    def gal_cluster_window_z(self, z):
+    def _get_z_distr_func(self, typ):
+        self._check_z_distr_typ(typ)
+        if typ == "LSST_gold":
+            return self._gal_z_LSST_distribution
+
+    def gal_cluster_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None):
         """
-        1705.02332 equation 14 and B1
+        1705.02332 equation 14 and B1 (originally from 0912.0201)
         Parameters
         ----------
         z
@@ -65,15 +75,18 @@ class Cosmology:
 
         """
         z0 = 0.311
-        dn_dz = self._gal_z_distribution(z)
+        z_distr_func = self._get_z_distr_func(typ)
+        dn_dz = z_distr_func(z)
         b = 1 + 0.84*z
         zs = np.linspace(0, 100, 2000)
         dz = zs[1] - zs[0]
-        norm = np.sum(dz*self._gal_z_distribution(zs))
+        norm = np.sum(dz*z_distr_func(zs))
         window = (dn_dz * b)/norm
+        if zmin is not None and zmax is not None:
+            return self._maths.rectangular_pulse_steps(z, zmin, zmax) * window
         return window
 
-    def gal_cluster_window_Chi(self, Chi, heaviside=False, Chi_edge1=None, Chi_edge2=None):
+    def gal_cluster_window_Chi(self, Chi, typ="LSST_gold", zmin=None, zmax=None):
         """
         1906.08760 eq 2.7
         Parameters
@@ -88,11 +101,73 @@ class Cosmology:
 
         """
         z = self.Chi_to_z(Chi)
-        window_z = self.gal_cluster_window_z(z)
+        window_z = self.gal_cluster_window_z(z, typ, zmin, zmax)
         window = window_z * self.get_hubble(z)
-        if heaviside:
-            return self._maths.rectangular_pulse_steps(Chi, Chi_edge1, Chi_edge2) * window
         return window
+
+    def _SED_func(self, nu):
+        #"1801.05396 uses 857 GHz (pg. 2)"
+        #"1705.02332 uses 353 GHz (pg. 4)"
+        nu_prim = 4955e9  # according to 1705.02332 this is in 1502.01591
+        alpha = 2       # 0912.4315 and Planck 2015 appendix D
+        beta = 2
+        pow = beta + 3
+        T = 34
+        h = Planck
+        k_B = physical_constants["Boltzmann constant"][0]
+        thing = np.asarray((h*nu)/(k_B*T), dtype=np.double)
+        #small_nu = (np.exp(thing) - 1)**-1 * 2*Planck/(speed_of_light**2) * nu**pow
+        #big_nu = (np.exp(thing) - 1)**-1 * 2*Planck/(speed_of_light**2) * nu_prim**pow * (nu/nu_prim)**-alpha
+        small_nu = (np.exp(thing) - 1) ** -1 * 2 * nu ** pow
+        big_nu = (np.exp(thing) - 1)**-1 * nu_prim**pow * (nu/nu_prim)**-alpha
+        if np.shape(nu) != ():
+            w1 = np.zeros(np.shape(nu))
+            w2 = np.zeros(np.shape(nu))
+            w1[nu<=nu_prim] = 1
+            w2[nu>nu_prim] = 1
+            return w1*small_nu + w2*big_nu
+        if nu<=nu_prim:
+            return small_nu
+        return big_nu
+
+    def _cib_window_z_sSED(self, z, nu, normalise, bias=1):
+        #"1801.05396 uses 857 GHz (pg. 2)"
+        #"1705.02332 uses 353 GHz (pg. 4)"
+        """
+        1705.02332 equation 12 (originally from 0912.4315)
+        Parameters
+        ----------
+        z
+
+        Returns
+        -------
+
+        """
+        b_c = bias
+        Chi = self.z_to_Chi(z)
+        H = self.get_hubble(z)
+        z_c = 2
+        sig_z = 2
+        window = (Chi ** 2) / (H * (1 + z) ** 2) * np.exp(-((z - z_c) ** 2) / (2 * sig_z ** 2)) * self._SED_func(nu*(z + 1))
+        if not normalise:
+            return b_c*window
+        zs = np.linspace(0, 100, 2000)
+        dz = zs[1] - zs[0]
+        norm = np.sum(dz*self._cib_window_z_sSED(zs, nu, normalise=False))
+        return b_c*window/norm
+
+    def _cib_window_Chi_sSED(self, Chi, nu=857e9, normalise=True, bias=1):
+        #"1801.05396 uses 857 GHz (pg. 2)"
+        #"1705.02332 uses 353 GHz (pg. 4)"
+        z = self.Chi_to_z(Chi)
+        return self._cib_window_z_sSED(z, nu, normalise, bias) * self.get_hubble(z)
+
+    def cib_window_Chi(self, Chi, nu=857e9, normalise=True, bias=1):
+        return self._cib_window_Chi_sSED(Chi, nu, normalise, bias)
+
+    def cib_window_z(self, z, nu=857e9, normalise=True, bias=1):
+        return self._cib_window_z_sSED(z, nu, normalise, bias)
+
 
     def get_chi_star(self):
         """
