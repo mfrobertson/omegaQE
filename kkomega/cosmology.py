@@ -130,7 +130,7 @@ class Cosmology:
             return small_nu
         return big_nu
 
-    def _cib_window_z_sSED(self, z, nu, normalise, bias=1):
+    def _cib_window_z_sSED(self, z, nu, normalise, bias=1.):
         #"1801.05396 uses 857 GHz (pg. 2)"
         #"1705.02332 uses 353 GHz (pg. 4)"
         """
@@ -156,16 +156,16 @@ class Cosmology:
         norm = np.sum(dz*self._cib_window_z_sSED(zs, nu, normalise=False))
         return b_c*window/norm
 
-    def _cib_window_Chi_sSED(self, Chi, nu=857e9, normalise=True, bias=1):
+    def _cib_window_Chi_sSED(self, Chi, nu=857e9, normalise=True, bias=0.45):
         #"1801.05396 uses 857 GHz (pg. 2)"
         #"1705.02332 uses 353 GHz (pg. 4)"
         z = self.Chi_to_z(Chi)
         return self._cib_window_z_sSED(z, nu, normalise, bias) * self.get_hubble(z)
 
-    def cib_window_Chi(self, Chi, nu=857e9, normalise=True, bias=1):
+    def cib_window_Chi(self, Chi, nu=857e9, normalise=True, bias=0.45):
         return self._cib_window_Chi_sSED(Chi, nu, normalise, bias)
 
-    def cib_window_z(self, z, nu=857e9, normalise=True, bias=1):
+    def cib_window_z(self, z, nu=857e9, normalise=True, bias=0.45):
         return self._cib_window_z_sSED(z, nu, normalise, bias)
 
 

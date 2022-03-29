@@ -50,24 +50,30 @@ class Modecoupling:
         dChi = Chis[1] - Chis[0]
         zs = self._cosmo.Chi_to_z(Chis)
         cmb_lens_window = self._cosmo.cmb_lens_window(Chis, self._cosmo.get_chi_star())
-        if typ == "kappa-kappa" or typ == "kappa-gal":
+        if typ == "kappa-kappa" or typ == "kappa-gal" or typ == "kappa-cib":
             win1 = win2 = cmb_lens_window
         elif typ == "gal-gal" or typ == "gal-kappa":
             gal_cluster_window = self._cosmo.gal_cluster_window_Chi(Chis)
             win1 = cmb_lens_window
             win2 = gal_cluster_window
+        elif typ == "cib-cib" or typ == "cib-kappa":
+            cib_window = self._cosmo.cib_window_Chi(Chis)
+            win1 = cmb_lens_window
+            win2 = cib_window
         return zs, Chis, dChi, win1, win2
 
     def _get_ps(self, ells, Chis, Chi_source2, typ, recalc_PK):
-        if typ == "kappa-kappa" or typ == "gal-kappa":
+        if typ == "kappa-kappa" or typ == "gal-kappa" or typ == "cib-kappa":
             return self._powerspectra.get_kappa_ps_2source(ells, Chis, Chi_source2, recalc_PK=recalc_PK)
         if typ == "gal-gal" or typ == "kappa-gal":
             return self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK)
+        if typ == "cib-cib" or typ == "kappa-cib":
+            return self._powerspectra.get_cib_kappa_ps(ells, Chi_source1=Chis, recalc_PK=recalc_PK)
 
     def _get_matter_ps(self, typ, zs, ks):
-        if typ == "kappa-kappa" or typ == "kappa-gal":
+        if typ == "kappa-kappa" or typ == "kappa-gal" or typ == "kappa-cib":
             return self._cosmo.get_matter_ps(self.weyl_PK, zs, ks, curly=False, weyl_scaled=False)
-        if typ == "gal-gal" or typ == "gal-kappa":
+        if typ == "gal-gal" or typ == "gal-kappa" or typ == "cib-cib" or typ == "cib-kappa":
             return self._cosmo.get_matter_ps(self.matter_weyl_PK, zs, ks, curly=False, weyl_scaled=False, typ="matter-weyl")
 
     def _components(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, extended, recalc_PK):
@@ -90,9 +96,9 @@ class Modecoupling:
         step = self._maths.rectangular_pulse_steps(ks, kmin, kmax)
         matter_ps = self._get_matter_ps(typ, zs, ks)
         I = step * matter_ps / Chis ** 2 * dChi * win1 * win2 * Cl_kappa
-        if typ == "kappa-kappa" or typ == "kappa-gal":
+        if typ == "kappa-kappa" or typ == "kappa-gal" or typ == "kappa-cib":
             ell_power = 4
-        elif typ == "gal-gal" or typ == "gal-kappa":
+        elif typ == "gal-gal" or typ == "gal-kappa" or typ == "cib-cib" or typ == "cib-kappa":
             ell_power = 2
         if extended:
             return I.sum(axis=1) * (ells1 + 0.5) ** ell_power
@@ -105,7 +111,7 @@ class Modecoupling:
         return M
 
     def _check_type(self, typ):
-        typs = ["kappa-kappa", "kappa-gal", "gal-kappa", "gal-gal"]
+        typs = ["kappa-kappa", "kappa-gal", "gal-kappa", "gal-gal", "cib-cib", "cib-kappa", "kappa-cib"]
         if typ not in typs:
             raise ValueError(f"Modecoupling type {typ} not from accepted types: {typs}")
 

@@ -345,7 +345,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_gal(ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin, gal_win_zmax, extended)
 
-    def get_cib_kappa_ps(self, ells, nu, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=True, bias=1, recalc_PK=False):
+    def get_cib_kappa_ps(self, ells, nu=857e9, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=True, bias=1, recalc_PK=False):
         """
 
         Parameters
@@ -366,7 +366,7 @@ class Powerspectra:
             self.matter_weyl_PK = self._get_PK("matter-weyl", np.max(ells), Nchi)
         return self._Cl_cib_kappa(ells, nu, Chi_source1, Nchi, kmin, kmax, extended, bias)
 
-    def get_cib_ps(self, ells, nu, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, bias=1, recalc_PK=False):
+    def get_cib_ps(self, ells, nu=857e9, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, bias=1, recalc_PK=False):
         """
 
 
