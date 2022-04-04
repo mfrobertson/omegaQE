@@ -108,6 +108,28 @@ class Fisher:
         ells = np.arange(ellmax + 1)
         return self.power.get_cib_kappa_ps(ells)
 
+    def _get_Cl_cib_gal(self,ellmax):
+        ells = np.arange(ellmax + 1)
+        return self.power.get_cib_kappa_ps(ells)
+
+    def _get_Cl(self, typ, ellmax):
+        if typ == "kk":
+            N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+            return self._get_Cl_kappa(ellmax) + N0_kappa
+        elif typ == "gk" or typ == "kg":
+            return self._get_Cl_gal_kappa(ellmax)
+        elif typ == "gg":
+            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
+            return self._get_Cl_gal(ellmax) + N0_gal
+        elif typ == "Ik" or typ == "kI":
+            return self._get_Cl_cib_kappa(ellmax)
+        elif typ == "II":
+            N0_gal = 0
+            return self._get_Cl_cib(ellmax) + N0_gal
+        elif typ == "Ig" or typ == "gI":
+            return self._get_Cl_cib_gal(ellmax)
+
+
     def _get_L3(self, L1, L2, theta):
         return np.sqrt(L1**2 + L2**2 - (2*L1*L2*np.cos(theta).astype("double"))).astype("double")
 
@@ -174,12 +196,23 @@ class Fisher:
             N0_kappa = self.noise.get_N0("phi", Lmax, tidy=True, ell_factors=self.N0_ell_factors)
             C1 = Cl_cib + N_cib
             C2 = Cl_kappa + N0_kappa
+        elif typ == "cib_gal_rot":
+            Cl_gal = self._get_Cl_gal(Lmax)
+            N0_gal = self.noise.get_gal_shot_N(ellmax=Lmax)
+            C1 = Cl_cib + N_cib
+            C2 = Cl_gal + N0_gal
         if all_splines:
             C1_spline = self._interpolate(C1)
             C2_spline = self._interpolate(C2)
             return C1_spline, C2_spline, C3_spline
         return C1, C2, C3_spline
 
+    def _get_optimal_Ns(self, Lmax, typ):
+        N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, ell_factors=self.N0_ell_factors))
+        C3_spline = N0_omega_spline
+        C1 = self._get_Cl(typ[0]+typ[2], Lmax)
+        C2 = self._get_Cl(typ[1]+typ[3], Lmax)
+        return C1, C2, C3_spline
 
     def _get_thetas(self, Ntheta):
         dTheta = np.pi / Ntheta
@@ -191,8 +224,10 @@ class Fisher:
             C1, C2, C3_spline = self._get_cmb_Ns(Lmax, typ, include_N0_kappa)
         elif typ == "gal_rot" or typ == "gal_conv_rot":
             C1, C2, C3_spline = self._get_gal_Ns(Lmax, typ)
-        elif typ == "cib_rot" or typ == "cib_conv_rot":
+        elif typ == "cib_rot" or typ == "cib_conv_rot" or typ == "cib_gal_rot":
             C1, C2, C3_spline = self._get_cib_Ns(Lmax, typ)
+        elif typ[:3] == "opt":
+            C1, C2, C3_spline = self._get_optimal_Ns(Lmax, typ[4:])
         thetas, dTheta = self._get_thetas(Ntheta)
         Ls = np.arange(2, Lmax + 1, dL)
         L3 = self._get_L3(Ls[:, None], Ls[None, :], thetas[:, None, None])
@@ -202,18 +237,24 @@ class Fisher:
         return Ls, L3, dTheta, w, C1, C2, C3_spline
 
     def _get_bi(self, typ):
-        if typ == "conv_rot":
+        if typ == "conv_rot" or typ == "kkw":
             return self.bi.get_convergence_rotation_bispectrum
         if typ == "conv":
             return self.bi.get_convergence_bispectrum
-        elif typ == "gal_rot":
+        elif typ == "gal_rot" or typ == "ggw":
             return self.bi.get_gal_rotation_bispectrum
-        elif typ == "gal_conv_rot":
+        elif typ == "gal_conv_rot" or typ == "gkw" or typ == "kgw":
             return self.bi.get_gal_convergence_rotation_bispectrum
-        elif typ == "cib_rot":
+        elif typ == "cib_rot" or typ == "IIw":
             return self.bi.get_cib_rotation_bispectrum
-        elif typ == "cib_conv_rot":
+        elif typ == "cib_conv_rot" or typ == "Ikw" or typ == "kIw":
             return self.bi.get_cib_convergence_rotation_bispectrum
+        elif typ == "cib_gal_rot" or typ == "Igw" or typ == "gIw":
+            return self.bi.get_cib_gal_rotation_bispectrum
+        elif typ[:3] == "opt":
+            bi1 = self._get_bi(typ[4:6]+"w")
+            bi2 = self._get_bi(typ[6:]+"w")
+            return bi1, bi2
 
     def _get_factor(self, typ, method):
         if typ == "conv_rot":
@@ -246,22 +287,24 @@ class Fisher:
                 return 2
             elif method == "arr":
                 return 2
+        elif typ == "cib_gal_rot":
+            if method == "vec":
+                return 2
+            elif method == "arr":
+                return 2
 
     def _get_denom(self, typ, C1, C2, C3, Ls, L3, Lmax):
-        if typ == "conv_rot":
-            return C1[None, Ls, None] * C2[None, None, Ls] * C3(L3)
-        if typ == "conv":
-            return C1[None, Ls, None] * C2[None, None, Ls] * C3(L3)
-        elif typ == "gal_rot":
+        if typ == "conv_rot" or typ == "conv" or typ == "gal_rot" or typ == "cib_rot":
             return C1[None, Ls, None] * C2[None, None, Ls] * C3(L3)
         elif typ == "gal_conv_rot":
             Cl_gal_kappa = self._get_Cl_gal_kappa(Lmax)
             return ((C1[None, Ls, None] * C2[None, None, Ls]) + (Cl_gal_kappa[None, Ls, None] * Cl_gal_kappa[None, None, Ls])) * C3(L3)
-        elif typ == "cib_rot":
-            return C1[None, Ls, None] * C2[None, None, Ls] * C3(L3)
         elif typ == "cib_conv_rot":
             Cl_cib_kappa = self._get_Cl_cib_kappa(Lmax)
             return ((C1[None, Ls, None] * C2[None, None, Ls]) + (Cl_cib_kappa[None, Ls, None] * Cl_cib_kappa[None, None, Ls])) * C3(L3)
+        elif typ == "cib_gal_rot":
+            Cl_cib_gal = self._get_Cl_cib_gal(Lmax)
+            return ((C1[None, Ls, None] * C2[None, None, Ls]) + (Cl_cib_gal[None, Ls, None] * Cl_cib_gal[None, None, Ls])) * C3(L3)
 
     def _get_bispectrum_Fisher_vec(self, typ, Lmax, dL, Ntheta, f_sky, include_N0_kappa):
         Ls, L3, dTheta, w, C1, C2, C3_spline = self._integral_prep_vec(Lmax, dL, Ntheta, typ, include_N0_kappa)
@@ -270,6 +313,33 @@ class Fisher:
         I = 2 * 2 * np.pi * dL * dL * np.sum(Ls[None, :, None] * Ls[None, None, :] * dTheta * w * (bi(Ls[:, None], Ls[None, :], L3, M_spline=True) ** 2) / denom)
         factor = self._get_factor(typ, method="vec")
         return factor * I * f_sky / ((2 * np.pi) ** 3)
+
+    def _get_optimal_bispectrum_Fisher_element_vec(self, typ, Lmax, dL, Ntheta, f_sky):
+        Ls, L3, dTheta, w, C1, C2, C3_spline = self._integral_prep_vec(Lmax, dL, Ntheta, typ)
+        print(typ)
+        bi1, bi2 = self._get_bi(typ)
+        denom = C1[None, Ls, None] * C2[None, None, Ls] * C3_spline(L3)
+        I = 2 * 2 * np.pi * dL * dL * np.sum(Ls[None, :, None] * Ls[None, None, :] * dTheta * w * (bi1(Ls[:, None], Ls[None, :], L3, M_spline=True) * bi2(Ls[:, None], Ls[None, :], L3, M_spline=True) ) / denom)
+        return I * f_sky / ((2 * np.pi) ** 3)
+
+    def _get_optimal_bispectrum_Fisher(self, typs, Lmax, dL, Ntheta, f_sky):
+        typs = np.char.array(typs)
+        all_combos = typs[:, None] + typs[None, :]
+        upper_matrix_flat = np.triu(all_combos).flatten()
+        combos = upper_matrix_flat[upper_matrix_flat != '']
+        Ncombos = np.size(combos)
+        F = 0
+        for iii in np.arange(Ncombos):
+            for jjj in np.arange(iii, Ncombos):
+                typ = "opt_" + combos[iii] + combos[jjj]
+                F_tmp = self._get_optimal_bispectrum_Fisher_element_vec(typ, Lmax, dL, Ntheta, f_sky)
+                print(F_tmp)
+                if combos[iii] == combos[jjj]:
+                    factor = 1
+                else:
+                    factor = np.size(typs)
+                F += factor * F_tmp
+        return F
 
     # def _get_convergence_rotation_bispectrum_Fisher_vec(self, Lmax, dL, Ntheta, f_sky, include_N0_kappa):
     #     Ls, L3, dTheta, w, C1, C2, N3_spline = self._integral_prep_vec(Lmax, dL, Ntheta, "conv_rot", include_N0_kappa)
@@ -303,7 +373,7 @@ class Fisher:
             C1_spline, C2_spline, C3_spline = self._get_cmb_Ns(Lmax, typ, include_N0_kappa, all_splines=True)
         elif typ == "gal_rot" or typ == "gal_conv_rot":
             C1_spline, C2_spline, C3_spline = self._get_gal_Ns(Lmax, typ, all_splines=True)
-        elif typ == "cib_rot" or typ == "cib_conv_rot":
+        elif typ == "cib_rot" or typ == "cib_conv_rot" or typ == "cib_gal_rot":
             C1_spline, C2_spline, C3_spline = self._get_cib_Ns(Lmax, typ, all_splines=True)
         thetas, dTheta = self._get_thetas(Ntheta)
         weights = np.ones(np.size(thetas))
@@ -432,12 +502,32 @@ class Fisher:
             return I
         return np.sum(I)
 
+    def _get_cib_gal_rotation_bispectrum_Fisher_sample(self, Ls, Ntheta, f_sky, arr):
+        Lmax, dLs, thetas, dTheta, weights, C1_spline, C2_spline, N3_spline = self._integral_prep_sample(Ls, Ntheta, "cib_gal_rot")
+        Cl_cib_gal_spline = self._interpolate(self._get_Cl_cib_gal(Lmax))
+        I = np.zeros(np.size(Ls))
+        for iii, L1 in enumerate(Ls):
+            I_tmp = 0
+            for jjj, L2 in enumerate(Ls):
+                L3 = self._get_L3(L1, L2, thetas)
+                w = copy.deepcopy(weights)
+                w[L3 > Lmax] = 0
+                w[L3 < 2] = 0
+                bi_cib_gal_rot = self.bi.get_cib_gal_rotation_bispectrum(L1, L2, theta=thetas, M_spline=True)
+                denom = ((C1_spline(L1) * C2_spline(L2)) + (Cl_cib_gal_spline(L1) * Cl_cib_gal_spline(L2))) * N3_spline(L3)
+                I_tmp += L2 * dLs[jjj] * 2 * dTheta * np.dot(w, (bi_cib_gal_rot ** 2) / denom)
+            I[iii] = 2 * np.pi * L1 * dLs[iii] * I_tmp
+        I *= 2*f_sky/((2*np.pi)**3)
+        if arr:
+            return I
+        return np.sum(I)
+
     def _integral_prep_arr(self, Lmax, dL, Ntheta, typ, include_N0_kappa="both"):
         if typ == "conv" or typ == "conv_rot":
             C1, C2, C3_spline = self._get_cmb_Ns(Lmax, typ, include_N0_kappa)
         elif typ == "gal_rot" or typ == "gal_conv_rot":
             C1, C2, C3_spline = self._get_gal_Ns(Lmax, typ)
-        elif typ == "cib_rot" or typ == "cib_conv_rot":
+        elif typ == "cib_rot" or typ == "cib_conv_rot" or typ == "cib_gal_rot":
             C1, C2, C3_spline = self._get_cib_Ns(Lmax, typ)
         thetas, dTheta = self._get_thetas(Ntheta)
         Ls = np.arange(2, Lmax + 1, dL)
@@ -587,6 +677,26 @@ class Fisher:
                 bi_cib_conv_rot = self.bi.get_cib_convergence_rotation_bispectrum(L1, L2, L3, M_spline=True)
                 denom = ((C1[L1] * C2[L2]) + (Cl_cib_kappa[L1] * Cl_cib_kappa[L2])) * N3_spline(L3)
                 I_tmp += L2 * dL * 2 * np.dot(w, dTheta * (bi_cib_conv_rot ** 2) / denom)
+            I[iii] = 2 * np.pi * L1 * dL * I_tmp
+        I *= 2 * f_sky / ((2 * np.pi) ** 3)
+        if arr:
+            return Ls, I
+        return np.sum(I)
+
+    def _get_cib_gal_rotation_bispectrum_Fisher_arr(self, Lmax, dL, Ntheta, f_sky, arr):
+        Ls, thetas, dTheta, weights, C1, C2, N3_spline = self._integral_prep_arr(Lmax, dL, Ntheta, "cib_gal_rot")
+        Cl_cib_gal = self._get_Cl_cib_gal(Lmax)
+        I = np.zeros(np.size(Ls))
+        for iii, L1 in enumerate(Ls):
+            I_tmp = 0
+            for L2 in Ls:
+                L3 = self._get_L3(L1, L2, thetas)
+                w = copy.deepcopy(weights)
+                w[L3 > Lmax] = 0
+                w[L3 < 2] = 0
+                bi_cib_gal_rot = self.bi.get_cib_gal_rotation_bispectrum(L1, L2, L3, M_spline=True)
+                denom = ((C1[L1] * C2[L2]) + (Cl_cib_gal[L1] * Cl_cib_gal[L2])) * N3_spline(L3)
+                I_tmp += L2 * dL * 2 * np.dot(w, dTheta * (bi_cib_gal_rot ** 2) / denom)
             I[iii] = 2 * np.pi * L1 * dL * I_tmp
         I *= 2 * f_sky / ((2 * np.pi) ** 3)
         if arr:
@@ -790,6 +900,54 @@ class Fisher:
                 return self._get_bispectrum_Fisher_vec("cib_conv_rot", Lmax, dL, Ntheta, f_sky, include_N0_kappa=None)
         return self._get_cib_convergence_rotation_bispectrum_Fisher_sample(Ls, Ntheta, f_sky, arr)
 
+    def get_cib_gal_rotation_bispectrum_Fisher(self, Lmax=4000, dL=1, Ls=None, Ntheta=10, f_sky=1, arr=False):
+        """
+        Computes the Fisher information for the leading order post born I g omega bispectrum.
+
+        Parameters
+        ----------
+        Lmax : int
+            Maximum multipole moment limit in the integrals.
+        dL : int
+            Step size of the integrals.
+        Ls : ndarray
+            Alternative to supplying Lmax and dL; 1D array of the sampled multipole moments wished to be integrated over.
+        Ntheta : int
+            Number of steps to use in the angular integral.
+        f_sky : int or float
+            Fraction of sky.
+        arr : bool
+            Return an array of Fisher value for each step in the first integral.
+
+        Returns
+        -------
+            float or 2-tuple
+        If arr = False then the Fisher information is returned as float. If True then a 1D array of multipole moment steps are returned as the first part of the tuple, the second is the corresponding Fisher values at each moment.
+        """
+        if Ls is None:
+            if arr:
+                return self._get_cib_gal_rotation_bispectrum_Fisher_arr(Lmax, dL, Ntheta, f_sky, arr)
+            else:
+                #return self._get_gal_convergence_rotation_bispectrum_Fisher_vec(Lmax, dL, Ntheta, f_sky)
+                return self._get_bispectrum_Fisher_vec("cib_gal_rot", Lmax, dL, Ntheta, f_sky, include_N0_kappa=None)
+        return self._get_cib_gal_rotation_bispectrum_Fisher_sample(Ls, Ntheta, f_sky, arr)
+
+    def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=1, Ntheta=10, f_sky=1):
+        """
+
+        Parameters
+        ----------
+        Lmax
+        dL
+        Ntheta
+        f_sky
+
+        Returns
+        -------
+
+        """
+        typs = list(typs)
+        return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ntheta, f_sky)
 
     def _get_ell_prim_prim(self, ell, ell_prim, theta):
         ell_prim_prim = self._maths.cosine_rule(ell, ell_prim, theta)

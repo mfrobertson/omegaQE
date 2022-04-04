@@ -108,18 +108,17 @@ class Cosmology:
     def _SED_func(self, nu):
         #"1801.05396 uses 857 GHz (pg. 2)"
         #"1705.02332 uses 353 GHz (pg. 4)"
-        nu_prim = 4955e9  # according to 1705.02332 this is in 1502.01591
+        nu_prim = 4955e9  # according to 1705.02332 this is in 1502.01591 (also in  Planck lensing 2015)
         alpha = 2       # 0912.4315 and Planck 2015 appendix D
         beta = 2
         pow = beta + 3
         T = 34
         h = Planck
         k_B = physical_constants["Boltzmann constant"][0]
-        thing = np.asarray((h*nu)/(k_B*T), dtype=np.double)
-        #small_nu = (np.exp(thing) - 1)**-1 * 2*Planck/(speed_of_light**2) * nu**pow
-        #big_nu = (np.exp(thing) - 1)**-1 * 2*Planck/(speed_of_light**2) * nu_prim**pow * (nu/nu_prim)**-alpha
-        small_nu = (np.exp(thing) - 1) ** -1 * 2 * nu ** pow
-        big_nu = (np.exp(thing) - 1)**-1 * nu_prim**pow * (nu/nu_prim)**-alpha
+        exponent = np.asarray((h*nu)/(k_B*T), dtype=np.double)
+        exponent[exponent>700] = np.double(700)
+        small_nu = (np.exp(exponent) - 1) ** -1 * 2 * nu ** pow
+        big_nu = (np.exp(exponent) - 1)**-1 * nu_prim**pow * (nu/nu_prim)**-alpha
         if np.shape(nu) != ():
             w1 = np.zeros(np.shape(nu))
             w2 = np.zeros(np.shape(nu))

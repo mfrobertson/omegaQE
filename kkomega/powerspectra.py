@@ -168,8 +168,8 @@ class Powerspectra:
         if np.size(Chi_source1) > 1:
             ells = self._vectorise_ells(ells, 1)
         if extended:
-            return I.sum(axis=1) * (ells + 0.5) ** 2
-        return I.sum(axis=1) * ells ** 2
+            return (-1) * I.sum(axis=1) * (ells + 0.5) ** 2
+        return (-1) * I.sum(axis=1) * ells ** 2
 
     def _Cl_gal(self, ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin, gal_win_zmax, extended):
         step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
@@ -188,13 +188,20 @@ class Powerspectra:
         if np.size(Chi_source1) > 1:
             ells = self._vectorise_ells(ells, 1)
         if extended:
-            return I.sum(axis=1) * (ells + 0.5) ** 2
-        return I.sum(axis=1) * ells ** 2
+            return (-1) * I.sum(axis=1) * (ells + 0.5) ** 2
+        return (-1) * I.sum(axis=1) * ells ** 2
 
     def _Cl_cib(self, ells, nu, Nchi, zmin, zmax, kmin, kmax, extended, bias):
         step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
         window = self._cosmo.cib_window_Chi(Chis, nu, bias=bias)
         I = step * matter_ps/(Chis)**2 * dChi * window ** 2
+        return I.sum(axis=1)
+
+    def _Cl_cib_gal(self, ells, nu, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin, gal_win_zmax, extended, bias):
+        step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
+        window1 = self._cosmo.cib_window_Chi(Chis, nu, bias=bias)
+        window2 = self._cosmo.gal_cluster_window_Chi(Chis, zmin=gal_win_zmin, zmax=gal_win_zmax)
+        I = step * matter_ps/(Chis)**2 * dChi * window1 * window2
         return I.sum(axis=1)
 
     def get_phi_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_PK=False):
@@ -345,7 +352,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_gal(ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin, gal_win_zmax, extended)
 
-    def get_cib_kappa_ps(self, ells, nu=857e9, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=True, bias=1, recalc_PK=False):
+    def get_cib_kappa_ps(self, ells, nu=857e9, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=True, bias=0.45, recalc_PK=False):
         """
 
         Parameters
@@ -366,7 +373,7 @@ class Powerspectra:
             self.matter_weyl_PK = self._get_PK("matter-weyl", np.max(ells), Nchi)
         return self._Cl_cib_kappa(ells, nu, Chi_source1, Nchi, kmin, kmax, extended, bias)
 
-    def get_cib_ps(self, ells, nu=857e9, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, bias=1, recalc_PK=False):
+    def get_cib_ps(self, ells, nu=857e9, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, bias=0.45, recalc_PK=False):
         """
 
 
@@ -397,6 +404,39 @@ class Powerspectra:
         if recalc_PK or self.matter_PK is None:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_cib(ells, nu, Nchi, zmin, zmax, kmin, kmax, extended, bias)
+
+    def get_cib_gal_ps(self, ells, nu=857e9, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, gal_win_zmin=None, gal_win_zmax=None, extended=True, bias=0.45, recalc_PK=False):
+        """
+        Return the Limber approximated lensing convergence power spectrum.
+
+        Parameters
+        ----------
+        ells : int or float or ndarray
+            Multipole moment(s) over which to calculate the power spectrum.
+        Nchi : int
+            Number of steps in the integral over Chi.
+        zmin : int or float
+            Minimum redshift to be used in the calculation.
+        zmax : int or float or None
+            Maximum redshift to be used in the calculation. None value will default yo surface of last scattering.
+        kmin : int or float
+            Minimum wavelength to be used in the calculation.
+        kmax : int or float
+            Minimum wavelength to be used in the calculation.
+        extended : bool
+            Use extended Limber approximation.
+        recalc_PK : bool
+            Recalculate the Weyl potential power spectrum interpolator optimised for this particular calculation given the supplied inputs.
+
+        Returns
+        -------
+        ndarray
+            1D ndarray of the lensing convergence power spectrum calculated at the supplied ell values.
+        """
+        if recalc_PK or self.matter_PK is None:
+            self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
+        return self._Cl_cib_gal(ells, nu, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin, gal_win_zmax, extended, bias)
+
 
     def get_camb_postborn_omega_ps(self, ellmax=10000):
         """
