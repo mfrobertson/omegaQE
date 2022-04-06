@@ -5,8 +5,14 @@ from noise import Noise
 from maths import Maths
 from modecoupling import Modecoupling
 from scipy.interpolate import InterpolatedUnivariateSpline
+from sympy.matrices import Matrix
+from sympy import lambdify
 from cache.tools import getFileSep, path_exists
 import copy
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
+
 
 class Fisher:
     """
@@ -128,6 +134,9 @@ class Fisher:
             return self._get_Cl_cib(ellmax) + N0_gal
         elif typ == "Ig" or typ == "gI":
             return self._get_Cl_cib_gal(ellmax)
+        elif typ == "ww":
+            N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
+            return N0_omega
 
 
     def _get_L3(self, L1, L2, theta):
@@ -207,19 +216,96 @@ class Fisher:
             return C1_spline, C2_spline, C3_spline
         return C1, C2, C3_spline
 
-    def _get_optimal_Ns(self, Lmax, typ):
-        N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, ell_factors=self.N0_ell_factors))
-        C3_spline = N0_omega_spline
-        C1 = self._get_Cl(typ[0]+typ[2], Lmax)
-        C2 = self._get_Cl(typ[1]+typ[3], Lmax)
-        return C1, C2, C3_spline
+    def _optimal_Ns_1(self, combo, typs, C0):
+        return 1/C0
+
+    def _optimal_Ns_2(self, combo, typs, C0, C1, C01):
+
+        D = (C0 * C1) - C01 ** 2
+        if combo == typs[0]+typs[0]:
+           return C1/D
+        elif combo == typs[1] + typs[1]:
+            return C0/D
+        elif combo == typs[0] + typs[1] or combo == typs[1] + typs[0]:
+            return -C01/D
+
+    def _optimal_Ns_3(self, combo, typs, C0, C1, C2, C01, C02, C12):
+        D = C0 * C1 * C2 - (C0*C12**2) - (C1*C02**2) - (C2*C01**2) + (2*C01*C02*C12)
+        if combo == typs[0]+typs[0]:
+           return (C1*C2 - C12**2)/D
+        elif combo == typs[1] + typs[1]:
+            return (C0*C2 - C02**2)/D
+        elif combo == typs[2] + typs[2]:
+            return (C0*C1 - C01**2)/D
+        elif combo == typs[0]+typs[1] or combo == typs[1]+typs[0]:
+            return (C02*C12 - C2*C01)/D
+        elif combo == typs[0]+typs[2] or combo == typs[2]+typs[0]:
+            return (C01*C12 - C1*C02)/D
+        elif combo == typs[1]+typs[2] or combo == typs[2]+typs[1]:
+            return (C01*C02 - C0*C12)/D
+
+    def _get_optimal_Ns_analyt(self, Lmax, typ, typs):
+        N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, tidy=True, ell_factors=self.N0_ell_factors))
+        cov3_spline = N0_omega_spline
+        combo1 = typ[0] + typ[2]
+        combo2 = typ[1] + typ[3]
+        if np.size(typs) == 1:
+            C0 = self._get_Cl(typs[0] + typs[0], Lmax)
+            cov_inv1 = self._optimal_Ns_1(combo1, typs, C0)
+            cov_inv2 = self._optimal_Ns_1(combo2, typs, C0)
+        elif np.size(typs) == 2:
+            C0 = self._get_Cl(typs[0] + typs[0], Lmax)
+            C1 = self._get_Cl(typs[1] + typs[1], Lmax)
+            C01 = self._get_Cl(typs[0] + typs[1], Lmax)
+            cov_inv1 = self._optimal_Ns_2(combo1, typs, C0, C1, C01)
+            cov_inv2 = self._optimal_Ns_2(combo2, typs, C0, C1, C01)
+        elif np.size(typs) == 3:
+            C0 = self._get_Cl(typs[0] + typs[0], Lmax)
+            C1 = self._get_Cl(typs[1] + typs[1], Lmax)
+            C2 = self._get_Cl(typs[2] + typs[2], Lmax)
+            C01 = self._get_Cl(typs[0] + typs[1], Lmax)
+            C02 = self._get_Cl(typs[0] + typs[2], Lmax)
+            C12 = self._get_Cl(typs[1] + typs[2], Lmax)
+            cov_inv1 = self._optimal_Ns_3(combo1, typs, C0, C1, C2, C01, C02, C12)
+            cov_inv2 = self._optimal_Ns_3(combo2, typs, C0, C1, C2, C01, C02, C12)
+        return cov_inv1, cov_inv2, cov3_spline
+
+    def _get_C_inv(self, typs, Lmax):
+        Ntyps = np.size(typs)
+        all_typs = np.char.array(np.concatenate((typs, list('w'))))
+        C = all_typs[:, None] + all_typs[None, :]
+        C[:, Ntyps] = 0
+        C[Ntyps, :] = 0
+        C[Ntyps, Ntyps] = 'ww'
+        args = C.flatten()
+        args = args[args != '0']
+        C_sym = Matrix(C)
+        # print(C_sym)
+        C_inv = C_sym.inv()
+        C_inv_func = lambdify(args, C_inv)
+        Cls = [self._get_Cl(arg, Lmax) for arg in args]
+        return C_inv_func(*Cls)
+
+    def _get_optimal_Ns_sympy(self, Lmax, typ, typs, C_inv):
+        N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, tidy=True, ell_factors=self.N0_ell_factors))
+        cov3_spline = N0_omega_spline
+
+
+        combo1_idx1 = np.where(typs == typ[0])[0][0]
+        combo1_idx2 = np.where(typs == typ[2])[0][0]
+        combo2_idx1 = np.where(typs == typ[1])[0][0]
+        combo2_idx2 = np.where(typs == typ[3])[0][0]
+
+        cov_inv1 = C_inv[combo1_idx1][combo1_idx2]
+        cov_inv2 = C_inv[combo2_idx1][combo2_idx2]
+        return cov_inv1, cov_inv2, cov3_spline
 
     def _get_thetas(self, Ntheta):
         dTheta = np.pi / Ntheta
         thetas = np.arange(dTheta, np.pi + dTheta, dTheta, dtype=float)
         return thetas, dTheta
 
-    def _integral_prep_vec(self, Lmax, dL, Ntheta, typ, include_N0_kappa="both"):
+    def _integral_prep_vec(self, Lmax, dL, Ntheta, typ, include_N0_kappa="both", typs=None, C_inv=None):
         if typ == "conv" or typ == "conv_rot":
             C1, C2, C3_spline = self._get_cmb_Ns(Lmax, typ, include_N0_kappa)
         elif typ == "gal_rot" or typ == "gal_conv_rot":
@@ -227,7 +313,7 @@ class Fisher:
         elif typ == "cib_rot" or typ == "cib_conv_rot" or typ == "cib_gal_rot":
             C1, C2, C3_spline = self._get_cib_Ns(Lmax, typ)
         elif typ[:3] == "opt":
-            C1, C2, C3_spline = self._get_optimal_Ns(Lmax, typ[4:])
+            C1, C2, C3_spline = self._get_optimal_Ns_sympy(Lmax, typ[4:], typs, C_inv)
         thetas, dTheta = self._get_thetas(Ntheta)
         Ls = np.arange(2, Lmax + 1, dL)
         L3 = self._get_L3(Ls[:, None], Ls[None, :], thetas[:, None, None])
@@ -314,31 +400,33 @@ class Fisher:
         factor = self._get_factor(typ, method="vec")
         return factor * I * f_sky / ((2 * np.pi) ** 3)
 
-    def _get_optimal_bispectrum_Fisher_element_vec(self, typ, Lmax, dL, Ntheta, f_sky):
-        Ls, L3, dTheta, w, C1, C2, C3_spline = self._integral_prep_vec(Lmax, dL, Ntheta, typ)
-        print(typ)
+    def _get_optimal_bispectrum_Fisher_element_vec(self, typs, typ, Lmax, dL, Ntheta, f_sky, C_inv):
+        Ls, L3, dTheta, w, C1, C2, C3_spline = self._integral_prep_vec(Lmax, dL, Ntheta, typ, typs=typs, C_inv=C_inv)
         bi1, bi2 = self._get_bi(typ)
-        denom = C1[None, Ls, None] * C2[None, None, Ls] * C3_spline(L3)
-        I = 2 * 2 * np.pi * dL * dL * np.sum(Ls[None, :, None] * Ls[None, None, :] * dTheta * w * (bi1(Ls[:, None], Ls[None, :], L3, M_spline=True) * bi2(Ls[:, None], Ls[None, :], L3, M_spline=True) ) / denom)
+        covs = C1[None, Ls, None] * C2[None, None, Ls] / C3_spline(L3)
+        I = 2 * 2 * np.pi * dL * dL * np.sum(Ls[None, :, None] * Ls[None, None, :] * dTheta * w * (bi1(Ls[:, None], Ls[None, :], L3, M_spline=True) * bi2(Ls[:, None], Ls[None, :], L3, M_spline=True) ) * covs)
         return I * f_sky / ((2 * np.pi) ** 3)
 
-    def _get_optimal_bispectrum_Fisher(self, typs, Lmax, dL, Ntheta, f_sky):
+    def _get_optimal_bispectrum_Fisher(self, typs, Lmax, dL, Ntheta, f_sky, verbose=False):
         typs = np.char.array(typs)
+        C_inv = self._get_C_inv(typs, Lmax)
         all_combos = typs[:, None] + typs[None, :]
-        upper_matrix_flat = np.triu(all_combos).flatten()
-        combos = upper_matrix_flat[upper_matrix_flat != '']
+        combos = all_combos.flatten()
         Ncombos = np.size(combos)
         F = 0
+        perms = 0
         for iii in np.arange(Ncombos):
-            for jjj in np.arange(iii, Ncombos):
+            for jjj in np.arange(Ncombos):
                 typ = "opt_" + combos[iii] + combos[jjj]
-                F_tmp = self._get_optimal_bispectrum_Fisher_element_vec(typ, Lmax, dL, Ntheta, f_sky)
-                print(F_tmp)
-                if combos[iii] == combos[jjj]:
-                    factor = 1
-                else:
-                    factor = np.size(typs)
+                F_tmp = self._get_optimal_bispectrum_Fisher_element_vec(typs, typ, Lmax, dL, Ntheta, f_sky, C_inv)
+                if verbose:
+                    print(typ)
+                    print(F_tmp)
+                factor = 1
+                perms += factor
                 F += factor * F_tmp
+        if perms != np.size(typs)**4:
+            raise ValueError(f"{perms} permutations computed, should be {np.size(typs)**4}")
         return F
 
     # def _get_convergence_rotation_bispectrum_Fisher_vec(self, Lmax, dL, Ntheta, f_sky, include_N0_kappa):
