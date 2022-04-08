@@ -92,3 +92,14 @@ class Noise:
         arcmin2_to_strad = 11818080
         ones = np.ones(ellmax + 1)
         return ones/(arcmin2_to_strad * n)
+
+    def get_cib_shot_N(self, nu, ellmax=4000):
+        # 1309.0382 Table 6
+        ones = np.ones(ellmax + 1)
+        if nu == 353e9:
+            N = 225
+        elif nu == 545e9:
+            N = 1454
+        elif nu == 857e9:
+            N = 5628
+        return ones * N
