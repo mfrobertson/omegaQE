@@ -41,7 +41,7 @@ class Bispectra:
         s = (mag1 + mag2 + mag3)/2
         return 2 * np.sqrt(s*(s-mag1)*(s-mag2)*(s-mag3))
 
-    def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None):
+    def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=857e9):
         if M_spline:
             if typ == "kappa-kappa":
                 M1 = self._M_kk_spline.ev(L1, L2)
@@ -69,11 +69,11 @@ class Bispectra:
                 M1 = self._mode.components(L1, L2, typ="cib-kappa", zmin=zmin, zmax=zmax)
                 M2 = self._mode.components(L2, L1, typ="kappa-cib", zmin=zmin, zmax=zmax)
             elif typ == "gal-cib" or typ == "cib-gal":
-                M1 = self._mode.components(L1, L2, typ="cib-gal", zmin=zmin, zmax=zmax)
-                M2 = self._mode.components(L2, L1, typ="gal-cib", zmin=zmin, zmax=zmax)
+                M1 = self._mode.components(L1, L2, typ="cib-gal", zmin=zmin, zmax=zmax, nu=nu)
+                M2 = self._mode.components(L2, L1, typ="gal-cib", zmin=zmin, zmax=zmax, nu=nu)
             else:
-                M1 = self._mode.components(L1, L2, typ=typ, zmin=zmin, zmax=zmax)
-                M2 = self._mode.components(L2, L1, typ=typ, zmin=zmin, zmax=zmax)
+                M1 = self._mode.components(L1, L2, typ=typ, zmin=zmin, zmax=zmax, nu=nu)
+                M2 = self._mode.components(L2, L1, typ=typ, zmin=zmin, zmax=zmax, nu=nu)
         if L3 is not None:
             L12_dot = self._triangle_dot_product(L1, L2, L3)
             return M1, M2, L12_dot
@@ -121,45 +121,45 @@ class Bispectra:
         M1, M2 = self._bispectra_prep("gal-kappa", L1, L2, None, M_spline, zmin, zmax)
         return -np.sin(2 * theta) * (M1 - M2)
 
-    def _cib1_cib1_omega2(self, L1, L2, L3, M_spline, zmin, zmax):
-        M1, M2, L12_dot = self._bispectra_prep("cib-cib", L1, L2, L3, M_spline, zmin, zmax)
+    def _cib1_cib1_omega2(self, L1, L2, L3, M_spline, zmin, zmax, nu):
+        M1, M2, L12_dot = self._bispectra_prep("cib-cib", L1, L2, L3, M_spline, zmin, zmax, nu=nu)
         L13_cross = self._triangle_cross_product(L1, L3, L2)
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return 2 * L12_dot * (L13_cross * M1 - L23_cross * M2)/(L1**2 * L2**2)
 
-    def _cib1_cib1_omega2_angle(self, L1, L2, theta, M_spline, zmin, zmax):
-        M1, M2 = self._bispectra_prep("cib-cib", L1, L2, None, M_spline, zmin, zmax)
+    def _cib1_cib1_omega2_angle(self, L1, L2, theta, M_spline, zmin, zmax, nu):
+        M1, M2 = self._bispectra_prep("cib-cib", L1, L2, None, M_spline, zmin, zmax, nu=nu)
         return np.sin(2 * theta) * (M1 - M2)
 
-    def _cib1_kappa1_omega2(self, L1, L2, L3, M_spline, zmin, zmax):
-        M1, M2, L12_dot = self._bispectra_prep("cib-kappa", L1, L2, L3, M_spline, zmin, zmax)
+    def _cib1_kappa1_omega2(self, L1, L2, L3, M_spline, zmin, zmax, nu):
+        M1, M2, L12_dot = self._bispectra_prep("cib-kappa", L1, L2, L3, M_spline, zmin, zmax, nu=nu)
         L13_cross = self._triangle_cross_product(L1, L3, L2)
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return -2 * L12_dot * (L13_cross * M1 - L23_cross * M2)/(L1**2 * L2**2)
 
-    def _cib1_kappa1_omega2_angle(self, L1, L2, theta, M_spline, zmin, zmax):
-        M1, M2 = self._bispectra_prep("cib-kappa", L1, L2, None, M_spline, zmin, zmax)
+    def _cib1_kappa1_omega2_angle(self, L1, L2, theta, M_spline, zmin, zmax, nu):
+        M1, M2 = self._bispectra_prep("cib-kappa", L1, L2, None, M_spline, zmin, zmax, nu=nu)
         return -np.sin(2 * theta) * (M1 - M2)
 
-    def _cib1_gal1_omega2(self, L1, L2, L3, M_spline, zmin, zmax):
-        M1, M2, L12_dot = self._bispectra_prep("cib-gal", L1, L2, L3, M_spline, zmin, zmax)
+    def _cib1_gal1_omega2(self, L1, L2, L3, M_spline, zmin, zmax, nu):
+        M1, M2, L12_dot = self._bispectra_prep("cib-gal", L1, L2, L3, M_spline, zmin, zmax, nu=nu)
         L13_cross = self._triangle_cross_product(L1, L3, L2)
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return 2 * L12_dot * (L13_cross * M1 - L23_cross * M2)/(L1**2 * L2**2)
 
-    def _cib1_gal1_omega2_angle(self, L1, L2, theta, M_spline, zmin, zmax):
-        M1, M2 = self._bispectra_prep("cib-gal", L1, L2, None, M_spline, zmin, zmax)
+    def _cib1_gal1_omega2_angle(self, L1, L2, theta, M_spline, zmin, zmax, nu):
+        M1, M2 = self._bispectra_prep("cib-gal", L1, L2, None, M_spline, zmin, zmax, nu=nu)
         return np.sin(2 * theta) * (M1 - M2)
 
 
-    def _build_M_spline(self, typ, ells_sample, M_matrix, zmin, zmax):
+    def _build_M_spline(self, typ, ells_sample, M_matrix, zmin, zmax, nu):
         if ells_sample is not None and M_matrix is not None:
             return self._mode.spline(ells_sample, M_matrix, typ=typ)
         if ells_sample is None:
-            return self._mode.spline(typ=typ, zmin=zmin, zmax=zmax)
-        return self._mode.spline(ells_sample, typ=typ, zmin=zmin, zmax=zmax)
+            return self._mode.spline(typ=typ, zmin=zmin, zmax=zmax, nu=nu)
+        return self._mode.spline(ells_sample, typ=typ, zmin=zmin, zmax=zmax, nu=nu)
 
-    def build_M_spline(self, typ="kappa-kappa", ells_sample=None, M_matrix=None, zmin=0, zmax=None):
+    def build_M_spline(self, typ="kappa-kappa", ells_sample=None, M_matrix=None, zmin=0, zmax=None, nu=857e9):
         """
         Generates and stores/replaces spline for the mode-coupling matrix.
 
@@ -175,7 +175,7 @@ class Bispectra:
         """
         if not self._mode.check_type(typ):
             raise ValueError(f"Modecoupling type {typ} does not exist")
-        M_spline = self._build_M_spline(typ, ells_sample, M_matrix, zmin, zmax)
+        M_spline = self._build_M_spline(typ, ells_sample, M_matrix, zmin, zmax, nu=nu)
         if typ == "kappa-kappa":
             self._M_kk_spline = M_spline
             return
@@ -310,7 +310,7 @@ class Bispectra:
             return self._gal1_kappa1_omega2(L1, L2, L3, M_spline, zmin, zmax)
         return self._gal1_kappa1_omega2_angle(L1, L2, theta, M_spline, zmin, zmax)
 
-    def get_cib_rotation_bispectrum(self, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None):
+    def get_cib_rotation_bispectrum(self, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=857e9):
         """
         Calculates the galaxy-rotation bispectrum 'g g omega' for the leading order rotation term.
 
@@ -331,12 +331,12 @@ class Bispectra:
             The bispectrum.
         """
         if M_spline and self._M_II_spline is None:
-            self.build_M_spline(typ="cib-cib")
+            self.build_M_spline(typ="cib-cib", nu=nu)
         if L3 is not None:
-            return self._cib1_cib1_omega2(L1, L2, L3, M_spline, zmin, zmax)
-        return self._cib1_cib1_omega2_angle(L1, L2, theta, M_spline, zmin, zmax)
+            return self._cib1_cib1_omega2(L1, L2, L3, M_spline, zmin, zmax, nu)
+        return self._cib1_cib1_omega2_angle(L1, L2, theta, M_spline, zmin, zmax, nu)
 
-    def get_cib_convergence_rotation_bispectrum(self, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None):
+    def get_cib_convergence_rotation_bispectrum(self, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=857e9):
         """
         Calculates the galaxy-convergence-rotation bispectrum 'g kappa omega' for the leading order rotation term.
 
@@ -357,13 +357,13 @@ class Bispectra:
             The bispectrum.
         """
         if M_spline and self._M_Ik_spline is None:
-            self.build_M_spline(typ="cib-kappa")
-            self.build_M_spline(typ="kappa-cib")
+            self.build_M_spline(typ="cib-kappa", nu=nu)
+            self.build_M_spline(typ="kappa-cib", nu=nu)
         if L3 is not None:
-            return self._cib1_kappa1_omega2(L1, L2, L3, M_spline, zmin, zmax)
-        return self._cib1_kappa1_omega2_angle(L1, L2, theta, M_spline, zmin, zmax)
+            return self._cib1_kappa1_omega2(L1, L2, L3, M_spline, zmin, zmax, nu)
+        return self._cib1_kappa1_omega2_angle(L1, L2, theta, M_spline, zmin, zmax, nu)
 
-    def get_cib_gal_rotation_bispectrum(self, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None):
+    def get_cib_gal_rotation_bispectrum(self, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=857e9):
         """
         Calculates the cib-galaxy-rotation bispectrum 'I g omega' for the leading order rotation term.
 
@@ -384,8 +384,8 @@ class Bispectra:
             The bispectrum.
         """
         if M_spline and self._M_Ig_spline is None:
-            self.build_M_spline(typ="cib-gal")
-            self.build_M_spline(typ="gal-cib")
+            self.build_M_spline(typ="cib-gal", nu=nu)
+            self.build_M_spline(typ="gal-cib", nu=nu)
         if L3 is not None:
-            return self._cib1_gal1_omega2(L1, L2, L3, M_spline, zmin, zmax)
-        return self._cib1_gal1_omega2_angle(L1, L2, theta, M_spline, zmin, zmax)
+            return self._cib1_gal1_omega2(L1, L2, L3, M_spline, zmin, zmax, nu)
+        return self._cib1_gal1_omega2_angle(L1, L2, theta, M_spline, zmin, zmax, nu)

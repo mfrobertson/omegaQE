@@ -146,11 +146,11 @@ class Cosmology:
         """
         if b_c is None:
             if nu == 353e9:
-                b_c = 8.71253313e-65
+                b_c = 8.71253313e-65 * 1e-6   # 1e-6 to change units of window to MJy/sr
             elif nu == 545e9:
-                b_c = 8.76989271e-65
+                b_c = 8.76989271e-65 * 1e-6
             elif nu == 857e9:
-                b_c = 7.68698899e-65
+                b_c = 7.68698899e-65 * 1e-6
         Chi = self.z_to_Chi(z)
         H = self.get_hubble(z)
         z_c = 2
@@ -158,16 +158,16 @@ class Cosmology:
         window = (Chi ** 2) / (H * (1 + z) ** 2) * np.exp(-((z - z_c) ** 2) / (2 * sig_z ** 2)) * self._SED_func(nu*(z + 1))
         return b_c*window
 
-    def _cib_window_Chi_sSED(self, Chi, nu=353e9, b_c=None):
+    def _cib_window_Chi_sSED(self, Chi, nu=857e9, b_c=None):
         #"1801.05396 uses 857 GHz (pg. 2)"
         #"1705.02332 uses 353 GHz (pg. 4)"
         z = self.Chi_to_z(Chi)
         return self._cib_window_z_sSED(z, nu, b_c) * self.get_hubble(z)
 
-    def cib_window_Chi(self, Chi, nu=353e9, b_c=None):
+    def cib_window_Chi(self, Chi, nu=857e9, b_c=None):
         return self._cib_window_Chi_sSED(Chi, nu, b_c)
 
-    def cib_window_z(self, z, nu=353e9, b_c=None):
+    def cib_window_z(self, z, nu=857e9, b_c=None):
         return self._cib_window_z_sSED(z, nu, b_c)
 
 

@@ -97,9 +97,9 @@ class Noise:
         # 1309.0382 Table 6
         ones = np.ones(ellmax + 1)
         if nu == 353e9:
-            N = 225
+            N = 225 * 1e-12    # 1e-12 to change units to MJy^2/sr
         elif nu == 545e9:
-            N = 1454
+            N = 1454 * 1e-12
         elif nu == 857e9:
-            N = 5628
+            N = 5628 * 1e-12
         return ones * N
