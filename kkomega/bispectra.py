@@ -209,19 +209,19 @@ class Bispectra:
             return
         if typ == "cib-cib-kappa" or typ == "IIw":
             if self._M_II_spline is None:
-                self.build_M_spline(typ="cib-cib")
+                self.build_M_spline(typ="cib-cib", nu=nu)
             return
         if typ == "kappa-cib-kappa" or typ == "kIw" or typ == "cib-kapppa-omega" or typ == "Ikw":
             if self._M_kI_spline is None:
-                self.build_M_spline(typ="kappa-cib")
+                self.build_M_spline(typ="kappa-cib", nu=nu)
             if self._M_Ik_spline is None:
-                self.build_M_spline(typ="cib-kappa")
+                self.build_M_spline(typ="cib-kappa", nu=nu)
             return
         if typ == "gal-cib-kappa" or typ == "gIw" or typ == "cib-gal-omega" or typ == "Igw":
             if self._M_gI_spline is None:
-                self.build_M_spline(typ="gal-cib")
+                self.build_M_spline(typ="gal-cib", nu=nu)
             if self._M_Ig_spline is None:
-                self.build_M_spline(typ="cib-gal")
+                self.build_M_spline(typ="cib-gal", nu=nu)
             return
         raise UserWarning(f"Failed to build Mode Coupling splines for type {typ}")
 
