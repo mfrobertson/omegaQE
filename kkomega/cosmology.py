@@ -20,6 +20,7 @@ class Cosmology:
         sep = tools.getFileSep()
         self._pars = camb.read_ini(rf"{dir_current}{sep}data{sep}Lensit_fiducial_flatsky_params.ini")
         self._results = camb.get_background(self._pars)
+        self.cib_norms = None
 
 
     def cmb_lens_window(self, Chi1, Chi2, heaviside=True):
@@ -131,6 +132,19 @@ class Cosmology:
             return small_nu
         return big_nu
 
+    def _get_cib_norm(self, nu):
+        if self.cib_norms is None:
+            self.cib_norms = np.load("data/planck_cib/b_c.npy")
+        if nu == 353e9:
+            return self.cib_norms[0]
+            # b_c = 8.71253313e-65 * 1e-6   # 1e-6 to change units of window to MJy/sr
+        if nu == 545e9:
+            return self.cib_norms[1]
+            # b_c = 8.76989271e-65 * 1e-6
+        if nu == 857e9:
+            return self.cib_norms[2]
+            # b_c = 7.68698899e-65 * 1e-6
+
     def _cib_window_z_sSED(self, z, nu, b_c=None):
         #"1801.05396 uses 857 GHz (pg. 2)"
         #"1705.02332 uses 353 GHz (pg. 4)"
@@ -145,12 +159,7 @@ class Cosmology:
 
         """
         if b_c is None:
-            if nu == 353e9:
-                b_c = 8.71253313e-65 * 1e-6   # 1e-6 to change units of window to MJy/sr
-            elif nu == 545e9:
-                b_c = 8.76989271e-65 * 1e-6
-            elif nu == 857e9:
-                b_c = 7.68698899e-65 * 1e-6
+            b_c = self._get_cib_norm(nu)
         Chi = self.z_to_Chi(z)
         H = self.get_hubble(z)
         z_c = 2
