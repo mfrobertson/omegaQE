@@ -151,6 +151,21 @@ class Fisher:
             return self._get_Cl_cib(ellmax, nu) + N0_cib
         elif typ == "Ig" or typ == "gI":
             return self._get_Cl_cib_gal(ellmax, nu)
+        if typ == "xx":
+            N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+            return self._get_Cl_kappa(ellmax) + 3*N0_kappa
+        elif typ == "xy" or typ == "yx":
+            return self._get_Cl_kappa(ellmax)
+        if typ == "yy":
+            N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+            return self._get_Cl_kappa(ellmax) + 3*N0_kappa
+        if typ == "zz":
+            N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+            return self._get_Cl_kappa(ellmax) + 3*N0_kappa
+        elif typ == "xz" or typ == "zx":
+            return self._get_Cl_kappa(ellmax)
+        elif typ == "zy" or typ == "yz":
+            return self._get_Cl_kappa(ellmax)
         elif typ == "ww":
             N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
             return N0_omega

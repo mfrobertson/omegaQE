@@ -31,6 +31,12 @@ class Bispectra:
         self._M_II_spline = None
         self._M_gI_spline = None
         self._M_Ig_spline = None
+        self.Ik_nu = None
+        self.kI_nu = None
+        self.II_nu = None
+        self.Ig_nu = None
+        self.gI_nu = None
+
         #if M_spline:
             #self.build_M_spline(ells_sample, M_matrix, zmin, zmax)
 
@@ -45,7 +51,7 @@ class Bispectra:
         L12_dot = None
         if L3 is not None:
             L12_dot = self._triangle_dot_product(L1, L2, L3)
-        if typ == "kappa-kappa-kappa" or typ == "kkk" or typ == "kappa-kappa-omega" or typ == "kkw":
+        if typ == "kappa-kappa-kappa" or typ == "kkk" or typ == "kappa-kappa-omega" or typ == "kkw" or typ == "xxw" or typ == "xyw" or typ == "yyw" or typ == "yxw" or typ == "zzw" or typ == "zxw" or typ == "xzw" or typ == "zyw" or typ == "yzw":
             sign = 1
             if M_spline:
                 M1 = self._M_kk_spline.ev(L1, L2)
@@ -177,50 +183,55 @@ class Bispectra:
             return
         if typ == "cib-kappa":
             self._M_Ik_spline = M_spline
+            self.Ik_nu = nu
             return
         if typ == "kappa-cib":
             self._M_kI_spline = M_spline
+            self.kI_nu = nu
             return
         if typ == "cib-cib":
             self._M_II_spline = M_spline
+            self.II_nu = nu
             return
         if typ == "cib-gal":
             self._M_Ig_spline = M_spline
+            self.Ig_nu = nu
             return
         if typ == "gal-cib":
             self._M_gI_spline = M_spline
+            self.gI_nu = nu
             return
 
     def _build_M_splines(self, typ, nu):
         self._check_type(typ)
-        if typ == "kappa-kappa-kappa" or typ == "kkk" or typ == "kappa-kapppa-omega" or typ == "kkw":
+        if typ == "kappa-kappa-kappa" or typ == "kkk" or typ == "kappa-kapppa-omega" or typ == "kkw" or typ == "xxw" or typ == "xyw" or typ == "yyw"or typ == "yxw" or typ == "zzw" or typ == "zxw" or typ == "xzw" or typ == "zyw" or typ == "yzw":
             if self._M_kk_spline is None:
                 self.build_M_spline(typ="kappa-kappa")
             return
-        if typ == "kappa-gal-kappa" or typ == "kgw" or typ == "gal-kapppa-omega" or typ == "gkw":
+        if typ == "kappa-gal-omega" or typ == "kgw" or typ == "gal-kapppa-omega" or typ == "gkw":
             if self._M_kg_spline is None:
                 self.build_M_spline(typ="kappa-gal")
             if self._M_gk_spline is None:
                 self.build_M_spline(typ="gal-kappa")
             return
-        if typ == "gal-gal-kappa" or typ == "ggw":
+        if typ == "gal-gal-omega" or typ == "ggw":
             if self._M_gg_spline is None:
                 self.build_M_spline(typ="gal-gal")
             return
-        if typ == "cib-cib-kappa" or typ == "IIw":
-            if self._M_II_spline is None:
+        if typ == "cib-cib-omega" or typ == "IIw":
+            if self._M_II_spline is None or self.II_nu != nu:
                 self.build_M_spline(typ="cib-cib", nu=nu)
             return
-        if typ == "kappa-cib-kappa" or typ == "kIw" or typ == "cib-kapppa-omega" or typ == "Ikw":
-            if self._M_kI_spline is None:
+        if typ == "kappa-cib-omega" or typ == "kIw" or typ == "cib-kapppa-omega" or typ == "Ikw":
+            if self._M_kI_spline is None or self.kI_nu != nu:
                 self.build_M_spline(typ="kappa-cib", nu=nu)
-            if self._M_Ik_spline is None:
+            if self._M_Ik_spline is None or self.Ik_nu != nu:
                 self.build_M_spline(typ="cib-kappa", nu=nu)
             return
-        if typ == "gal-cib-kappa" or typ == "gIw" or typ == "cib-gal-omega" or typ == "Igw":
-            if self._M_gI_spline is None:
+        if typ == "gal-cib-omega" or typ == "gIw" or typ == "cib-gal-omega" or typ == "Igw":
+            if self._M_gI_spline is None or self.gI_nu != nu:
                 self.build_M_spline(typ="gal-cib", nu=nu)
-            if self._M_Ig_spline is None:
+            if self._M_Ig_spline is None or self.Ig_nu != nu:
                 self.build_M_spline(typ="cib-gal", nu=nu)
             return
         raise UserWarning(f"Failed to build Mode Coupling splines for type {typ}")
@@ -228,7 +239,8 @@ class Bispectra:
     def _check_type(self, typ):
         typs = ["kappa-kappa-kappa", "kappa-kappa-omega", "kappa-gal-omega", "gal-kappa-omega", "gal-gal-omega",
                 "cib-cib-omega", "cib-kappa-omega", "kappa-cib-omega", "gal-cib-omega", "cib-gal-omega", "kkk", "kkw",
-                "kgw", "gkw", "ggw", "IIw", "Ikw", "kIw", "gIw", "Igw"]
+                "kgw", "gkw", "ggw", "IIw", "Ikw", "kIw", "gIw", "Igw", "xxw", "yyw", "xyw", "yxw", "zzw", "yzw", "zyw",
+                "xzw", "zxw"]
         if typ not in typs:
             raise ValueError(f"Bispectrum type {typ} not from accepted types: {typs}")
 
