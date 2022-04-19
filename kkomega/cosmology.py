@@ -137,12 +137,15 @@ class Cosmology:
             self.cib_norms = np.load("data/planck_cib/b_c.npy")
         if nu == 353e9:
             return self.cib_norms[0]
+            #return 8.24989321e-71
             # b_c = 8.71253313e-65 * 1e-6   # 1e-6 to change units of window to MJy/sr
         if nu == 545e9:
             return self.cib_norms[1]
+            #return 7.52485062e-71
             # b_c = 8.76989271e-65 * 1e-6
         if nu == 857e9:
             return self.cib_norms[2]
+            #return 5.71686654e-71
             # b_c = 7.68698899e-65 * 1e-6
 
     def _cib_window_z_sSED(self, z, nu, b_c=None):
@@ -364,3 +367,7 @@ class Cosmology:
 
         """
         return postborn.get_field_rotation_power(self._pars, lmax=ellmax)
+
+    def get_cmb_ps(self, ellmax=4000):
+        cmb_ps = self._results.get_cmb_power_spectra(self._pars, lmax=ellmax, spectra=['total'],CMB_unit="muK", raw_cl=True)
+        return cmb_ps['total'][:,0]

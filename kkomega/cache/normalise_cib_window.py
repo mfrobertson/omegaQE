@@ -18,12 +18,15 @@ _noise = Noise()
 
 def _get_Cl_cib_353(ls, b_c):
     N_cib = _noise.get_cib_shot_N(353e9) * 1e12
+    #N_cib=[0]
     return _power.get_cib_ps(ls, Nchi=1000, nu=353e9, bias=b_c) + N_cib[0]
 def _get_Cl_cib_545(ls, b_c):
     N_cib = _noise.get_cib_shot_N(545e9) * 1e12
+    #N_cib = [0]
     return _power.get_cib_ps(ls, Nchi=1000, nu=545e9, bias=b_c) + N_cib[0]
 def _get_Cl_cib_857(ls, b_c):
     N_cib = _noise.get_cib_shot_N(857e9) * 1e12
+    #N_cib = [0]
     return _power.get_cib_ps(ls, Nchi=1000, nu=857e9, bias=b_c) + N_cib[0]
 
 def get_data(file_path):
