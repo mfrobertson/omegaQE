@@ -148,7 +148,9 @@ class Fisher:
             return self._get_Cl_cib_kappa(ellmax, nu)
         elif typ == "II":
             N0_cib = self.noise.get_cib_shot_N(ellmax=ellmax, nu=nu)
-            return self._get_Cl_cib(ellmax, nu) + N0_cib
+            N_dust = self.noise.get_dust_N(ellmax=ellmax, nu=nu)
+            N_cmb = self.noise.get_cmb_N(ellmax=ellmax, nu=nu)
+            return self._get_Cl_cib(ellmax, nu) + N0_cib + N_dust + N_cmb
         elif typ == "Ig" or typ == "gI":
             return self._get_Cl_cib_gal(ellmax, nu)
         if typ == "xx":
@@ -437,6 +439,10 @@ class Fisher:
 
     def _get_optimal_bispectrum_Fisher(self, typs, Lmax, dL, Ntheta, f_sky, verbose, arr, nu):
         typs = np.char.array(typs)
+        if 'I' in typs:
+            Lmin = 110
+        else:
+            Lmin = 30     # 1808.07445 and https://cmb-s4.uchicago.edu/wiki/index.php/Survey_Performance_Expectations
         C_inv = self._get_C_inv(typs, Lmax, nu)
         all_combos = typs[:, None] + typs[None, :]
         combos = all_combos.flatten()
@@ -446,10 +452,6 @@ class Fisher:
         for iii in np.arange(Ncombos):
             for jjj in np.arange(Ncombos):
                 typ = "opt_" + combos[iii] + combos[jjj]
-                if 'I' in combos[iii] or 'I' in combos[jjj]:
-                    Lmin = 110
-                else:
-                    Lmin = 2
                 if arr:
                     F_tmp = self._get_optimal_bispectrum_Fisher_element_arr(typs, typ, Lmax, dL, Ntheta, f_sky, C_inv, Lmin=Lmin, nu=nu)
                 else:
@@ -465,7 +467,7 @@ class Fisher:
             raise ValueError(f"{perms} permutations computed, should be {np.size(typs)**4}")
         return F
 
-    def get_bispectrum_Fisher(self, typ, Lmax=4000, dL=1, Ls=None, Ntheta=10, f_sky=1, arr=False, Lmin=2, nu=857e9, include_N0_kappa="both"):
+    def get_bispectrum_Fisher(self, typ, Lmax=4000, dL=1, Ls=None, Ntheta=10, f_sky=1, arr=False, Lmin=30, nu=857e9, include_N0_kappa="both"):
         self.bi.check_type(typ)
         if Ls is not None:
             if typ[0] == typ[1]:

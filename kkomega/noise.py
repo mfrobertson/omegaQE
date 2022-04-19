@@ -1,4 +1,5 @@
 import numpy as np
+from cosmology import Cosmology
 
 
 class Noise:
@@ -26,6 +27,7 @@ class Noise:
         """
         self.N0 = None
         self.cmb_offset = None
+        self._cosmo = Cosmology()
 
     def _get_N0_phi(self, ellmax):
         return np.concatenate((np.zeros(self.cmb_offset), self.N0[0][:ellmax + 1 - self.cmb_offset]))
@@ -94,12 +96,44 @@ class Noise:
         return ones/(arcmin2_to_strad * n)
 
     def get_cib_shot_N(self, nu, ellmax=4000):
-        # 1309.0382 Table 6
+        # 1309.0382 Table 9
         ones = np.ones(ellmax + 1)
         if nu == 353e9:
-            N = 225 * 1e-12    # 1e-12 to change units to MJy^2/sr
+            N = 262 * 1e-12    # 1e-12 to change units to MJy^2/sr
         elif nu == 545e9:
-            N = 1454 * 1e-12
+            N = 1690 * 1e-12
         elif nu == 857e9:
-            N = 5628 * 1e-12
+            N = 5364 * 1e-12
         return ones * N
+
+    def _microK2_to_MJy2(self, value, nu):
+        if nu == 353e9:
+            factor = 287
+        elif nu == 545e9:
+            factor = 58
+        elif nu == 857e9:
+            factor = 2.3
+        return value * 1e-12 * factor ** 2
+
+    def get_dust_N(self, nu, ellmax=4000):
+        # 1303.5075 eq 9,
+        ells = np.arange(ellmax + 1)
+        # alpha = 0.387             # parameters from 1609.08942 pg 8
+        # l_c = 162.9
+        # gamma = 0.168
+        alpha = 0.169              # parameters from 1303.5075 pg 6
+        l_c = 905
+        gamma = 0.427
+        if nu == 353e9:
+            A = 6e2              # Tuned to match 1705.02332 fig 2 and 3, and 2110.09730 fig 2
+        elif nu == 545e9:
+            A = 2e5              # Complete guess
+        elif nu == 857e9:
+            A = 6e8         # from 1303.5075 pg 6
+        D_l = self._microK2_to_MJy2(A, nu) * ((100 / ells) ** alpha / ((1 + (ells / l_c) ** 2) ** (gamma / 2)))
+        return 2*np.pi * D_l/(ells*(ells+1))
+
+    def get_cmb_N(self, nu, ellmax=4000):
+        # Important for 353e9 according to 1609.08942
+        cmb_ps = self._cosmo.get_cmb_ps(ellmax)
+        return self._microK2_to_MJy2(cmb_ps, nu)
