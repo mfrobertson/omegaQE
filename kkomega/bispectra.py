@@ -125,7 +125,7 @@ class Bispectra:
             M2 = self._mode.components(L2, L1, typ="cib-kappa", zmin=zmin, zmax=zmax, nu=nu)
             return M1, M2, L12_dot, sign
         if typ == "gal-cib-omega" or typ == "gIw":
-            sign = -1
+            sign = 1
             if M_spline:
                 M1 = self._M_gI_spline.ev(L1, L2)
                 M2 = self._M_Ig_spline.ev(L2, L1)
@@ -134,7 +134,7 @@ class Bispectra:
             M2 = self._mode.components(L2, L1, typ="cib-gal", zmin=zmin, zmax=zmax, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
             return M1, M2, L12_dot, sign
         if typ == "cib-gal-omega" or typ == "Igw":
-            sign = -1
+            sign = 1
             if M_spline:
                 M1 = self._M_Ig_spline.ev(L1, L2)
                 M2 = self._M_gI_spline.ev(L2, L1)
