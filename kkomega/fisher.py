@@ -87,7 +87,7 @@ class Fisher:
             M = np.load(f"{dir}M.npy")
             self.bi.build_M_spline(M_type, ells, M)
 
-    def _get_L3(self, L1, L2, theta):
+    def _get_third_L(self, L1, L2, theta):
         return np.sqrt(L1**2 + L2**2 - (2*L1*L2*np.cos(theta).astype("double"))).astype("double")
 
     def _interpolate(self, arr):
@@ -199,60 +199,6 @@ class Fisher:
             return C1_spline, C2_spline, C3_spline
         return C1, C2, C3_spline
 
-    def _optimal_Ns_1(self, combo, typs, C0):
-        return 1/C0
-
-    def _optimal_Ns_2(self, combo, typs, C0, C1, C01):
-
-        D = (C0 * C1) - C01 ** 2
-        if combo == typs[0]+typs[0]:
-           return C1/D
-        elif combo == typs[1] + typs[1]:
-            return C0/D
-        elif combo == typs[0] + typs[1] or combo == typs[1] + typs[0]:
-            return -C01/D
-
-    def _optimal_Ns_3(self, combo, typs, C0, C1, C2, C01, C02, C12):
-        D = C0 * C1 * C2 - (C0*C12**2) - (C1*C02**2) - (C2*C01**2) + (2*C01*C02*C12)
-        if combo == typs[0]+typs[0]:
-           return (C1*C2 - C12**2)/D
-        elif combo == typs[1] + typs[1]:
-            return (C0*C2 - C02**2)/D
-        elif combo == typs[2] + typs[2]:
-            return (C0*C1 - C01**2)/D
-        elif combo == typs[0]+typs[1] or combo == typs[1]+typs[0]:
-            return (C02*C12 - C2*C01)/D
-        elif combo == typs[0]+typs[2] or combo == typs[2]+typs[0]:
-            return (C01*C12 - C1*C02)/D
-        elif combo == typs[1]+typs[2] or combo == typs[2]+typs[1]:
-            return (C01*C02 - C0*C12)/D
-
-    def _get_optimal_Ns_analyt(self, Lmax, typ, typs, nu=857e9):
-        N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, tidy=True, ell_factors=self.N0_ell_factors))
-        cov3_spline = N0_omega_spline
-        combo1 = typ[0] + typ[2]
-        combo2 = typ[1] + typ[3]
-        if np.size(typs) == 1:
-            C0 = self._get_Cov(typs[0] + typs[0], Lmax, nu=nu)
-            cov_inv1 = self._optimal_Ns_1(combo1, typs, C0)
-            cov_inv2 = self._optimal_Ns_1(combo2, typs, C0)
-        elif np.size(typs) == 2:
-            C0 = self._get_Cov(typs[0] + typs[0], Lmax, nu=nu)
-            C1 = self._get_Cov(typs[1] + typs[1], Lmax, nu=nu)
-            C01 = self._get_Cov(typs[0] + typs[1], Lmax, nu=nu)
-            cov_inv1 = self._optimal_Ns_2(combo1, typs, C0, C1, C01)
-            cov_inv2 = self._optimal_Ns_2(combo2, typs, C0, C1, C01)
-        elif np.size(typs) == 3:
-            C0 = self._get_Cov(typs[0] + typs[0], Lmax, nu=nu)
-            C1 = self._get_Cov(typs[1] + typs[1], Lmax, nu=nu)
-            C2 = self._get_Cov(typs[2] + typs[2], Lmax, nu=nu)
-            C01 = self._get_Cov(typs[0] + typs[1], Lmax, nu=nu)
-            C02 = self._get_Cov(typs[0] + typs[2], Lmax, nu=nu)
-            C12 = self._get_Cov(typs[1] + typs[2], Lmax, nu=nu)
-            cov_inv1 = self._optimal_Ns_3(combo1, typs, C0, C1, C2, C01, C02, C12)
-            cov_inv2 = self._optimal_Ns_3(combo2, typs, C0, C1, C2, C01, C02, C12)
-        return cov_inv1, cov_inv2, cov3_spline
-
     def _get_C_inv(self, typs, Lmax, nu, gal_win_zmin, gal_win_zmax):
         Ntyps = np.size(typs)
         all_typs = np.char.array(np.concatenate((typs, list('w'))))
@@ -289,13 +235,12 @@ class Fisher:
     def _integral_prep_vec(self, Lmax, dL, Ntheta, typ, Lmin, nu, gal_win_zmin, gal_win_zmax, typs=None, C_inv=None, include_N0_kappa="both"):
         thetas, dTheta = self._get_thetas(Ntheta)
         Ls = np.arange(Lmin, Lmax + 1, dL)
-        L3 = self._get_L3(Ls[:, None], Ls[None, :], thetas[:, None, None])
+        L3 = self._get_third_L(Ls[:, None], Ls[None, :], thetas[:, None, None])
         w = np.ones(np.shape(L3))
         w[L3 < Lmin] = 0
         w[L3 > Lmax] = 0
         if typ[:3] == "opt":
             C1, C2, C3_spline = self._get_optimal_Ns_sympy(Lmax, typ[4:], typs, C_inv)
-            #C1, C2, C3_spline = self._get_optimal_Ns_analyt(Lmax, typ[4:], typs, nu=nu)
             denom = C1[None, Ls, None] * C2[None, None, Ls] / C3_spline(L3)             # These are actually the C_inv
         else:
             C1, C2, C3_spline = self._get_Covs(typ, Lmax, all_splines=False, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
@@ -315,7 +260,6 @@ class Fisher:
     def _integral_prep_arr(self, Lmax, dL, Ntheta, typ, Lmin, nu, gal_win_zmin, gal_win_zmax, typs=None, C_inv=None, include_N0_kappa="both"):
         if typ[:3] == "opt":
             C1, C2, C3_spline = self._get_optimal_Ns_sympy(Lmax, typ[4:], typs, C_inv)
-            # C1, C2, C3_spline = self._get_optimal_Ns_analyt(Lmax, typ[4:], typs)
         else:
             C1, C2, C3_spline = self._get_Covs(typ, Lmax, all_splines=False, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
         thetas, dTheta = self._get_thetas(Ntheta)
@@ -323,38 +267,41 @@ class Fisher:
         weights = np.ones(np.shape(thetas))
         return Ls, thetas, dTheta, weights, C1, C2, C3_spline
 
-    def _get_bispectrum_Fisher_arr_xx(self, typ, Lmax, dL, Ntheta, f_sky, include_N0_kappa, Lmin, nu, gal_win_zmin, gal_win_zmax):
-        Ls, thetas, dTheta, weights, C1, C2, C3_spline = self._integral_prep_arr(Lmax, dL, Ntheta, typ, Lmin, nu, gal_win_zmin, gal_win_zmax, include_N0_kappa=include_N0_kappa)
-        I = np.zeros(np.size(Ls))
-        for iii, L1 in enumerate(Ls):
-            I_tmp = 0
-            for L2 in Ls[iii:]:
-                L3 = self._get_L3(L1, L2, thetas)
-                w = copy.deepcopy(weights)
-                w[L3 > Lmax] = 0
-                w[L3 < Lmin] = 0
-                bispectrum = self.bi.get_bispectrum(typ, L1, L2, L3, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-                denom = 2 * C1[L1] * C2[L2] * C3_spline(L3)
-                I_tmp += L2 * dL * 2 * np.dot(w, dTheta * bispectrum**2 / denom)
-            I[iii] = 2 * np.pi * L1 * dL * I_tmp
-        I *= 2 * f_sky/np.pi * 1/((2*np.pi)**2)
-        return Ls, I
+    # def _get_bispectrum_Fisher_arr_xx(self, typ, Lmax, dL, Ntheta, f_sky, include_N0_kappa, Lmin, nu, gal_win_zmin, gal_win_zmax):
+    #     Ls, thetas, dTheta, weights, C1, C2, C3_spline = self._integral_prep_arr(Lmax, dL, Ntheta, typ, Lmin, nu, gal_win_zmin, gal_win_zmax, include_N0_kappa=include_N0_kappa)
+    #     I = np.zeros(np.size(Ls))
+    #     for iii, L1 in enumerate(Ls):
+    #         I_tmp = 0
+    #         for L2 in Ls[iii:]:
+    #             L3 = self._get_L3(L1, L2, thetas)
+    #             w = copy.deepcopy(weights)
+    #             w[L3 > Lmax] = 0
+    #             w[L3 < Lmin] = 0
+    #             bispectrum = self.bi.get_bispectrum(typ, L1, L2, L3, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+    #             denom = 2 * C1[L1] * C2[L2] * C3_spline(L3)
+    #             I_tmp += L2 * dL * 2 * np.dot(w, dTheta * bispectrum**2 / denom)
+    #         I[iii] = 2 * np.pi * L1 * dL * I_tmp
+    #     I *= 2 * f_sky/np.pi * 1/((2*np.pi)**2)
+    #     return Ls, I
 
-    def _get_bispectrum_Fisher_arr_xy(self, typ, Lmax, dL, Ntheta, f_sky, include_N0_kappa, Lmin, nu, gal_win_zmin, gal_win_zmax):
+    def _get_bispectrum_Fisher_arr(self, typ, Lmax, dL, Ntheta, f_sky, include_N0_kappa, Lmin, nu, gal_win_zmin, gal_win_zmax):
         Ls, thetas, dTheta, weights, C1, C2, C3_spline = self._integral_prep_arr(Lmax, dL, Ntheta, typ, Lmin, nu, gal_win_zmin, gal_win_zmax, include_N0_kappa=include_N0_kappa)
         Cl_xy = self._get_Cl(typ[:2], Lmax, nu, gal_win_zmin, gal_win_zmax)
         I = np.zeros(np.size(Ls))
-        for iii, L1 in enumerate(Ls):
+        for iii, L3 in enumerate(Ls):
             I_tmp = 0
             for L2 in Ls:
-                L3 = self._get_L3(L1, L2, thetas)
+                L1 = self._get_third_L(L3, L2, thetas)
                 w = copy.deepcopy(weights)
-                w[L3 > Lmax] = 0
-                w[L3 < Lmin] = 0
+                w[L1 > Lmax] = 0
+                w[L1 < Lmin] = 0
                 bispectrum = self.bi.get_bispectrum(typ, L1, L2, L3, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-                denom = ((C1[L1] * C2[L2]) + (Cl_xy[L1] * Cl_xy[L2])) * C3_spline(L3)
+                if typ[0] == typ[1]:
+                    denom = 2 * C1[L1] * C2[L2] * C3_spline(L3)
+                else:
+                    denom = ((C1[L1] * C2[L2]) + (Cl_xy[L1] * Cl_xy[L2])) * C3_spline(L3)
                 I_tmp += L2 * dL * 2 * np.dot(w, dTheta * bispectrum ** 2 / denom)
-            I[iii] = 2 * np.pi * L1 * dL * I_tmp
+            I[iii] = 2 * np.pi * L3 * dL * I_tmp
         I *= f_sky / np.pi * 1 / ((2 * np.pi) ** 2)
         return Ls, I
 
@@ -363,7 +310,6 @@ class Fisher:
         Lmin = int(np.min(Ls))
         if typ[:3] == "opt":
             C1, C2, C3_spline = self._get_optimal_Ns_sympy(Lmax, typ[4:], typs, C_inv)
-            # C1, C2, C3_spline = self._get_optimal_Ns_analyt(Lmax, typ[4:], typs)
         else:
             C1_spline, C2_spline, C3_spline = self._get_Covs(typ, Lmax, all_splines=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
         thetas, dTheta = self._get_thetas(Ntheta)
@@ -373,40 +319,44 @@ class Fisher:
         dLs[-1] = dLs[-2]
         return Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline
 
-    def _get_bispectrum_Fisher_sample_xx(self, typ, Ls, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_win_zmin, gal_win_zmax):
-        Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta, typ, nu, gal_win_zmin, gal_win_zmax, include_N0_kappa=include_N0_kappa)
-        I = np.zeros(np.size(Ls))
-        for iii, L1 in enumerate(Ls):
-            I_tmp = 0
-            for jjj, L2 in enumerate(Ls[iii:]):
-                L3 = self._get_L3(L1, L2, thetas)
-                w = copy.deepcopy(weights)
-                w[L3 > Lmax] = 0
-                w[L3 < Lmin] = 0
-                bispectrum = self.bi.get_bispectrum(typ, L1, L2, theta=thetas, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-                denom = 2 * C1_spline(L1) * C2_spline(L2) * C3_spline(L3)
-                I_tmp += L2 * dLs[iii + jjj] * 2 * dTheta * np.dot(w, bispectrum ** 2 / denom)
-            I[iii] = 2 * np.pi * L1 * dLs[iii] * I_tmp
-        I *= 2 * f_sky/np.pi * 1/((2 * np.pi) ** 2)
-        if arr:
-            return Ls, I
-        return np.sum(I)
+    # def _get_bispectrum_Fisher_sample_xx(self, typ, Ls, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_win_zmin, gal_win_zmax):
+    #     Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta, typ, nu, gal_win_zmin, gal_win_zmax, include_N0_kappa=include_N0_kappa)
+    #     I = np.zeros(np.size(Ls))
+    #     for iii, L1 in enumerate(Ls):
+    #         I_tmp = 0
+    #         for jjj, L2 in enumerate(Ls[iii:]):
+    #             L3 = self._get_L3(L1, L2, thetas)
+    #             w = copy.deepcopy(weights)
+    #             w[L3 > Lmax] = 0
+    #             w[L3 < Lmin] = 0
+    #             bispectrum = self.bi.get_bispectrum(typ, L1, L2, theta=thetas, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+    #             denom = 2 * C1_spline(L1) * C2_spline(L2) * C3_spline(L3)
+    #             I_tmp += L2 * dLs[iii + jjj] * 2 * dTheta * np.dot(w, bispectrum ** 2 / denom)
+    #         I[iii] = 2 * np.pi * L1 * dLs[iii] * I_tmp
+    #     I *= 2 * f_sky/np.pi * 1/((2 * np.pi) ** 2)
+    #     if arr:
+    #         return Ls, I
+    #     return np.sum(I)
 
-    def _get_bispectrum_Fisher_sample_xy(self, typ, Ls, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_win_zmin, gal_win_zmax):
+    def _get_bispectrum_Fisher_sample(self, typ, Ls, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_win_zmin, gal_win_zmax):
         Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta,typ, nu, gal_win_zmin, gal_win_zmax, include_N0_kappa=include_N0_kappa)
         I = np.zeros(np.size(Ls))
         Cl_xy_spline = self._interpolate(self._get_Cl(typ[:2], Lmax, nu, gal_win_zmin, gal_win_zmax))
-        for iii, L1 in enumerate(Ls):
+        for iii, L3 in enumerate(Ls):
             I_tmp = 0
             for jjj, L2 in enumerate(Ls):
-                L3 = self._get_L3(L1, L2, thetas)
+                L1 = self._get_third_L(L3, L2, thetas)
                 w = copy.deepcopy(weights)
-                w[L3 > Lmax] = 0
-                w[L3 < Lmin] = 0
-                bispectrum = self.bi.get_bispectrum(typ, L1, L2, theta=thetas, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-                denom = ((C1_spline(L1) * C2_spline(L2)) + (Cl_xy_spline(L1) * Cl_xy_spline(L2))) * C3_spline(L3)
+                w[L1 > Lmax] = 0
+                w[L1 < Lmin] = 0
+                thetas12 = np.arcsin(L3 * np.sin(thetas) / L1)
+                bispectrum = self.bi.get_bispectrum(typ, L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+                if typ[0] == typ[1]:
+                    denom = 2 * C1_spline(L1) * C2_spline(L2) * C3_spline(L3)
+                else:
+                    denom = ((C1_spline(L1) * C2_spline(L2)) + (Cl_xy_spline(L1) * Cl_xy_spline(L2))) * C3_spline(L3)
                 I_tmp += L2 * dLs[jjj] * 2 * dTheta * np.dot(w, bispectrum ** 2 / denom)
-            I[iii] = 2 * np.pi * L1 * dLs[iii] * I_tmp
+            I[iii] = 2 * np.pi * L3 * dLs[iii] * I_tmp
         I *= f_sky/np.pi * 1/((2 * np.pi) ** 2)
         if arr:
             return Ls, I
@@ -425,11 +375,11 @@ class Fisher:
         for iii, L1 in enumerate(Ls):
             I_tmp = 0
             for L2 in Ls:
-                L3 = self._get_L3(L1, L2, thetas)
+                L3 = self._get_third_L(L1, L2, thetas)
                 w = copy.deepcopy(weights)
                 w[L3 > Lmax] = 0
                 w[L3 < Lmin] = 0
-                bi1 = self.bi.get_bispectrum(typ[4:6]+"w", L1, L2, L3, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+                bi1 = self.bi.get_bispectrum(typ[4:6] + "w", L1, L2, L3, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
                 bi2 = self.bi.get_bispectrum(typ[6:] + "w", L1, L2, L3, M_spline=True, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
                 covs = C1[L1] * C2[L2] / C3_spline(L3)
                 I_tmp += L2 * dL * 2 * np.dot(w, dTheta * bi1 * bi2 * covs)
@@ -473,15 +423,32 @@ class Fisher:
         return F
 
     def get_bispectrum_Fisher(self, typ, Lmax=4000, dL=1, Ls=None, Ntheta=10, f_sky=1, arr=False, Lmin=30, nu=857e9, gal_win_zmin=None, gal_win_zmax=None, include_N0_kappa="both"):
+        """
+
+        Parameters
+        ----------
+        typ
+        Lmax
+        dL
+        Ls
+        Ntheta
+        f_sky
+        arr
+        Lmin
+        nu
+        gal_win_zmin
+        gal_win_zmax
+        include_N0_kappa
+
+        Returns
+        -------
+
+        """
         self.bi.check_type(typ)
         if Ls is not None:
-            if typ[0] == typ[1]:
-                return self._get_bispectrum_Fisher_sample_xx(typ, Ls, Ntheta, f_sky, arr, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
-            return self._get_bispectrum_Fisher_sample_xy(typ, Ls, Ntheta, f_sky, arr, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
+            return self._get_bispectrum_Fisher_sample(typ, Ls, Ntheta, f_sky, arr, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
         if arr:
-            if typ[0] == typ[1]:
-                return self._get_bispectrum_Fisher_arr_xx(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
-            return self._get_bispectrum_Fisher_arr_xy(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
+            return self._get_bispectrum_Fisher_arr(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, include_N0_kappa=include_N0_kappa)
 
 
