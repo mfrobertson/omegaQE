@@ -40,7 +40,7 @@ class Modecoupling:
         if ndim == 2:
             return np.repeat(zs[np.newaxis, :, :], Nells, 0)
 
-    def _integral_prep(self, Nchi, zmin, zmax, typ, nu):
+    def _integral_prep(self, Nchi, zmin, zmax, typ, nu, gal_win_zmin, gal_win_zmax):
         Chi_min = self._cosmo.z_to_Chi(zmin)
         if zmax is not None:
             Chi_max = self._cosmo.z_to_Chi(zmax)
@@ -53,7 +53,7 @@ class Modecoupling:
         if typ == "kappa-kappa" or typ == "kappa-gal" or typ == "kappa-cib":
             win1 = win2 = cmb_lens_window
         elif typ == "gal-gal" or typ == "gal-kappa" or typ == "gal-cib":
-            gal_cluster_window = self._cosmo.gal_cluster_window_Chi(Chis)
+            gal_cluster_window = self._cosmo.gal_cluster_window_Chi(Chis, zmin=gal_win_zmin, zmax=gal_win_zmax)
             win1 = cmb_lens_window
             win2 = gal_cluster_window
         elif typ == "cib-cib" or typ == "cib-kappa" or typ == "cib-gal":
@@ -62,11 +62,11 @@ class Modecoupling:
             win2 = cib_window
         return zs, Chis, dChi, win1, win2
 
-    def _get_ps(self, ells, Chis, Chi_source2, typ, nu, recalc_PK):
+    def _get_ps(self, ells, Chis, Chi_source2, typ, nu, gal_win_zmin, gal_win_zmax, recalc_PK):
         if typ == "kappa-kappa" or typ == "gal-kappa" or typ == "cib-kappa":
             return self._powerspectra.get_kappa_ps_2source(ells, Chis, Chi_source2, recalc_PK=recalc_PK)
         if typ == "gal-gal" or typ == "kappa-gal" or typ == "cib-gal":
-            return (-1) * self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK)
+            return (-1) * self._powerspectra.get_gal_kappa_ps(ells, Chis, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, recalc_PK=recalc_PK)
         if typ == "cib-cib" or typ == "kappa-cib" or typ == "gal-cib":
             return (-1) * self._powerspectra.get_cib_kappa_ps(ells, nu=nu, Chi_source1=Chis, recalc_PK=recalc_PK)
 
@@ -76,8 +76,8 @@ class Modecoupling:
         if typ == "gal-gal" or typ == "gal-kappa" or typ == "cib-cib" or typ == "cib-kappa" or typ == "gal-cib" or typ == "cib-gal":
             return self._cosmo.get_matter_ps(self.matter_weyl_PK, zs, ks, curly=False, weyl_scaled=False, typ="matter-weyl")
 
-    def _components(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, extended, recalc_PK):
-        zs, Chis, dChi, win1, win2 = self._integral_prep(Nchi, zmin, zmax, typ, nu)
+    def _components(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_PK):
+        zs, Chis, dChi, win1, win2 = self._integral_prep(Nchi, zmin, zmax, typ, nu, gal_win_zmin, gal_win_zmax)
         Nells1 = np.size(ells1)
         ells1_vec = self._vectorise_ells(ells1, zs.ndim)
         zs = self._vectorise_zs(zs, Nells1)
@@ -85,7 +85,7 @@ class Modecoupling:
             Chi_source2 = self._cosmo.get_chi_star()
         else:
             Chi_source2 = None
-        Cl = self._get_ps(ells2, Chis, Chi_source2, typ, nu, recalc_PK=recalc_PK)
+        Cl = self._get_ps(ells2, Chis, Chi_source2, typ, nu, gal_win_zmin, gal_win_zmax, recalc_PK=recalc_PK)
         if recalc_PK:
             self.weyl_PK = self._powerspectra.weyl_PK
             self.matter_weyl_PK = self._powerspectra.matter_weyl_PK
@@ -104,10 +104,10 @@ class Modecoupling:
             return I.sum(axis=1) * (ells1 + 0.5) ** ell_power
         return I.sum(axis=1) * ells1 ** ell_power
 
-    def _matrix(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, extended, recalc_weyl):
+    def _matrix(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_weyl):
         M = np.ones((np.size(ells1), np.size(ells2)))
         for iii, ell1 in enumerate(ells1):
-            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, extended, recalc_weyl)
+            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_weyl)
         return M
 
     def _check_type(self, typ):
@@ -123,7 +123,7 @@ class Modecoupling:
         return True
 
 
-    def components(self, ells1, ells2, typ="kappa-kappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, extended=True, recalc_PK=False):
+    def components(self, ells1, ells2, typ="kappa-kappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, gal_win_zmin=None, gal_win_zmax=None, extended=True, recalc_PK=False):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
 
@@ -154,9 +154,9 @@ class Modecoupling:
             1D array of the matrix components at [ells, ells2].
         """
         self._check_type(typ)
-        return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, extended, recalc_PK)
+        return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_PK)
 
-    def spline(self, ells_sample=None, M_matrix=None, typ = "kappa-kappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, extended=True, recalc_PK=False):
+    def spline(self, ells_sample=None, M_matrix=None, typ = "kappa-kappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, gal_win_zmin=None, gal_win_zmax=None, extended=True, recalc_PK=False):
         """
         Produces 2D spline of the mode coupling matrix.
 
@@ -192,7 +192,7 @@ class Modecoupling:
         if ells_sample is None:
             ells_sample = self.generate_sample_ells()
         self._check_type(typ)
-        M = self._matrix(ells_sample, ells_sample, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, extended, recalc_PK)
+        M = self._matrix(ells_sample, ells_sample, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_PK)
         return RectBivariateSpline(ells_sample, ells_sample, M)
 
     def generate_sample_ells(self, ellmax=10000, Nells=100):
