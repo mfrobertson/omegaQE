@@ -131,7 +131,9 @@ class Noise:
         elif nu == 857e9:
             A = 6e8         # from 1303.5075 pg 6
         D_l = self._microK2_to_MJy2(A, nu) * ((100 / ells) ** alpha / ((1 + (ells / l_c) ** 2) ** (gamma / 2)))
-        return 2*np.pi * D_l/(ells*(ells+1))
+        N_dust = 2*np.pi * D_l/(ells*(ells+1))
+        N_dust[0] = 0
+        return N_dust
 
     def get_cmb_N(self, nu, ellmax=4000):
         # Important for 353e9 according to 1609.08942
