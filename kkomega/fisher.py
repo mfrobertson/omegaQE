@@ -1,9 +1,9 @@
 import numpy as np
-from _bispectra import Bispectra
+from bispectra import Bispectra
 from powerspectra import Powerspectra
 from noise import Noise
 from maths import Maths
-from _modecoupling import Modecoupling
+from modecoupling import Modecoupling
 from scipy.interpolate import InterpolatedUnivariateSpline
 from sympy.matrices import Matrix
 from sympy import lambdify
@@ -233,11 +233,10 @@ class Fisher:
         gal_win_zmin_a = gal_bins[0]
         gal_win_zmax_a = gal_bins[1]
         if typ == "aa":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
+            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_a, zmax=gal_win_zmax_a)
             return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_a, gal_win_zmax_a) + N0_gal
         elif typ == "ga" or typ == "ag":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a)
         elif typ == "ka" or typ == "ak":
             return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_a, gal_win_zmax_a)
         elif typ == "Ia" or typ == "aI":
@@ -246,59 +245,50 @@ class Fisher:
         gal_win_zmin_b = gal_bins[2]
         gal_win_zmax_b = gal_bins[3]
         if typ == "bb":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
+            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_b, zmax=gal_win_zmax_b)
             return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_b, gal_win_zmax_b) + N0_gal
         elif typ == "gb" or typ == "bg":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b)
         elif typ == "kb" or typ == "bk":
             return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_b, gal_win_zmax_b)
         elif typ == "Ib" or typ == "bI":
             return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_b, gal_win_zmax_b)
         elif typ == "ab" or typ == "ba":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b)
 
         gal_win_zmin_c = gal_bins[4]
         gal_win_zmax_c = gal_bins[5]
         if typ == "cc":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
+            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_c, zmax=gal_win_zmax_c)
             return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_c, gal_win_zmax_c) + N0_gal
         elif typ == "gc" or typ == "cg":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c)
         elif typ == "kc" or typ == "ck":
             return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_c, gal_win_zmax_c)
         elif typ == "Ic" or typ == "cI":
             return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_c, gal_win_zmax_c)
         elif typ == "ac" or typ == "ca":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_c, gal_win_zmax_c) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_c, gal_win_zmax_c)
         elif typ == "bc" or typ == "cb":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_c, gal_win_zmax_c) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_c, gal_win_zmax_c)
 
         gal_win_zmin_d = gal_bins[6]
         gal_win_zmax_d = gal_bins[7]
         if typ == "dd":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
+            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_d, zmax=gal_win_zmax_d)
             return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d, gal_win_zmin_d, gal_win_zmax_d) + N0_gal
         elif typ == "gd" or typ == "dg":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d)
         elif typ == "kd" or typ == "dk":
             return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_d, gal_win_zmax_d)
         elif typ == "Id" or typ == "dI":
             return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_d, gal_win_zmax_d)
         elif typ == "ad" or typ == "da":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_d, gal_win_zmax_d) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_d, gal_win_zmax_d)
         elif typ == "bd" or typ == "db":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_d, gal_win_zmax_d) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_d, gal_win_zmax_d)
         elif typ == "cd" or typ == "dc":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_d, gal_win_zmax_d) + N0_gal
+            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_d, gal_win_zmax_d)
 
     def _get_Covs(self, typ, Lmax, all_splines=False, nu=857e9, gal_bins=(None,None,None,None), include_N0_kappa="both"):
         N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, ell_factors=self.N0_ell_factors))

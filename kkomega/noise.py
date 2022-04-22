@@ -90,10 +90,13 @@ class Noise:
             return self._replace_bad_Ls(N0)
         return N0
 
-    def get_gal_shot_N(self, n=40, ellmax=4000):
+    def get_gal_shot_N(self, n=40, ellmax=4000, zmin=None, zmax=None):
+        fraction = 1
+        if zmin is not None and zmax is not None:
+            fraction = self._cosmo.gal_window_fraction(zmin, zmax)
         arcmin2_to_strad = 11818080
         ones = np.ones(ellmax + 1)
-        return ones/(arcmin2_to_strad * n)
+        return ones/(arcmin2_to_strad * n * fraction)
 
     def get_cib_shot_N(self, nu, ellmax=4000):
         # 1309.0382 Table 9

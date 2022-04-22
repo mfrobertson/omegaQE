@@ -64,7 +64,7 @@ class Cosmology:
         if typ == "LSST_gold":
             return self._gal_z_LSST_distribution
 
-    def gal_cluster_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None):
+    def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None):
         """
         1705.02332 equation 14 and B1 (originally from 0912.0201)
         Parameters
@@ -89,7 +89,7 @@ class Cosmology:
         window = (dn_dz * b) / norm
         return window
 
-    def gal_cluster_window_Chi(self, Chi, typ="LSST_gold", zmin=None, zmax=None):
+    def gal_window_Chi(self, Chi, typ="LSST_gold", zmin=None, zmax=None):
         """
         1906.08760 eq 2.7
         Parameters
@@ -104,9 +104,44 @@ class Cosmology:
 
         """
         z = self.Chi_to_z(Chi)
-        window_z = self.gal_cluster_window_z(z, typ, zmin, zmax)
+        window_z = self.gal_window_z(z, typ, zmin, zmax)
         window = window_z * self.get_hubble(z)
         return window
+
+    def _gal_window_z_no_norm(self, z, typ="LSST_gold", zmin=None, zmax=None):
+        z0 = 0.311
+        z_distr_func = self._get_z_distr_func(typ)
+        dn_dz = z_distr_func(z)
+        b = 1 + 0.84 * z
+        zs = np.linspace(0, 100, 2000)
+        dz = zs[1] - zs[0]
+        norm = np.sum(dz * z_distr_func(zs))
+        window = (dn_dz * b) / norm
+        if zmin is not None and zmax is not None:
+            return self._maths.rectangular_pulse_steps(z, zmin, zmax) * window
+        return window
+
+    def gal_window_fraction(self, zmin, zmax):
+        """
+
+        Parameters
+        ----------
+        zmin
+        zmax
+
+        Returns
+        -------
+
+        """
+        zs = np.linspace(zmin, zmax, 1000)
+        window = self._gal_window_z_no_norm(zs, zmin=zmin, zmax=zmax)
+        total_zs = np.linspace(0, 10, 1000)
+        total_window = self._gal_window_z_no_norm(total_zs)
+        dz = zs[1] - zs[0]
+        I = np.sum(dz * window)
+        dz = total_zs[1] - total_zs[0]
+        I_total = np.sum(dz * total_window)
+        return I / I_total
 
     def _SED_func(self, nu):
         #"1801.05396 uses 857 GHz (pg. 2)"

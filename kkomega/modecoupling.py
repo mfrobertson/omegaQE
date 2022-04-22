@@ -53,14 +53,14 @@ class Modecoupling:
         if typ[0] == "k":
             win1 = win2 = cmb_lens_window
         elif typ[0] == "g":
-            gal_cluster_window = self._cosmo.gal_cluster_window_Chi(Chis)
+            gal_window = self._cosmo.gal_window_Chi(Chis)
             win1 = cmb_lens_window
-            win2 = gal_cluster_window
+            win2 = gal_window
         elif typ[0] in ["a", "b", "c", "d"]:
             index = 2*(ord(typ[0]) - ord("a"))
-            gal_cluster_window = self._cosmo.gal_cluster_window_Chi(Chis, zmin=gal_bins[index], zmax=gal_bins[index+1])
+            gal_window = self._cosmo.gal_window_Chi(Chis, zmin=gal_bins[index], zmax=gal_bins[index+1])
             win1 = cmb_lens_window
-            win2 = gal_cluster_window
+            win2 = gal_window
         elif typ[0] == "I":
             cib_window = self._cosmo.cib_window_Chi(Chis, nu=nu)
             win1 = cmb_lens_window

@@ -1,4 +1,4 @@
-from _modecoupling import Modecoupling
+from modecoupling import Modecoupling
 import numpy as np
 
 
