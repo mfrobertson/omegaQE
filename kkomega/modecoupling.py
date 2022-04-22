@@ -40,7 +40,7 @@ class Modecoupling:
         if ndim == 2:
             return np.repeat(zs[np.newaxis, :, :], Nells, 0)
 
-    def _integral_prep(self, Nchi, zmin, zmax, typ, nu, gal_win_zmin, gal_win_zmax):
+    def _integral_prep(self, Nchi, zmin, zmax, typ, nu, gal_bins):
         Chi_min = self._cosmo.z_to_Chi(zmin)
         if zmax is not None:
             Chi_max = self._cosmo.z_to_Chi(zmax)
@@ -50,34 +50,42 @@ class Modecoupling:
         dChi = Chis[1] - Chis[0]
         zs = self._cosmo.Chi_to_z(Chis)
         cmb_lens_window = self._cosmo.cmb_lens_window(Chis, self._cosmo.get_chi_star())
-        if typ == "kappa-kappa" or typ == "kappa-gal" or typ == "kappa-cib":
+        if typ[0] == "k":
             win1 = win2 = cmb_lens_window
-        elif typ == "gal-gal" or typ == "gal-kappa" or typ == "gal-cib":
-            gal_cluster_window = self._cosmo.gal_cluster_window_Chi(Chis, zmin=gal_win_zmin, zmax=gal_win_zmax)
+        elif typ[0] == "g":
+            gal_cluster_window = self._cosmo.gal_cluster_window_Chi(Chis)
             win1 = cmb_lens_window
             win2 = gal_cluster_window
-        elif typ == "cib-cib" or typ == "cib-kappa" or typ == "cib-gal":
+        elif typ[0] in ["a", "b", "c", "d"]:
+            index = 2*(ord(typ[0]) - ord("a"))
+            gal_cluster_window = self._cosmo.gal_cluster_window_Chi(Chis, zmin=gal_bins[index], zmax=gal_bins[index+1])
+            win1 = cmb_lens_window
+            win2 = gal_cluster_window
+        elif typ[0] == "I":
             cib_window = self._cosmo.cib_window_Chi(Chis, nu=nu)
             win1 = cmb_lens_window
             win2 = cib_window
         return zs, Chis, dChi, win1, win2
 
-    def _get_ps(self, ells, Chis, Chi_source2, typ, nu, gal_win_zmin, gal_win_zmax, recalc_PK):
-        if typ == "kappa-kappa" or typ == "gal-kappa" or typ == "cib-kappa":
+    def _get_ps(self, ells, Chis, Chi_source2, typ, nu, gal_bins, recalc_PK):
+        if typ[1] == "k":
             return self._powerspectra.get_kappa_ps_2source(ells, Chis, Chi_source2, recalc_PK=recalc_PK)
-        if typ == "gal-gal" or typ == "kappa-gal" or typ == "cib-gal":
-            return (-1) * self._powerspectra.get_gal_kappa_ps(ells, Chis, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, recalc_PK=recalc_PK)
-        if typ == "cib-cib" or typ == "kappa-cib" or typ == "gal-cib":
+        if typ[1] == "g":
+            return (-1) * self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK)
+        if typ[1] in ["a", "b", "c", "d"]:
+            index = 2*(ord(typ[1]) - ord("a"))
+            return (-1) * self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK, gal_win_zmin=gal_bins[index], gal_win_zmax=gal_bins[index+1])
+        if typ[1] == "I":
             return (-1) * self._powerspectra.get_cib_kappa_ps(ells, nu=nu, Chi_source1=Chis, recalc_PK=recalc_PK)
 
     def _get_matter_ps(self, typ, zs, ks):
-        if typ == "kappa-kappa" or typ == "kappa-gal" or typ == "kappa-cib":
+        if typ[0] == "k":
             return self._cosmo.get_matter_ps(self.weyl_PK, zs, ks, curly=False, weyl_scaled=False)
-        if typ == "gal-gal" or typ == "gal-kappa" or typ == "cib-cib" or typ == "cib-kappa" or typ == "gal-cib" or typ == "cib-gal":
+        else:
             return self._cosmo.get_matter_ps(self.matter_weyl_PK, zs, ks, curly=False, weyl_scaled=False, typ="matter-weyl")
 
-    def _components(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_PK):
-        zs, Chis, dChi, win1, win2 = self._integral_prep(Nchi, zmin, zmax, typ, nu, gal_win_zmin, gal_win_zmax)
+    def _components(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK):
+        zs, Chis, dChi, win1, win2 = self._integral_prep(Nchi, zmin, zmax, typ, nu, gal_bins)
         Nells1 = np.size(ells1)
         ells1_vec = self._vectorise_ells(ells1, zs.ndim)
         zs = self._vectorise_zs(zs, Nells1)
@@ -85,7 +93,7 @@ class Modecoupling:
             Chi_source2 = self._cosmo.get_chi_star()
         else:
             Chi_source2 = None
-        Cl = self._get_ps(ells2, Chis, Chi_source2, typ, nu, gal_win_zmin, gal_win_zmax, recalc_PK=recalc_PK)
+        Cl = self._get_ps(ells2, Chis, Chi_source2, typ, nu, gal_bins, recalc_PK=recalc_PK)
         if recalc_PK:
             self.weyl_PK = self._powerspectra.weyl_PK
             self.matter_weyl_PK = self._powerspectra.matter_weyl_PK
@@ -96,22 +104,22 @@ class Modecoupling:
         step = self._maths.rectangular_pulse_steps(ks, kmin, kmax)
         matter_ps = self._get_matter_ps(typ, zs, ks)
         I = step * matter_ps / Chis ** 2 * dChi * win1 * win2 * Cl
-        if typ == "kappa-kappa" or typ == "kappa-gal" or typ == "kappa-cib":
+        if typ[0] == "k":
             ell_power = 4
-        elif typ == "gal-gal" or typ == "gal-kappa" or typ == "cib-cib" or typ == "cib-kappa" or typ == "cib-gal" or typ == "gal-cib":
+        else:
             ell_power = 2
         if extended:
             return I.sum(axis=1) * (ells1 + 0.5) ** ell_power
         return I.sum(axis=1) * ells1 ** ell_power
 
-    def _matrix(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_weyl):
+    def _matrix(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_weyl):
         M = np.ones((np.size(ells1), np.size(ells2)))
         for iii, ell1 in enumerate(ells1):
-            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_weyl)
+            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_weyl)
         return M
 
     def _check_type(self, typ):
-        typs = ["kappa-kappa", "kappa-gal", "gal-kappa", "gal-gal", "cib-cib", "cib-kappa", "kappa-cib", "gal-cib", "cib-gal"]
+        typs = self.get_M_types()
         if typ not in typs:
             raise ValueError(f"Modecoupling type {typ} not from accepted types: {typs}")
 
@@ -122,8 +130,12 @@ class Modecoupling:
             return False
         return True
 
+    def get_M_types(self):
+        observables = np.char.array(list("kgIabcd"))
+        return (observables[:, None] + observables[None, :]).flatten()
 
-    def components(self, ells1, ells2, typ="kappa-kappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, gal_win_zmin=None, gal_win_zmax=None, extended=True, recalc_PK=False):
+
+    def components(self, ells1, ells2, typ="kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None), extended=True, recalc_PK=False):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
 
@@ -154,9 +166,9 @@ class Modecoupling:
             1D array of the matrix components at [ells, ells2].
         """
         self._check_type(typ)
-        return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_PK)
+        return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK)
 
-    def spline(self, ells_sample=None, M_matrix=None, typ = "kappa-kappa", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, gal_win_zmin=None, gal_win_zmax=None, extended=True, recalc_PK=False):
+    def spline(self, ells_sample=None, M_matrix=None, typ = "kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None), extended=True, recalc_PK=False):
         """
         Produces 2D spline of the mode coupling matrix.
 
@@ -192,7 +204,7 @@ class Modecoupling:
         if ells_sample is None:
             ells_sample = self.generate_sample_ells()
         self._check_type(typ)
-        M = self._matrix(ells_sample, ells_sample, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_win_zmin, gal_win_zmax, extended, recalc_PK)
+        M = self._matrix(ells_sample, ells_sample, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK)
         return RectBivariateSpline(ells_sample, ells_sample, M)
 
     def generate_sample_ells(self, ellmax=10000, Nells=100):

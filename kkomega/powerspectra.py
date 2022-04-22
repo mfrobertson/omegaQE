@@ -171,10 +171,11 @@ class Powerspectra:
             return (-1) * I.sum(axis=1) * (ells + 0.5) ** 2
         return (-1) * I.sum(axis=1) * ells ** 2
 
-    def _Cl_gal(self, ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin, gal_win_zmax, extended):
+    def _Cl_gal(self, ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended):
         step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window = self._cosmo.gal_cluster_window_Chi(Chis, zmin=gal_win_zmin, zmax=gal_win_zmax)
-        I = step * matter_ps/(Chis)**2 * dChi * window ** 2
+        window1 = self._cosmo.gal_cluster_window_Chi(Chis, zmin=gal_win_zmin_a, zmax=gal_win_zmax_a)
+        window2 = self._cosmo.gal_cluster_window_Chi(Chis, zmin=gal_win_zmin_b, zmax=gal_win_zmax_b)
+        I = step * matter_ps/(Chis)**2 * dChi * window1 * window2
         return I.sum(axis=1)
 
     def _Cl_cib_kappa(self, ells, nu, Chi_source1, Nchi, kmin, kmax, extended, bias):
@@ -320,7 +321,7 @@ class Powerspectra:
             self.matter_weyl_PK = self._get_PK("matter-weyl", np.max(ells), Nchi)
         return self._Cl_gal_kappa(ells, Chi_source1, Nchi, kmin, kmax, gal_win_zmin, gal_win_zmax, extended)
 
-    def get_gal_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, gal_win_zmin=None, gal_win_zmax=None, extended=True, recalc_PK=False):
+    def get_gal_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, extended=True, recalc_PK=False):
         """
         Return the Limber approximated lensing convergence power spectrum.
 
@@ -350,7 +351,7 @@ class Powerspectra:
         """
         if recalc_PK or self.matter_PK is None:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
-        return self._Cl_gal(ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin, gal_win_zmax, extended)
+        return self._Cl_gal(ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended)
 
     def get_cib_kappa_ps(self, ells, nu=857e9, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=True, bias=None, recalc_PK=False):
         """

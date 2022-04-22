@@ -1,4 +1,4 @@
-from modecoupling import Modecoupling
+from _modecoupling import Modecoupling
 import numpy as np
 
 
@@ -7,6 +7,14 @@ class Bispectra:
     Calculates the convergence and convergence-rotation bispectrum to leading order in the Post Born approximation.
 
     """
+
+    class M_spline:
+
+
+        def __init__(self, spline, nu, gal_bins):
+            self.spline = spline
+            self.nu = nu
+            self.gal_bins = gal_bins
 
     def __init__(self):
         """
@@ -22,33 +30,7 @@ class Bispectra:
             2D array of the modecoupling matrix at calculated at the positions given by ells_sample.
         """
         self._mode = Modecoupling()
-        self._M_kk_spline = None
-        self._M_gk_spline = None
-        self._M_kg_spline = None
-        self._M_gg_spline = None
-        self._M_Ik_spline = None
-        self._M_kI_spline = None
-        self._M_II_spline = None
-        self._M_gI_spline = None
-        self._M_Ig_spline = None
-        self._Ik_nu = None
-        self._kI_nu = None
-        self._II_nu = None
-        self._Ig_nu = None
-        self._gI_nu = None
-        self._gg_win_zmin = None
-        self._gg_win_zmax = None
-        self._gk_win_zmin = None
-        self._gk_win_zmax = None
-        self._kg_win_zmin = None
-        self._kg_win_zmax = None
-        self._gI_win_zmin = None
-        self._gI_win_zmax = None
-        self._Ig_win_zmin = None
-        self._Ig_win_zmax = None
-
-        #if M_spline:
-            #self.build_M_spline(ells_sample, M_matrix, zmin, zmax)
+        self._M_splines = dict.fromkeys(self._mode.get_M_types())
 
     def _triangle_dot_product(self, mag1, mag2, mag3):
         return (mag1**2 + mag2**2 - mag3**2)/2
@@ -57,94 +39,30 @@ class Bispectra:
         s = (mag1 + mag2 + mag3)/2
         return 2 * np.sqrt(s*(s-mag1)*(s-mag2)*(s-mag3))
 
-    def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=857e9, gal_win_zmin=None, gal_win_zmax=None):
+    def _get_sign(self, typ):
+        if typ == "kk":
+            return 1
+        if typ[0] == "k" or typ[1] == "k":
+            return -1
+        return 1
+
+    def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None)):
         L12_dot = None
         if L3 is not None:
             L12_dot = self._triangle_dot_product(L1, L2, L3)
-        if typ == "kappa-kappa-kappa" or typ == "kkk" or typ == "kappa-kappa-omega" or typ == "kkw" or typ == "xxw" or typ == "xyw" or typ == "yyw" or typ == "yxw" or typ == "zzw" or typ == "zxw" or typ == "xzw" or typ == "zyw" or typ == "yzw":
-            sign = 1
-            if M_spline:
-                M1 = self._M_kk_spline.ev(L1, L2)
-                M2 = self._M_kk_spline.ev(L2, L1)
-                return M1, M2, L12_dot, sign
-            M1 = self._mode.components(L1, L2, typ="kappa-kappa", zmin=zmin, zmax=zmax)
-            M2 = self._mode.components(L2, L1, typ="kappa-kappa", zmin=zmin, zmax=zmax)
+        M_typ1 = typ[:2]
+        M_typ2 = M_typ1[::-1]
+        sign = self._get_sign(M_typ1)
+        if M_spline:
+            M1 = self._M_splines[M_typ1].spline.ev(L1, L2)
+            M2 = self._M_splines[M_typ2].spline.ev(L2, L1)
             return M1, M2, L12_dot, sign
-        if typ == "gal-gal-omega" or typ == "ggw":
-            sign = 1
-            if M_spline:
-                M1 = self._M_gg_spline.ev(L1, L2)
-                M2 = self._M_gg_spline.ev(L2, L1)
-                return M1, M2, L12_dot, sign
-            M1 = self._mode.components(L1, L2, typ="gal-gal", zmin=zmin, zmax=zmax, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            M2 = self._mode.components(L2, L1, typ="gal-gal", zmin=zmin, zmax=zmax, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            return M1, M2, L12_dot, sign
-        if typ == "gal-kappa-omega" or typ == "gkw":
-            sign = -1
-            if M_spline:
-                M1 = self._M_gk_spline.ev(L1, L2)
-                M2 = self._M_kg_spline.ev(L2, L1)
-                return M1, M2, L12_dot, sign
-            M1 = self._mode.components(L1, L2, typ="gal-kappa", zmin=zmin, zmax=zmax, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            M2 = self._mode.components(L2, L1, typ="kappa-gal", zmin=zmin, zmax=zmax, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            return M1, M2, L12_dot, sign
-        if typ == "kappa-gal-omega" or typ == "kgw":
-            sign = -1
-            if M_spline:
-                M1 = self._M_kg_spline.ev(L1, L2)
-                M2 = self._M_gk_spline.ev(L2, L1)
-                return M1, M2, L12_dot, sign
-            M1 = self._mode.components(L1, L2, typ="kappa-gal", zmin=zmin, zmax=zmax, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            M2 = self._mode.components(L2, L1, typ="gal-kappa", zmin=zmin, zmax=zmax, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            return M1, M2, L12_dot, sign
-        if typ == "cib-cib-omega" or typ == "IIw":
-            sign = 1
-            if M_spline:
-                M1 = self._M_II_spline.ev(L1, L2)
-                M2 = self._M_II_spline.ev(L2, L1)
-                return M1, M2, L12_dot, sign
-            M1 = self._mode.components(L1, L2, typ="cib-cib", zmin=zmin, zmax=zmax, nu=nu)
-            M2 = self._mode.components(L2, L1, typ="cib-cib", zmin=zmin, zmax=zmax, nu=nu)
-            return M1, M2, L12_dot, sign
-        if typ == "cib-kappa-omega" or typ == "Ikw":
-            sign = -1
-            if M_spline:
-                M1 = self._M_Ik_spline.ev(L1, L2)
-                M2 = self._M_kI_spline.ev(L2, L1)
-                return M1, M2, L12_dot, sign
-            M1 = self._mode.components(L1, L2, typ="cib-kappa", zmin=zmin, zmax=zmax, nu=nu)
-            M2 = self._mode.components(L2, L1, typ="kappa-cib", zmin=zmin, zmax=zmax, nu=nu)
-            return M1, M2, L12_dot, sign
-        if typ == "kappa-cib-omega" or typ == "kIw":
-            sign = -1
-            if M_spline:
-                M1 = self._M_kI_spline.ev(L1, L2)
-                M2 = self._M_Ik_spline.ev(L2, L1)
-                return M1, M2, L12_dot, sign
-            M1 = self._mode.components(L1, L2, typ="kappa-cib", zmin=zmin, zmax=zmax, nu=nu)
-            M2 = self._mode.components(L2, L1, typ="cib-kappa", zmin=zmin, zmax=zmax, nu=nu)
-            return M1, M2, L12_dot, sign
-        if typ == "gal-cib-omega" or typ == "gIw":
-            sign = 1
-            if M_spline:
-                M1 = self._M_gI_spline.ev(L1, L2)
-                M2 = self._M_Ig_spline.ev(L2, L1)
-                return M1, M2, L12_dot, sign
-            M1 = self._mode.components(L1, L2, typ="gal-cib", zmin=zmin, zmax=zmax, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            M2 = self._mode.components(L2, L1, typ="cib-gal", zmin=zmin, zmax=zmax, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            return M1, M2, L12_dot, sign
-        if typ == "cib-gal-omega" or typ == "Igw":
-            sign = 1
-            if M_spline:
-                M1 = self._M_Ig_spline.ev(L1, L2)
-                M2 = self._M_gI_spline.ev(L2, L1)
-                return M1, M2, L12_dot, sign
-            M1 = self._mode.components(L1, L2, typ="cib-gal", zmin=zmin, zmax=zmax, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            M2 = self._mode.components(L2, L1, typ="gal-cib", zmin=zmin, zmax=zmax, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            return M1, M2, L12_dot, sign
+        M1 = self._mode.components(L1, L2, typ=M_typ1, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins)
+        M2 = self._mode.components(L2, L1, typ=M_typ2, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins)
+        return M1, M2, L12_dot, sign
 
     def _kappa1_kappa1_kappa2(self, L1, L2, L3, M_spline, zmin, zmax):
-        M1, M2, L12_dot, sign = self._bispectra_prep("kappa-kappa-kappa", L1, L2, L3, M_spline, zmin, zmax)
+        M1, M2, L12_dot, sign = self._bispectra_prep("kkk", L1, L2, L3, M_spline, zmin, zmax)
         L13_dot = self._triangle_dot_product(L1, L3, L2)
         L23_dot = self._triangle_dot_product(L2, L3, L1)
         return sign * 2*L12_dot*(L13_dot*M1 + L23_dot*M2)/(L1**2 * L2**2)
@@ -155,14 +73,17 @@ class Bispectra:
     def _kappa2_kappa1_kappa1(self, L1, L2, L3, M_spline, zmin, zmax):
         return self._kappa1_kappa1_kappa2(L2, L3, L1, M_spline, zmin, zmax)
 
-    def _build_M_spline(self, typ, ells_sample, M_matrix, zmin, zmax, nu, gal_win_zmin, gal_win_zmax):
+    def _build_M_spline(self, typ, ells_sample, M_matrix, zmin, zmax, nu, gal_bins):
         if ells_sample is not None and M_matrix is not None:
-            return self._mode.spline(ells_sample, M_matrix, typ=typ)
+            spline = self._mode.spline(ells_sample, M_matrix, typ=typ)
+            return self.M_spline(spline, nu, gal_bins)
         if ells_sample is None:
-            return self._mode.spline(typ=typ, zmin=zmin, zmax=zmax, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-        return self._mode.spline(ells_sample, typ=typ, zmin=zmin, zmax=zmax, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+            spline = self._mode.spline(typ=typ, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins)
+            return self.M_spline(spline, nu, gal_bins)
+        spline = self._mode.spline(ells_sample, typ=typ, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins)
+        return self.M_spline(spline, nu, gal_bins)
 
-    def build_M_spline(self, typ="kappa-kappa", ells_sample=None, M_matrix=None, zmin=0, zmax=None, nu=857e9, gal_win_zmin=None, gal_win_zmax=None):
+    def build_M_spline(self, typ="kk", ells_sample=None, M_matrix=None, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None)):
         """
         Generates and stores/replaces spline for the mode-coupling matrix.
 
@@ -178,89 +99,23 @@ class Bispectra:
         """
         if not self._mode.check_type(typ):
             raise ValueError(f"Modecoupling type {typ} does not exist")
-        M_spline = self._build_M_spline(typ, ells_sample, M_matrix, zmin, zmax, nu, gal_win_zmin, gal_win_zmax)
-        if typ == "kappa-kappa":
-            self._M_kk_spline = M_spline
-            return
-        if typ == "gal-kappa":
-            self._M_gk_spline = M_spline
-            self._gk_win_zmin = gal_win_zmin
-            self._gk_win_zmax = gal_win_zmax
-            return
-        if typ == "kappa-gal":
-            self._M_kg_spline = M_spline
-            self._kg_win_zmin = gal_win_zmin
-            self._kg_win_zmax = gal_win_zmax
-            return
-        if typ == "gal-gal":
-            self._M_gg_spline = M_spline
-            self._gg_win_zmin = gal_win_zmin
-            self._gg_win_zmax = gal_win_zmax
-            return
-        if typ == "cib-kappa":
-            self._M_Ik_spline = M_spline
-            self._Ik_nu = nu
-            return
-        if typ == "kappa-cib":
-            self._M_kI_spline = M_spline
-            self._kI_nu = nu
-            return
-        if typ == "cib-cib":
-            self._M_II_spline = M_spline
-            self._II_nu = nu
-            return
-        if typ == "cib-gal":
-            self._M_Ig_spline = M_spline
-            self._Ig_nu = nu
-            self._Ig_win_zmin = gal_win_zmin
-            self._Ig_win_zmax = gal_win_zmax
-            return
-        if typ == "gal-cib":
-            self._M_gI_spline = M_spline
-            self._gI_nu = nu
-            self._gI_win_zmin = gal_win_zmin
-            self._gI_win_zmax = gal_win_zmax
-            return
+        self._M_splines[typ] = self._build_M_spline(typ, ells_sample, M_matrix, zmin, zmax, nu, gal_bins)
 
-    def _build_M_splines(self, typ, nu, gal_win_zmin, gal_win_zmax):
-        self._check_type(typ)
-        if typ == "kappa-kappa-kappa" or typ == "kkk" or typ == "kappa-kapppa-omega" or typ == "kkw" or typ == "xxw" or typ == "xyw" or typ == "yyw"or typ == "yxw" or typ == "zzw" or typ == "zxw" or typ == "xzw" or typ == "zyw" or typ == "yzw":
-            if self._M_kk_spline is None:
-                self.build_M_spline(typ="kappa-kappa")
+    def _build_M_splines(self, typ, nu, gal_bins):
+        M_typ1 = typ[:2]
+        M_typ2 = M_typ1[::-1]
+        if self._M_splines[M_typ1] is not None:
+            if self._M_splines[M_typ1].nu != nu or self._M_splines[M_typ1].gal_bins != gal_bins:
+                self._M_splines[M_typ1] = self._build_M_spline(M_typ1, None, None, 0, None, nu, gal_bins)
+                if M_typ2 != M_typ1:
+                    self._M_splines[M_typ2] = self._build_M_spline(M_typ2, None, None, 0, None, nu, gal_bins)
             return
-        if typ == "kappa-gal-omega" or typ == "kgw" or typ == "gal-kapppa-omega" or typ == "gkw":
-            if self._M_kg_spline is None or self._kg_win_zmin != gal_win_zmin or self._kg_win_zmax != gal_win_zmax:
-                self.build_M_spline(typ="kappa-gal", gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            if self._M_gk_spline is None or self._gk_win_zmin != gal_win_zmin or self._gk_win_zmax != gal_win_zmax:
-                self.build_M_spline(typ="gal-kappa", gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            return
-        if typ == "gal-gal-omega" or typ == "ggw":
-            if self._M_gg_spline is None or self._gg_win_zmin != gal_win_zmin or self._gg_win_zmax != gal_win_zmax:
-                self.build_M_spline(typ="gal-gal", gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            return
-        if typ == "cib-cib-omega" or typ == "IIw":
-            if self._M_II_spline is None or self._II_nu != nu:
-                self.build_M_spline(typ="cib-cib", nu=nu)
-            return
-        if typ == "kappa-cib-omega" or typ == "kIw" or typ == "cib-kapppa-omega" or typ == "Ikw":
-            if self._M_kI_spline is None or self._kI_nu != nu:
-                self.build_M_spline(typ="kappa-cib", nu=nu)
-            if self._M_Ik_spline is None or self._Ik_nu != nu:
-                self.build_M_spline(typ="cib-kappa", nu=nu)
-            return
-        if typ == "gal-cib-omega" or typ == "gIw" or typ == "cib-gal-omega" or typ == "Igw":
-            if self._M_gI_spline is None or self._gI_nu != nu or self._gI_win_zmin != gal_win_zmin or self._gI_win_zmax != gal_win_zmax:
-                self.build_M_spline(typ="gal-cib", nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            if self._M_Ig_spline is None or self._Ig_nu != nu or self._Ig_win_zmin != gal_win_zmin or self._Ig_win_zmax != gal_win_zmax:
-                self.build_M_spline(typ="cib-gal", nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
-            return
-        raise UserWarning(f"Failed to build Mode Coupling splines for type {typ}")
+        self._M_splines[M_typ1] = self._build_M_spline(M_typ1, None, None, 0, None, nu, gal_bins)
+        if M_typ2 != M_typ1:
+            self._M_splines[M_typ2] = self._build_M_spline(M_typ2, None, None, 0, None, nu, gal_bins)
 
     def _check_type(self, typ):
-        typs = ["kappa-kappa-kappa", "kappa-kappa-omega", "kappa-gal-omega", "gal-kappa-omega", "gal-gal-omega",
-                "cib-cib-omega", "cib-kappa-omega", "kappa-cib-omega", "gal-cib-omega", "cib-gal-omega", "kkk", "kkw",
-                "kgw", "gkw", "ggw", "IIw", "Ikw", "kIw", "gIw", "Igw", "xxw", "yyw", "xyw", "yxw", "zzw", "yzw", "zyw",
-                "xzw", "zxw"]
+        typs = self._mode.get_M_types() + "w"
         if typ not in typs:
             raise ValueError(f"Bispectrum type {typ} not from accepted types: {typs}")
 
@@ -282,17 +137,17 @@ class Bispectra:
             return False
         return True
 
-    def _bispectrum(self, typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_win_zmin, gal_win_zmax):
-        M1, M2, L12_dot, sign = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+    def _bispectrum(self, typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins):
+        M1, M2, L12_dot, sign = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins)
         L13_cross = self._triangle_cross_product(L1, L3, L2)
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return sign * 2 * L12_dot * (L13_cross * M1 - L23_cross * M2)/(L1**2 * L2**2)
 
-    def _bispectrum_angle(self, typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_win_zmin, gal_win_zmax):
-        M1, M2, _, sign = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+    def _bispectrum_angle(self, typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins):
+        M1, M2, _, sign = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins)
         return sign * np.sin(2 * theta) * (M1 - M2)
 
-    def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=857e9, gal_win_zmin=None, gal_win_zmax=None):
+    def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None)):
         """
         Calculates cmb lensing bispectrum for the combination of observables specified.
 
@@ -314,12 +169,12 @@ class Bispectra:
         """
         self._check_type(typ)
         if M_spline:
-            self._build_M_splines(typ, nu, gal_win_zmin, gal_win_zmax)
+            self._build_M_splines(typ, nu, gal_bins)
         if L3 is not None:
-            if typ == "kappa-kappa-kappa" or typ == "kkk":
+            if typ == "kkk":
                 b1 = self._kappa2_kappa1_kappa1(L1, L2, L3, M_spline, zmin, zmax)
                 b2 = self._kappa1_kappa2_kappa1(L1, L2, L3, M_spline, zmin, zmax)
                 b3 = self._kappa1_kappa1_kappa2(L1, L2, L3, M_spline, zmin, zmax)
                 return b1 + b2 + b3
-            return self._bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_win_zmin, gal_win_zmax)
-        return self._bispectrum_angle(typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_win_zmin, gal_win_zmax)
+            return self._bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins)
+        return self._bispectrum_angle(typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins)
