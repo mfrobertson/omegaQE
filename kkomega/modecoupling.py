@@ -24,6 +24,7 @@ class Modecoupling:
         self._maths = Maths()
         self.weyl_PK = self._cosmo.get_matter_PK(typ="weyl")
         self.matter_weyl_PK = self._cosmo.get_matter_PK(typ="matter-weyl")
+        self.binned_gal_types = list("abcdef")
 
     def _vectorise_ells(self, ells, ndim):
         if np.size(ells) == 1:
@@ -56,7 +57,7 @@ class Modecoupling:
             gal_window = self._cosmo.gal_window_Chi(Chis)
             win1 = cmb_lens_window
             win2 = gal_window
-        elif typ[0] in ["a", "b", "c", "d"]:
+        elif typ[0] in self.binned_gal_types:
             index = 2*(ord(typ[0]) - ord("a"))
             gal_window = self._cosmo.gal_window_Chi(Chis, zmin=gal_bins[index], zmax=gal_bins[index+1])
             win1 = cmb_lens_window
@@ -72,7 +73,7 @@ class Modecoupling:
             return self._powerspectra.get_kappa_ps_2source(ells, Chis, Chi_source2, recalc_PK=recalc_PK)
         if typ[1] == "g":
             return (-1) * self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK)
-        if typ[1] in ["a", "b", "c", "d"]:
+        if typ[1] in self.binned_gal_types:
             index = 2*(ord(typ[1]) - ord("a"))
             return (-1) * self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK, gal_win_zmin=gal_bins[index], gal_win_zmax=gal_bins[index+1])
         if typ[1] == "I":
@@ -131,7 +132,7 @@ class Modecoupling:
         return True
 
     def get_M_types(self):
-        observables = np.char.array(list("kgIabcd"))
+        observables = np.char.array(list("kgI")+self.binned_gal_types)
         return (observables[:, None] + observables[None, :]).flatten()
 
 

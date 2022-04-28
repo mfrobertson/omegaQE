@@ -47,6 +47,8 @@ class Fisher:
         self.power = Powerspectra()
         self._maths = Maths()
         self.opt_I_cache = None
+        self.binned_gal_types = list("abcdef")
+        self.test_types = list("xyz")
 
     def _setup_noise(self, N0_file, N0_offset, N0_ell_factors):
         self.noise = Noise()
@@ -99,197 +101,265 @@ class Fisher:
         ells = np.arange(ellmax + 1)
         return self.power.get_kappa_ps(ells)
 
-    def _get_Cl_gal(self,ellmax, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None):
+    def _get_Cl_gal(self,ellmax, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, use_bins=True):
         ells = np.arange(ellmax + 1)
-        return self.power.get_gal_ps(ells, gal_win_zmin_a=gal_win_zmin_a, gal_win_zmax_a=gal_win_zmax_a, gal_win_zmin_b=gal_win_zmin_b, gal_win_zmax_b=gal_win_zmax_b)
-
+        if use_bins:
+            return self.power.get_gal_ps(ells, gal_win_zmin_a=gal_win_zmin_a, gal_win_zmax_a=gal_win_zmax_a, gal_win_zmin_b=gal_win_zmin_b, gal_win_zmax_b=gal_win_zmax_b)
+        return self.power.get_gal_ps(ells)
     def _get_Cl_cib(self,ellmax, nu=857e9):
         ells = np.arange(ellmax + 1)
         return self.power.get_cib_ps(ells, nu=nu)
 
-    def _get_Cl_gal_kappa(self,ellmax, gal_win_zmin=None, gal_win_zmax=None):
+    def _get_Cl_gal_kappa(self,ellmax, gal_win_zmin=None, gal_win_zmax=None, use_bins=True):
         ells = np.arange(ellmax + 1)
-        return self.power.get_gal_kappa_ps(ells, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+        if use_bins:
+            return self.power.get_gal_kappa_ps(ells, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+        return self.power.get_gal_kappa_ps(ells)
 
     def _get_Cl_cib_kappa(self,ellmax, nu=857e9):
         ells = np.arange(ellmax + 1)
         return self.power.get_cib_kappa_ps(ells, nu=nu)
 
-    def _get_Cl_cib_gal(self,ellmax, nu=857e9, gal_win_zmin=None, gal_win_zmax=None):
+    def _get_Cl_cib_gal(self,ellmax, nu=857e9, gal_win_zmin=None, gal_win_zmax=None, use_bins=True):
         ells = np.arange(ellmax + 1)
-        return self.power.get_cib_gal_ps(ells, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+        if use_bins:
+            return self.power.get_cib_gal_ps(ells, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
+        return self.power.get_cib_gal_ps(ells, nu=nu)
 
-    def _get_Cl(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None)):
+    # def _get_Cl(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None)):
+    #     if typ == "kk":
+    #         return self._get_Cl_kappa(ellmax)
+    #     elif typ == "gk" or typ == "kg":
+    #         return self._get_Cl_gal_kappa(ellmax)
+    #     elif typ == "gg":
+    #         return self._get_Cl_gal(ellmax)
+    #     elif typ == "Ik" or typ == "kI":
+    #         return self._get_Cl_cib_kappa(ellmax, nu)
+    #     elif typ == "II":
+    #         return self._get_Cl_cib(ellmax, nu)
+    #     elif typ == "Ig" or typ == "gI":
+    #         return self._get_Cl_cib_gal(ellmax, nu)
+    #     elif typ == "ww":
+    #         N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
+    #         return N0_omega
+    #
+    #     # Binned gals
+    #     gal_win_zmin_a = gal_bins[0]
+    #     gal_win_zmax_a = gal_bins[1]
+    #     if typ == "aa":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_a, gal_win_zmax_a)
+    #     elif typ == "ga" or typ == "ag":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a)
+    #     elif typ == "ka" or typ == "ak":
+    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_a, gal_win_zmax_a)
+    #     elif typ == "Ia" or typ == "aI":
+    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_a, gal_win_zmax_a)
+    #
+    #     gal_win_zmin_b = gal_bins[2]
+    #     gal_win_zmax_b = gal_bins[3]
+    #     if typ == "bb":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_b, gal_win_zmax_b)
+    #     elif typ == "gb" or typ == "bg":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b)
+    #     elif typ == "kb" or typ == "bk":
+    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_b, gal_win_zmax_b)
+    #     elif typ == "Ib" or typ == "bI":
+    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_b, gal_win_zmax_b)
+    #     elif typ == "ab" or typ == "ba":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b)
+    #
+    #     gal_win_zmin_c = gal_bins[4]
+    #     gal_win_zmax_c = gal_bins[5]
+    #     if typ == "cc":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_c, gal_win_zmax_c)
+    #     elif typ == "gc" or typ == "cg":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c)
+    #     elif typ == "kc" or typ == "ck":
+    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_c, gal_win_zmax_c)
+    #     elif typ == "Ic" or typ == "cI":
+    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_c, gal_win_zmax_c)
+    #     elif typ == "ac" or typ == "ca":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_c, gal_win_zmax_c)
+    #     elif typ == "bc" or typ == "cb":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_c, gal_win_zmax_c)
+    #
+    #     gal_win_zmin_d = gal_bins[6]
+    #     gal_win_zmax_d = gal_bins[7]
+    #     if typ == "dd":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "gd" or typ == "dg":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "kd" or typ == "dk":
+    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "Id" or typ == "dI":
+    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "ad" or typ == "da":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "bd" or typ == "db":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "cd" or typ == "dc":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_d, gal_win_zmax_d)
+
+    def _get_Cl(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None), use_bins=False):
         if typ == "kk":
             return self._get_Cl_kappa(ellmax)
         elif typ == "gk" or typ == "kg":
-            return self._get_Cl_gal_kappa(ellmax)
+            return self._get_Cl_gal_kappa(ellmax, gal_bins[0], gal_bins[1], use_bins)
         elif typ == "gg":
-            return self._get_Cl_gal(ellmax)
+            return self._get_Cl_gal(ellmax, gal_bins[0], gal_bins[1], gal_bins[2], gal_bins[3], use_bins)
         elif typ == "Ik" or typ == "kI":
             return self._get_Cl_cib_kappa(ellmax, nu)
         elif typ == "II":
             return self._get_Cl_cib(ellmax, nu)
         elif typ == "Ig" or typ == "gI":
-            return self._get_Cl_cib_gal(ellmax, nu)
+            return self._get_Cl_cib_gal(ellmax, nu, gal_bins[0], gal_bins[1], use_bins)
         elif typ == "ww":
             N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
             return N0_omega
 
-        # Binned gals
-        gal_win_zmin_a = gal_bins[0]
-        gal_win_zmax_a = gal_bins[1]
-        if typ == "aa":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_a, gal_win_zmax_a)
-        elif typ == "ga" or typ == "ag":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a)
-        elif typ == "ka" or typ == "ak":
-            return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_a, gal_win_zmax_a)
-        elif typ == "Ia" or typ == "aI":
-            return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_a, gal_win_zmax_a)
-
-        gal_win_zmin_b = gal_bins[2]
-        gal_win_zmax_b = gal_bins[3]
-        if typ == "bb":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_b, gal_win_zmax_b)
-        elif typ == "gb" or typ == "bg":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b)
-        elif typ == "kb" or typ == "bk":
-            return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_b, gal_win_zmax_b)
-        elif typ == "Ib" or typ == "bI":
-            return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_b, gal_win_zmax_b)
-        elif typ == "ab" or typ == "ba":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b)
-
-        gal_win_zmin_c = gal_bins[4]
-        gal_win_zmax_c = gal_bins[5]
-        if typ == "cc":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_c, gal_win_zmax_c)
-        elif typ == "gc" or typ == "cg":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c)
-        elif typ == "kc" or typ == "ck":
-            return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_c, gal_win_zmax_c)
-        elif typ == "Ic" or typ == "cI":
-            return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_c, gal_win_zmax_c)
-        elif typ == "ac" or typ == "ca":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_c, gal_win_zmax_c)
-        elif typ == "bc" or typ == "cb":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_c, gal_win_zmax_c)
-
-        gal_win_zmin_d = gal_bins[6]
-        gal_win_zmax_d = gal_bins[7]
-        if typ == "dd":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "gd" or typ == "dg":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "kd" or typ == "dk":
-            return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "Id" or typ == "dI":
-            return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "ad" or typ == "da":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "bd" or typ == "db":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "cd" or typ == "dc":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_d, gal_win_zmax_d)
+        gal_win_zmin_1 = None
+        gal_win_zmax_1 = None
+        gal_win_zmin_2 = None
+        gal_win_zmax_2 = None
+        type_0_binned = False
+        if typ[0] in self.binned_gal_types:
+            index_1 = 2 * (ord(typ[0]) - ord("a"))
+            gal_win_zmin_1 = gal_bins[index_1]
+            gal_win_zmax_1 = gal_bins[index_1 + 1]
+            typ = "g" + typ[1]
+            type_0_binned = True
+        if typ[1] in self.binned_gal_types:
+            index_2 = 2*(ord(typ[1]) - ord("a"))
+            typ = typ[0] + "g"
+            if type_0_binned:
+                gal_win_zmin_2 = gal_bins[index_2]
+                gal_win_zmax_2 = gal_bins[index_2 + 1]
+            else:
+                gal_win_zmin_1 = gal_bins[index_2]
+                gal_win_zmax_1 = gal_bins[index_2 + 1]
+        return self._get_Cl(typ, ellmax, nu, (gal_win_zmin_1, gal_win_zmax_1, gal_win_zmin_2, gal_win_zmax_2), use_bins=True)
 
 
-    def _get_Cov(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None)):
-        if typ == "kk":
-            N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-            return self._get_Cl_kappa(ellmax) + N0_kappa
-        elif typ == "gk" or typ == "kg":
-            return self._get_Cl_gal_kappa(ellmax)
-        elif typ == "gg":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-            return self._get_Cl_gal(ellmax) + N0_gal
-        elif typ == "Ik" or typ == "kI":
-            return self._get_Cl_cib_kappa(ellmax, nu)
-        elif typ == "II":
-            N0_cib = self.noise.get_cib_shot_N(ellmax=ellmax, nu=nu)
+    # def _get_Cov(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None)):
+    #     if typ == "kk":
+    #         N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+    #         return self._get_Cl_kappa(ellmax) + N0_kappa
+    #     elif typ == "gk" or typ == "kg":
+    #         return self._get_Cl_gal_kappa(ellmax)
+    #     elif typ == "gg":
+    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
+    #         return self._get_Cl_gal(ellmax) + N0_gal
+    #     elif typ == "Ik" or typ == "kI":
+    #         return self._get_Cl_cib_kappa(ellmax, nu)
+    #     elif typ == "II":
+    #         N0_cib = self.noise.get_cib_shot_N(ellmax=ellmax, nu=nu)
+    #         N_dust = self.noise.get_dust_N(ellmax=ellmax, nu=nu)
+    #         return self._get_Cl_cib(ellmax, nu) + N0_cib + N_dust
+    #     elif typ == "Ig" or typ == "gI":
+    #         return self._get_Cl_cib_gal(ellmax, nu)
+    #     if typ == "xx":
+    #         N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+    #         return self._get_Cl_kappa(ellmax) + 3*N0_kappa
+    #     elif typ == "xy" or typ == "yx":
+    #         return self._get_Cl_kappa(ellmax)
+    #     if typ == "yy":
+    #         N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+    #         return self._get_Cl_kappa(ellmax) + 3*N0_kappa
+    #     if typ == "zz":
+    #         N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+    #         return self._get_Cl_kappa(ellmax) + 3*N0_kappa
+    #     elif typ == "xz" or typ == "zx":
+    #         return self._get_Cl_kappa(ellmax)
+    #     elif typ == "zy" or typ == "yz":
+    #         return self._get_Cl_kappa(ellmax)
+    #     elif typ == "ww":
+    #         N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
+    #         return N0_omega
+    #
+    #     # Binned gals
+    #     gal_win_zmin_a = gal_bins[0]
+    #     gal_win_zmax_a = gal_bins[1]
+    #     if typ == "aa":
+    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_a, zmax=gal_win_zmax_a)
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_a, gal_win_zmax_a) + N0_gal
+    #     elif typ == "ga" or typ == "ag":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a)
+    #     elif typ == "ka" or typ == "ak":
+    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_a, gal_win_zmax_a)
+    #     elif typ == "Ia" or typ == "aI":
+    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_a, gal_win_zmax_a)
+    #
+    #     gal_win_zmin_b = gal_bins[2]
+    #     gal_win_zmax_b = gal_bins[3]
+    #     if typ == "bb":
+    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_b, zmax=gal_win_zmax_b)
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_b, gal_win_zmax_b) + N0_gal
+    #     elif typ == "gb" or typ == "bg":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b)
+    #     elif typ == "kb" or typ == "bk":
+    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_b, gal_win_zmax_b)
+    #     elif typ == "Ib" or typ == "bI":
+    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_b, gal_win_zmax_b)
+    #     elif typ == "ab" or typ == "ba":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b)
+    #
+    #     gal_win_zmin_c = gal_bins[4]
+    #     gal_win_zmax_c = gal_bins[5]
+    #     if typ == "cc":
+    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_c, zmax=gal_win_zmax_c)
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_c, gal_win_zmax_c) + N0_gal
+    #     elif typ == "gc" or typ == "cg":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c)
+    #     elif typ == "kc" or typ == "ck":
+    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_c, gal_win_zmax_c)
+    #     elif typ == "Ic" or typ == "cI":
+    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_c, gal_win_zmax_c)
+    #     elif typ == "ac" or typ == "ca":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_c, gal_win_zmax_c)
+    #     elif typ == "bc" or typ == "cb":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_c, gal_win_zmax_c)
+    #
+    #     gal_win_zmin_d = gal_bins[6]
+    #     gal_win_zmax_d = gal_bins[7]
+    #     if typ == "dd":
+    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_d, zmax=gal_win_zmax_d)
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d, gal_win_zmin_d, gal_win_zmax_d) + N0_gal
+    #     elif typ == "gd" or typ == "dg":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "kd" or typ == "dk":
+    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "Id" or typ == "dI":
+    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "ad" or typ == "da":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "bd" or typ == "db":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_d, gal_win_zmax_d)
+    #     elif typ == "cd" or typ == "dc":
+    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_d, gal_win_zmax_d)
+
+    def _get_Cov(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None), use_bins=False):
+        if typ[0] != typ[1]:
+            return self._get_Cl(typ, ellmax, nu, gal_bins, use_bins)
+        if typ[0] == "k":
+            N = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+        elif typ[0] in self.test_types:
+            N = 3*self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+        elif typ[0] == "I":
+            N_cib = self.noise.get_cib_shot_N(ellmax=ellmax, nu=nu)
             N_dust = self.noise.get_dust_N(ellmax=ellmax, nu=nu)
-            return self._get_Cl_cib(ellmax, nu) + N0_cib + N_dust
-        elif typ == "Ig" or typ == "gI":
-            return self._get_Cl_cib_gal(ellmax, nu)
-        if typ == "xx":
-            N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-            return self._get_Cl_kappa(ellmax) + 3*N0_kappa
-        elif typ == "xy" or typ == "yx":
-            return self._get_Cl_kappa(ellmax)
-        if typ == "yy":
-            N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-            return self._get_Cl_kappa(ellmax) + 3*N0_kappa
-        if typ == "zz":
-            N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-            return self._get_Cl_kappa(ellmax) + 3*N0_kappa
-        elif typ == "xz" or typ == "zx":
-            return self._get_Cl_kappa(ellmax)
-        elif typ == "zy" or typ == "yz":
-            return self._get_Cl_kappa(ellmax)
-        elif typ == "ww":
-            N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
-            return N0_omega
-
-        # Binned gals
-        gal_win_zmin_a = gal_bins[0]
-        gal_win_zmax_a = gal_bins[1]
-        if typ == "aa":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_a, zmax=gal_win_zmax_a)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_a, gal_win_zmax_a) + N0_gal
-        elif typ == "ga" or typ == "ag":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a)
-        elif typ == "ka" or typ == "ak":
-            return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_a, gal_win_zmax_a)
-        elif typ == "Ia" or typ == "aI":
-            return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_a, gal_win_zmax_a)
-
-        gal_win_zmin_b = gal_bins[2]
-        gal_win_zmax_b = gal_bins[3]
-        if typ == "bb":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_b, zmax=gal_win_zmax_b)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_b, gal_win_zmax_b) + N0_gal
-        elif typ == "gb" or typ == "bg":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b)
-        elif typ == "kb" or typ == "bk":
-            return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_b, gal_win_zmax_b)
-        elif typ == "Ib" or typ == "bI":
-            return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_b, gal_win_zmax_b)
-        elif typ == "ab" or typ == "ba":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b)
-
-        gal_win_zmin_c = gal_bins[4]
-        gal_win_zmax_c = gal_bins[5]
-        if typ == "cc":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_c, zmax=gal_win_zmax_c)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_c, gal_win_zmax_c) + N0_gal
-        elif typ == "gc" or typ == "cg":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c)
-        elif typ == "kc" or typ == "ck":
-            return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_c, gal_win_zmax_c)
-        elif typ == "Ic" or typ == "cI":
-            return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_c, gal_win_zmax_c)
-        elif typ == "ac" or typ == "ca":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_c, gal_win_zmax_c)
-        elif typ == "bc" or typ == "cb":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_c, gal_win_zmax_c)
-
-        gal_win_zmin_d = gal_bins[6]
-        gal_win_zmax_d = gal_bins[7]
-        if typ == "dd":
-            N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_d, zmax=gal_win_zmax_d)
-            return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d, gal_win_zmin_d, gal_win_zmax_d) + N0_gal
-        elif typ == "gd" or typ == "dg":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "kd" or typ == "dk":
-            return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "Id" or typ == "dI":
-            return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "ad" or typ == "da":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "bd" or typ == "db":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_d, gal_win_zmax_d)
-        elif typ == "cd" or typ == "dc":
-            return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_d, gal_win_zmax_d)
+            N = N_cib + N_dust
+            N[:111] = 1e10
+        elif typ[0] == "g":
+            N = self.noise.get_gal_shot_N(ellmax=ellmax)
+        elif typ[0] in self.binned_gal_types:
+            index = 2 * (ord(typ[0]) - ord("a"))
+            gal_win_zmin = gal_bins[index]
+            gal_win_zmax = gal_bins[index + 1]
+            N = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin, zmax=gal_win_zmax)
+            return self._get_Cl_gal(ellmax, gal_win_zmin, gal_win_zmax, gal_win_zmin, gal_win_zmax) + N
+        else:
+            raise ValueError(f"Could not get Cov for type {typ}")
+        return self._get_Cl(typ, ellmax, nu, gal_bins) + N
 
     def _get_Covs(self, typ, Lmax, all_splines=False, nu=857e9, gal_bins=(None,None,None,None), include_N0_kappa="both"):
         N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, ell_factors=self.N0_ell_factors))
@@ -318,22 +388,39 @@ class Fisher:
             return C1_spline, C2_spline, C3_spline
         return C1, C2, C3_spline
 
+    # def _get_C_inv(self, typs, Lmax, nu, gal_bins):
+    #     Ntyps = np.size(typs)
+    #     all_typs = np.char.array(np.concatenate((typs, list('w'))))
+    #     C = all_typs[:, None] + all_typs[None, :]
+    #     C[:, Ntyps] = 0
+    #     C[Ntyps, :] = 0
+    #     C[Ntyps, Ntyps] = 'ww'
+    #     args = C.flatten()
+    #     args = args[args != '0']
+    #
+    #     C_sym = Matrix(C)
+    #     if Ntyps > 3:
+    #         C_inv = C_sym.inv('LU')
+    #     else:
+    #         C_inv = C_sym.inv()
+    #     C_inv_func = lambdify(args, C_inv)
+    #     Covs = [self._get_Cov(arg, Lmax, nu, gal_bins) for arg in args]
+    #     return C_inv_func(*Covs)
+
     def _get_C_inv(self, typs, Lmax, nu, gal_bins):
         Ntyps = np.size(typs)
-        all_typs = np.char.array(np.concatenate((typs, list('w'))))
-        C = all_typs[:, None] + all_typs[None, :]
-        C[:, Ntyps] = 0
-        C[Ntyps, :] = 0
-        C[Ntyps, Ntyps] = 'ww'
+        typs_no_f = copy.deepcopy(typs)
+        typs_no_f[typs_no_f == "f"] = "h"        # Replacing 'f' with 'h' for sympy operations as 'ff' is sympy function
+        C = typs[:, None] + typs[None, :]
+        C_no_f = typs_no_f[:, None] + typs_no_f[None, :]
         args = C.flatten()
-        args = args[args != '0']
-
-        C_sym = Matrix(C)
+        args_no_f = C_no_f.flatten()
+        C_sym = Matrix(C_no_f)
         if Ntyps > 3:
             C_inv = C_sym.inv('LU')
         else:
             C_inv = C_sym.inv()
-        C_inv_func = lambdify(args, C_inv)
+        C_inv_func = lambdify(args_no_f, C_inv)
         Covs = [self._get_Cov(arg, Lmax, nu, gal_bins) for arg in args]
         return C_inv_func(*Covs)
 
@@ -483,12 +570,61 @@ class Fisher:
             self.opt_I_cache += I
         return np.sum(I)
 
+    def _get_F_L_element(self, typs, typ, Lmax, dL, Ntheta, C_inv, Lmin, nu, gal_bins, C_omega_spline, Ls):
+        _, thetas, dTheta, C1, C2, C3_spline = self._integral_prep_arr(Lmax, dL, Ntheta, typ, Lmin=Lmin, nu=nu, gal_bins=gal_bins, typs=typs, C_inv=C_inv)
+        C1_spline = self._interpolate(C1)
+        C2_spline = self._interpolate(C2)
+        F_L = np.zeros(np.size(Ls))
+        for iii, L3 in enumerate(Ls):
+            I_tmp = 0
+            L2 = Ls[None, :]
+            L1 = self._get_third_L(L3, L2, thetas[:, None])
+            w = np.ones(np.shape(L1))
+            w[L1 > Lmax] = 0
+            w[L1 < Lmin] = 0
+            bi1 = self.bi.get_bispectrum(typ[4:6] + "w", L1, L2, L3, M_spline=True, nu=nu, gal_bins=gal_bins)
+            bi2 = self.bi.get_bispectrum(typ[6:] + "w", L1, L2, L3, M_spline=True, nu=nu, gal_bins=gal_bins)
+            covs = C1_spline(L1) * C2_spline(L2)
+            I_tmp += dL * 2 * np.sum(L2 * w * dTheta * bi1 * bi2 * covs)
+            F_L[iii] = I_tmp/(2*C_omega_spline(L3))
+        F_L *= 1/((2 * np.pi) ** 2)
+        return F_L
+
+    def _get_F_L(self, typs, Lmax, dL, Ntheta, nu, gal_bins):
+        typs = np.char.array(typs)
+        # if 'I' in typs:
+        #     Lmin = 110
+        # else:
+        Lmin = 30  # 1808.07445 and https://cmb-s4.uchicago.edu/wiki/index.php/Survey_Performance_Expectations
+        C_inv = self._get_C_inv(typs, Lmax, nu, gal_bins)
+        all_combos = typs[:, None] + typs[None, :]
+        combos = all_combos.flatten()
+        Ncombos = np.size(combos)
+        Ls = np.arange(Lmin, Lmax + 1, dL)
+        F_L = np.zeros(np.size(Ls))
+        perms = 0
+        omega_ells, C_omega = self.power.get_camb_postborn_omega_ps(Lmax * 2)
+        C_omega_spline = InterpolatedUnivariateSpline(omega_ells, C_omega)
+        for iii in np.arange(Ncombos):
+            for jjj in np.arange(iii, Ncombos):
+                typ = "opt_" + combos[iii] + combos[jjj]
+                F_L_tmp = self._get_F_L_element(typs, typ, Lmax, dL, Ntheta, C_inv,Lmin, nu, gal_bins, C_omega_spline, Ls)
+                if combos[iii] != combos[jjj]:
+                    factor = 2
+                else:
+                    factor = 1
+                perms += factor
+                F_L += factor * F_L_tmp
+        if perms != np.size(typs) ** 4:
+            raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
+        return Ls, F_L
+
     def _get_optimal_bispectrum_Fisher(self, typs, Lmax, dL, Ntheta, f_sky, verbose, arr, nu, gal_bins, save_array):
         typs = np.char.array(typs)
-        if 'I' in typs:
-            Lmin = 110
-        else:
-            Lmin = 30     # 1808.07445 and https://cmb-s4.uchicago.edu/wiki/index.php/Survey_Performance_Expectations
+        # if 'I' in typs:
+        #     Lmin = 110
+        # else:
+        Lmin = 30     # 1808.07445 and https://cmb-s4.uchicago.edu/wiki/index.php/Survey_Performance_Expectations
         C_inv = self._get_C_inv(typs, Lmax, nu, gal_bins)
         # if verbose:
         #     cond_10 = np.linalg.cond(C_inv[:, :][10])
@@ -532,6 +668,24 @@ class Fisher:
             return self._get_bispectrum_Fisher_arr(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa)
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa)
 
+    def get_F_L(self, typs="kg", Lmax=4000, dL=10, Ntheta=100, nu=857e9, gal_bins=(None,None,None,None)):
+        """
+
+        Parameters
+        ----------
+        typs
+        Lmax
+        dL
+        Ntheta
+        nu
+        gal_bins
+
+        Returns
+        -------
+
+        """
+        typs = list(typs)
+        return self._get_F_L(typs, Lmax, dL, Ntheta, nu, gal_bins)
 
     def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=1, Ntheta=10, f_sky=1, verbose=False, arr=False, nu=857e9, gal_bins=(None,None,None,None), save_array=False):
         """
