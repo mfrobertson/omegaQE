@@ -126,80 +126,6 @@ class Fisher:
             return self.power.get_cib_gal_ps(ells, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
         return self.power.get_cib_gal_ps(ells, nu=nu)
 
-    # def _get_Cl(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None)):
-    #     if typ == "kk":
-    #         return self._get_Cl_kappa(ellmax)
-    #     elif typ == "gk" or typ == "kg":
-    #         return self._get_Cl_gal_kappa(ellmax)
-    #     elif typ == "gg":
-    #         return self._get_Cl_gal(ellmax)
-    #     elif typ == "Ik" or typ == "kI":
-    #         return self._get_Cl_cib_kappa(ellmax, nu)
-    #     elif typ == "II":
-    #         return self._get_Cl_cib(ellmax, nu)
-    #     elif typ == "Ig" or typ == "gI":
-    #         return self._get_Cl_cib_gal(ellmax, nu)
-    #     elif typ == "ww":
-    #         N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
-    #         return N0_omega
-    #
-    #     # Binned gals
-    #     gal_win_zmin_a = gal_bins[0]
-    #     gal_win_zmax_a = gal_bins[1]
-    #     if typ == "aa":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_a, gal_win_zmax_a)
-    #     elif typ == "ga" or typ == "ag":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a)
-    #     elif typ == "ka" or typ == "ak":
-    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_a, gal_win_zmax_a)
-    #     elif typ == "Ia" or typ == "aI":
-    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_a, gal_win_zmax_a)
-    #
-    #     gal_win_zmin_b = gal_bins[2]
-    #     gal_win_zmax_b = gal_bins[3]
-    #     if typ == "bb":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_b, gal_win_zmax_b)
-    #     elif typ == "gb" or typ == "bg":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b)
-    #     elif typ == "kb" or typ == "bk":
-    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_b, gal_win_zmax_b)
-    #     elif typ == "Ib" or typ == "bI":
-    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_b, gal_win_zmax_b)
-    #     elif typ == "ab" or typ == "ba":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b)
-    #
-    #     gal_win_zmin_c = gal_bins[4]
-    #     gal_win_zmax_c = gal_bins[5]
-    #     if typ == "cc":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_c, gal_win_zmax_c)
-    #     elif typ == "gc" or typ == "cg":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c)
-    #     elif typ == "kc" or typ == "ck":
-    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_c, gal_win_zmax_c)
-    #     elif typ == "Ic" or typ == "cI":
-    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_c, gal_win_zmax_c)
-    #     elif typ == "ac" or typ == "ca":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_c, gal_win_zmax_c)
-    #     elif typ == "bc" or typ == "cb":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_c, gal_win_zmax_c)
-    #
-    #     gal_win_zmin_d = gal_bins[6]
-    #     gal_win_zmax_d = gal_bins[7]
-    #     if typ == "dd":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "gd" or typ == "dg":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "kd" or typ == "dk":
-    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "Id" or typ == "dI":
-    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "ad" or typ == "da":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "bd" or typ == "db":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "cd" or typ == "dc":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_d, gal_win_zmax_d)
-
     def _get_Cl(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None), use_bins=False):
         if typ == "kk":
             return self._get_Cl_kappa(ellmax)
@@ -238,104 +164,6 @@ class Fisher:
                 gal_win_zmin_1 = gal_bins[index_2]
                 gal_win_zmax_1 = gal_bins[index_2 + 1]
         return self._get_Cl(typ, ellmax, nu, (gal_win_zmin_1, gal_win_zmax_1, gal_win_zmin_2, gal_win_zmax_2), use_bins=True)
-
-
-    # def _get_Cov(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None)):
-    #     if typ == "kk":
-    #         N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-    #         return self._get_Cl_kappa(ellmax) + N0_kappa
-    #     elif typ == "gk" or typ == "kg":
-    #         return self._get_Cl_gal_kappa(ellmax)
-    #     elif typ == "gg":
-    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax)
-    #         return self._get_Cl_gal(ellmax) + N0_gal
-    #     elif typ == "Ik" or typ == "kI":
-    #         return self._get_Cl_cib_kappa(ellmax, nu)
-    #     elif typ == "II":
-    #         N0_cib = self.noise.get_cib_shot_N(ellmax=ellmax, nu=nu)
-    #         N_dust = self.noise.get_dust_N(ellmax=ellmax, nu=nu)
-    #         return self._get_Cl_cib(ellmax, nu) + N0_cib + N_dust
-    #     elif typ == "Ig" or typ == "gI":
-    #         return self._get_Cl_cib_gal(ellmax, nu)
-    #     if typ == "xx":
-    #         N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-    #         return self._get_Cl_kappa(ellmax) + 3*N0_kappa
-    #     elif typ == "xy" or typ == "yx":
-    #         return self._get_Cl_kappa(ellmax)
-    #     if typ == "yy":
-    #         N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-    #         return self._get_Cl_kappa(ellmax) + 3*N0_kappa
-    #     if typ == "zz":
-    #         N0_kappa = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-    #         return self._get_Cl_kappa(ellmax) + 3*N0_kappa
-    #     elif typ == "xz" or typ == "zx":
-    #         return self._get_Cl_kappa(ellmax)
-    #     elif typ == "zy" or typ == "yz":
-    #         return self._get_Cl_kappa(ellmax)
-    #     elif typ == "ww":
-    #         N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
-    #         return N0_omega
-    #
-    #     # Binned gals
-    #     gal_win_zmin_a = gal_bins[0]
-    #     gal_win_zmax_a = gal_bins[1]
-    #     if typ == "aa":
-    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_a, zmax=gal_win_zmax_a)
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_a, gal_win_zmax_a) + N0_gal
-    #     elif typ == "ga" or typ == "ag":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a)
-    #     elif typ == "ka" or typ == "ak":
-    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_a, gal_win_zmax_a)
-    #     elif typ == "Ia" or typ == "aI":
-    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_a, gal_win_zmax_a)
-    #
-    #     gal_win_zmin_b = gal_bins[2]
-    #     gal_win_zmax_b = gal_bins[3]
-    #     if typ == "bb":
-    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_b, zmax=gal_win_zmax_b)
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_b, gal_win_zmax_b) + N0_gal
-    #     elif typ == "gb" or typ == "bg":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b)
-    #     elif typ == "kb" or typ == "bk":
-    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_b, gal_win_zmax_b)
-    #     elif typ == "Ib" or typ == "bI":
-    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_b, gal_win_zmax_b)
-    #     elif typ == "ab" or typ == "ba":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b)
-    #
-    #     gal_win_zmin_c = gal_bins[4]
-    #     gal_win_zmax_c = gal_bins[5]
-    #     if typ == "cc":
-    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_c, zmax=gal_win_zmax_c)
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_c, gal_win_zmax_c) + N0_gal
-    #     elif typ == "gc" or typ == "cg":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c)
-    #     elif typ == "kc" or typ == "ck":
-    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_c, gal_win_zmax_c)
-    #     elif typ == "Ic" or typ == "cI":
-    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_c, gal_win_zmax_c)
-    #     elif typ == "ac" or typ == "ca":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_c, gal_win_zmax_c)
-    #     elif typ == "bc" or typ == "cb":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_c, gal_win_zmax_c)
-    #
-    #     gal_win_zmin_d = gal_bins[6]
-    #     gal_win_zmax_d = gal_bins[7]
-    #     if typ == "dd":
-    #         N0_gal = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin_d, zmax=gal_win_zmax_d)
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d, gal_win_zmin_d, gal_win_zmax_d) + N0_gal
-    #     elif typ == "gd" or typ == "dg":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "kd" or typ == "dk":
-    #         return self._get_Cl_gal_kappa(ellmax, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "Id" or typ == "dI":
-    #         return self._get_Cl_cib_gal(ellmax, nu, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "ad" or typ == "da":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "bd" or typ == "db":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_b, gal_win_zmax_b, gal_win_zmin_d, gal_win_zmax_d)
-    #     elif typ == "cd" or typ == "dc":
-    #         return self._get_Cl_gal(ellmax, gal_win_zmin_c, gal_win_zmax_c, gal_win_zmin_d, gal_win_zmax_d)
 
     def _get_Cov(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None), use_bins=False):
         if typ[0] != typ[1]:
@@ -426,7 +254,7 @@ class Fisher:
         Covs = [self._get_Cov(arg, Lmax, nu, gal_bins) for arg in args]
         return C_inv_func(*Covs)
 
-    def _get_optimal_Ns_sympy(self, Lmax, typ, typs, C_inv):
+    def _get_optimal_Ns_sympy(self, Lmax, typ, typs, C_inv, all_spline=False):
         N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, tidy=True, ell_factors=self.N0_ell_factors))
         cov3_spline = N0_omega_spline
 
@@ -437,6 +265,10 @@ class Fisher:
 
         cov_inv1 = C_inv[combo1_idx1][combo1_idx2]
         cov_inv2 = C_inv[combo2_idx1][combo2_idx2]
+        if all_spline:
+            cov_inv1_spline = self._interpolate(cov_inv1)
+            cov_inv2_spline = self._interpolate(cov_inv2)
+            return cov_inv1_spline, cov_inv2_spline, cov3_spline
         return cov_inv1, cov_inv2, cov3_spline
 
     def _get_thetas(self, Ntheta):
@@ -505,8 +337,7 @@ class Fisher:
         Lmax = int(np.max(Ls))
         Lmin = int(np.min(Ls))
         if typ[:3] == "opt":
-            C1, C2, C3_spline = self._get_optimal_Ns_sympy(Lmax, typ[4:], typs, C_inv)
-            # C1, C2, C3_spline = self._get_optimal_Ns_analyt(Lmax, typ[4:], typs)
+            C1_spline, C2_spline, C3_spline = self._get_optimal_Ns_sympy(Lmax, typ[4:], typs, C_inv, all_spline=True)
         else:
             C1_spline, C2_spline, C3_spline = self._get_Covs(typ, Lmax, all_splines=True, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa)
         thetas, dTheta = self._get_thetas(Ntheta)
@@ -521,7 +352,7 @@ class Fisher:
         I = np.zeros(np.size(Ls))
         Cl_xy_spline = self._interpolate(self._get_Cl(typ[:2], Lmax, nu, gal_bins))
         for iii, L3 in enumerate(Ls):
-            I_tmp = 0
+            I_internal = np.zeros(np.size(Ls))
             for jjj, L2 in enumerate(Ls):
                 L1 = self._get_third_L(L3, L2, thetas)
                 w = copy.deepcopy(weights)
@@ -533,12 +364,15 @@ class Fisher:
                     denom = 2 * C1_spline(L1) * C2_spline(L2) * C3_spline(L3)
                 else:
                     denom = ((C1_spline(L1) * C2_spline(L2)) + (Cl_xy_spline(L1) * Cl_xy_spline(L2))) * C3_spline(L3)
-                I_tmp += L2 * dLs[jjj] * 2 * dTheta * np.dot(w, bispectrum ** 2 / denom)
-            I[iii] = 2 * np.pi * L3 * dLs[iii] * I_tmp
+                I_internal[jjj] = L2 * 2 * dTheta * np.dot(w, bispectrum ** 2 / denom)
+            I_internal_spline = InterpolatedUnivariateSpline(Ls, I_internal)
+            I_tmp = I_internal_spline.integral(Lmin, Lmax)
+            I[iii] = 2 * np.pi * L3 * I_tmp
         I *= f_sky/np.pi * 1/((2 * np.pi) ** 2)
         if arr:
             return Ls, I
-        return np.sum(I)
+        I_spline = InterpolatedUnivariateSpline(Ls, I)
+        return I_spline.integral(Lmin, Lmax)
 
     def _get_optimal_bispectrum_Fisher_element_vec(self, typs, typ, Lmax, dL, Ntheta, f_sky, C_inv, Lmin, nu, gal_bins):
         Ls, L3, dTheta, w, covs = self._integral_prep_vec(Lmax, dL, Ntheta, typ, Lmin=Lmin, nu=nu, gal_bins=gal_bins, typs=typs, C_inv=C_inv)
@@ -572,7 +406,34 @@ class Fisher:
             self.opt_I_cache += I
         return np.sum(I)
 
-    def _get_F_L_element(self, typs, typ, Lmax, dL, Ntheta, C_inv, Lmin, nu, gal_bins, C_omega_spline, Ls):
+    def _get_optimal_bispectrum_Fisher_sample(self, typs, typ, Ls, Ntheta, f_sky, C_inv, nu, gal_bins, save_array):
+        Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta,typ, nu, gal_bins, typs=typs, C_inv=C_inv)
+        if save_array and self.opt_I_cache is None:
+            self.opt_I_cache = np.zeros(np.size(Ls))
+            self.opt_Ls = Ls
+        I = np.zeros(np.size(Ls))
+        for iii, L3 in enumerate(Ls):
+            I_internal = np.zeros(np.size(Ls))
+            for jjj, L2 in enumerate(Ls):
+                L1 = self._get_third_L(L3, L2, thetas)
+                w = copy.deepcopy(weights)
+                w[L1 > Lmax] = 0
+                w[L1 < Lmin] = 0
+                thetas12 = np.arcsin(L3 * np.sin(thetas) / L1)
+                bi1 = self.bi.get_bispectrum(typ[4:6] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
+                bi2 = self.bi.get_bispectrum(typ[6:] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
+                covs = C1_spline(L1) * C2_spline(L2) / C3_spline(L3)
+                I_internal[jjj] = L2 * 2 * dTheta * np.sum(w * bi1 * bi2 * covs)
+            I_internal_spline = InterpolatedUnivariateSpline(Ls, I_internal)
+            I_tmp = I_internal_spline.integral(Lmin, Lmax)
+            I[iii] = 2 * np.pi * L3 * I_tmp
+        I *= 0.5 * f_sky/np.pi * 1/((2 * np.pi) ** 2)
+        if save_array:
+            self.opt_I_cache += I
+        I_spline = InterpolatedUnivariateSpline(Ls, I)
+        return I_spline.integral(Lmin, Lmax)
+
+    def _get_F_L_element_arr(self, typs, typ, Lmax, dL, Ntheta, C_inv, Lmin, nu, gal_bins, C_omega_spline, Ls):
         _, thetas, dTheta, C1, C2, C3_spline = self._integral_prep_arr(Lmax, dL, Ntheta, typ, Lmin=Lmin, nu=nu, gal_bins=gal_bins, typs=typs, C_inv=C_inv)
         C1_spline = self._interpolate(C1)
         C2_spline = self._interpolate(C2)
@@ -592,17 +453,36 @@ class Fisher:
         F_L *= 1/((2 * np.pi) ** 2)
         return F_L
 
-    def _get_F_L(self, typs, Lmax, dL, Ntheta, nu, gal_bins):
+    def _get_F_L_element_sample(self, typs, typ, Ls, Ntheta, C_inv, nu, gal_bins, C_omega_spline):
+        Lmax, Lmin, _, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta, typ, nu, gal_bins, typs, C_inv)
+        F_L = np.zeros(np.size(Ls))
+        for iii, L3 in enumerate(Ls):
+            I = np.zeros(np.size(Ls))
+            for jjj, L2 in enumerate(Ls):
+                L1 = self._get_third_L(L3, L2, thetas)
+                w = np.ones(np.shape(L1))
+                w[L1 > Lmax] = 0
+                w[L1 < Lmin] = 0
+                thetas12 = np.arcsin(L3 * np.sin(thetas) / L1)
+                bi1 = self.bi.get_bispectrum(typ[4:6] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
+                bi2 = self.bi.get_bispectrum(typ[6:] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
+                covs = C1_spline(L1) * C2_spline(L2)
+                I[jjj] = 2 * np.sum(L2 * w * dTheta * bi1 * bi2 * covs)
+            I_spline = InterpolatedUnivariateSpline(Ls, I)
+            F_L[iii] = I_spline.integral(Lmin, Lmax)/ (2 * C_omega_spline(L3)) / ((2 * np.pi) ** 2)
+        return F_L
+
+    def _get_F_L(self, typs, Lmax, dL, Ls, Ntheta, nu, gal_bins):
         typs = np.char.array(typs)
-        # if 'I' in typs:
-        #     Lmin = 110
-        # else:
         Lmin = 30  # 1808.07445 and https://cmb-s4.uchicago.edu/wiki/index.php/Survey_Performance_Expectations
         C_inv = self._get_C_inv(typs, Lmax, nu, gal_bins)
         all_combos = typs[:, None] + typs[None, :]
         combos = all_combos.flatten()
         Ncombos = np.size(combos)
-        Ls = np.arange(Lmin, Lmax + 1, dL)
+        arr = False
+        if Ls is None:
+            Ls = np.arange(Lmin, Lmax + 1, dL)
+            arr = True
         F_L = np.zeros(np.size(Ls))
         perms = 0
         omega_ells, C_omega = self.power.get_camb_postborn_omega_ps(Lmax * 2)
@@ -610,7 +490,10 @@ class Fisher:
         for iii in np.arange(Ncombos):
             for jjj in np.arange(iii, Ncombos):
                 typ = "opt_" + combos[iii] + combos[jjj]
-                F_L_tmp = self._get_F_L_element(typs, typ, Lmax, dL, Ntheta, C_inv,Lmin, nu, gal_bins, C_omega_spline, Ls)
+                if arr:
+                    F_L_tmp = self._get_F_L_element_arr(typs, typ, Lmax, dL, Ntheta, C_inv,Lmin, nu, gal_bins, C_omega_spline, Ls)
+                else:
+                    F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, Ntheta, C_inv, nu, gal_bins, C_omega_spline)
                 if combos[iii] != combos[jjj]:
                     factor = 2
                 else:
@@ -621,18 +504,10 @@ class Fisher:
             raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
         return Ls, F_L
 
-    def _get_optimal_bispectrum_Fisher(self, typs, Lmax, dL, Ntheta, f_sky, verbose, arr, nu, gal_bins, save_array):
+    def _get_optimal_bispectrum_Fisher(self, typs, Lmax, dL, Ls, Ntheta, f_sky, verbose, arr, nu, gal_bins, save_array):
         typs = np.char.array(typs)
-        # if 'I' in typs:
-        #     Lmin = 110
-        # else:
         Lmin = 30     # 1808.07445 and https://cmb-s4.uchicago.edu/wiki/index.php/Survey_Performance_Expectations
         C_inv = self._get_C_inv(typs, Lmax, nu, gal_bins)
-        # if verbose:
-        #     cond_10 = np.linalg.cond(C_inv[:, :][10])
-        #     cond_100 = np.linalg.cond(C_inv)[:, :, 100]
-        #     cond_1000 = np.linalg.cond(C_inv)[:, :, 1000]
-        #     print(f"C_inv condition number at L = 10, 100, 1000: {cond_10:.2f}, {cond_100:.2f}, {cond_1000:.2f}")
         all_combos = typs[:, None] + typs[None, :]
         combos = all_combos.flatten()
         Ncombos = np.size(combos)
@@ -643,6 +518,8 @@ class Fisher:
                 typ = "opt_" + combos[iii] + combos[jjj]
                 if arr:
                     F_tmp = self._get_optimal_bispectrum_Fisher_element_arr(typs, typ, Lmax, dL, Ntheta, f_sky, C_inv, Lmin, nu, gal_bins, save_array)
+                elif Ls is not None:
+                    F_tmp = self._get_optimal_bispectrum_Fisher_sample(typs, typ, Ls, Ntheta, f_sky, C_inv, nu, gal_bins, save_array)
                 else:
                     F_tmp = self._get_optimal_bispectrum_Fisher_element_vec(typs, typ, Lmax, dL, Ntheta, f_sky, C_inv, Lmin, nu, gal_bins)
                 if combos[iii] != combos[jjj]:
@@ -670,7 +547,7 @@ class Fisher:
             return self._get_bispectrum_Fisher_arr(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa)
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa)
 
-    def get_F_L(self, typs="kg", Lmax=4000, dL=10, Ntheta=100, nu=857e9, gal_bins=(None,None,None,None)):
+    def get_F_L(self, typs="kg", Lmax=4000, dL=10, Ls=None, Ntheta=100, nu=857e9, gal_bins=(None,None,None,None)):
         """
 
         Parameters
@@ -687,9 +564,9 @@ class Fisher:
 
         """
         typs = list(typs)
-        return self._get_F_L(typs, Lmax, dL, Ntheta, nu, gal_bins)
+        return self._get_F_L(typs, Lmax, dL, Ls, Ntheta, nu, gal_bins)
 
-    def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=1, Ntheta=10, f_sky=1, verbose=False, arr=False, nu=857e9, gal_bins=(None,None,None,None), save_array=False):
+    def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=1, Ls=None, Ntheta=10, f_sky=1, verbose=False, arr=False, nu=857e9, gal_bins=(None,None,None,None), save_array=False):
         """
 
         Parameters
@@ -704,7 +581,7 @@ class Fisher:
 
         """
         typs = list(typs)
-        return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ntheta, f_sky, verbose, arr, nu, gal_bins, save_array)
+        return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ls, Ntheta, f_sky, verbose, arr, nu, gal_bins, save_array)
 
     def _get_ell_prim_prim(self, ell, ell_prim, theta):
         ell_prim_prim = self._maths.cosine_rule(ell, ell_prim, theta)
