@@ -409,18 +409,20 @@ class Fisher:
 
     def _get_C_inv(self, typs, Lmax, nu, gal_bins):
         Ntyps = np.size(typs)
-        typs_no_f = copy.deepcopy(typs)
-        typs_no_f[typs_no_f == "f"] = "h"        # Replacing 'f' with 'h' for sympy operations as 'ff' is sympy function
+        typs_no_fI = copy.deepcopy(typs)
+        typs_no_fI[typs_no_fI == "f"] = "z"        # Replacing 'f' with 'z' for sympy operations as 'ff' is sympy function
+        typs_no_fI[typs_no_fI == "I"] = "y"
         C = typs[:, None] + typs[None, :]
-        C_no_f = typs_no_f[:, None] + typs_no_f[None, :]
+        C_no_fI = typs_no_fI[:, None] + typs_no_fI[None, :]
         args = C.flatten()
-        args_no_f = C_no_f.flatten()
-        C_sym = Matrix(C_no_f)
+        args_no_fI = C_no_fI.flatten()
+        C_sym = Matrix(C_no_fI)
+        print(C_sym)
         if Ntyps > 3:
             C_inv = C_sym.inv('LU')
         else:
             C_inv = C_sym.inv()
-        C_inv_func = lambdify(args_no_f, C_inv)
+        C_inv_func = lambdify(args_no_fI, C_inv)
         Covs = [self._get_Cov(arg, Lmax, nu, gal_bins) for arg in args]
         return C_inv_func(*Covs)
 
