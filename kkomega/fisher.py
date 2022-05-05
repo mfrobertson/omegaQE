@@ -95,7 +95,7 @@ class Fisher:
 
     def _interpolate(self, arr):
         ells_sample = np.arange(np.size(arr))
-        return InterpolatedUnivariateSpline(ells_sample, arr)
+        return InterpolatedUnivariateSpline(ells_sample[1:], arr[1:])
 
     def _get_Cl_kappa(self,ellmax):
         ells = np.arange(ellmax + 1)
@@ -582,6 +582,25 @@ class Fisher:
         """
         typs = list(typs)
         return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ls, Ntheta, f_sky, verbose, arr, nu, gal_bins, save_array)
+
+    def get_C_inv(self, typs, Lmax, nu, gal_bins=(None,None,None,None)):
+        """
+
+        Parameters
+        ----------
+        typs
+        Lmax
+        nu
+        gal_bins
+
+        Returns
+        -------
+
+        """
+        return self._get_C_inv(typs, Lmax, nu, gal_bins)
+
+    def get_Cov(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None), use_bins=False):
+        return self._get_Cov(typ, ellmax, nu, gal_bins, use_bins)
 
     def _get_ell_prim_prim(self, ell, ell_prim, theta):
         ell_prim_prim = self._maths.cosine_rule(ell, ell_prim, theta)
