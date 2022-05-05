@@ -134,11 +134,11 @@ class Powerspectra:
             return I.sum(axis=1) / (ells + 0.5) ** 3 * 8 * np.pi ** 2
         return I.sum(axis=1) / ells ** 3 * 8 * np.pi ** 2
 
-    def _Cl_kappa(self, ells, Nchi, zmin, zmax, kmin, kmax, extended):
+    def _Cl_kappa(self, ells, Nchi, zmin, zmax, kmin, kmax, extended, prefactor):
         step, Chis, weyl_ps, dChi = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False)
         window = self._cosmo.cmb_lens_window(Chis, self._cosmo.get_chi_star())
         I = step * weyl_ps/(Chis)**2 * dChi * window ** 2
-        if extended:
+        if extended and prefactor:
             return I.sum(axis=1) * (ells + 0.5)** 4
         return I.sum(axis=1) * ells** 4
 
@@ -153,8 +153,8 @@ class Powerspectra:
         I = step * weyl_ps / Chis ** 2 * dChi * window1 * window2
         if np.size(Chi_source1) > 1:
             ells = self._vectorise_ells(ells, 1)
-        if extended:
-            return I.sum(axis=1) * (ells + 0.5) ** 4
+        # if extended:
+        #     return I.sum(axis=1) * (ells + 0.5) ** 4
         return I.sum(axis=1) * ells ** 4
 
     def _Cl_gal_kappa(self, ells, Chi_source1, Nchi, kmin, kmax, gal_win_zmin, gal_win_zmax, extended):
@@ -167,8 +167,8 @@ class Powerspectra:
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
         if np.size(Chi_source1) > 1:
             ells = self._vectorise_ells(ells, 1)
-        if extended:
-            return (-1) * I.sum(axis=1) * (ells + 0.5) ** 2
+        # if extended:
+        #     return (-1) * I.sum(axis=1) * (ells + 0.5) ** 2
         return (-1) * I.sum(axis=1) * ells ** 2
 
     def _Cl_gal(self, ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended):
@@ -188,8 +188,8 @@ class Powerspectra:
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
         if np.size(Chi_source1) > 1:
             ells = self._vectorise_ells(ells, 1)
-        if extended:
-            return (-1) * I.sum(axis=1) * (ells + 0.5) ** 2
+        # if extended:
+        #     return (-1) * I.sum(axis=1) * (ells + 0.5) ** 2
         return (-1) * I.sum(axis=1) * ells ** 2
 
     def _Cl_cib(self, ells, nu, Nchi, zmin, zmax, kmin, kmax, extended, bias):
@@ -237,7 +237,7 @@ class Powerspectra:
             self.weyl_PK = self._get_PK("weyl", np.max(ells), Nchi)
         return self._Cl_phi(ells, Nchi, zmin, zmax, kmin, kmax, extended)
 
-    def get_kappa_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_PK=False):
+    def get_kappa_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, prefactor=False, recalc_PK=False):
         """
         Return the Limber approximated lensing convergence power spectrum.
 
@@ -267,7 +267,7 @@ class Powerspectra:
         """
         if recalc_PK or self.weyl_PK is None:
             self.weyl_PK = self._get_PK("weyl", np.max(ells), Nchi)
-        return self._Cl_kappa(ells, Nchi, zmin, zmax, kmin, kmax, extended)
+        return self._Cl_kappa(ells, Nchi, zmin, zmax, kmin, kmax, extended, prefactor)
 
     def get_kappa_ps_2source(self, ells, Chi_source1, Chi_source2=None, Nchi=100, kmin=0, kmax=100, extended=True, recalc_PK=False):
         """
