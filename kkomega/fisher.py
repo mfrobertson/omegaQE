@@ -64,7 +64,7 @@ class Fisher:
         if not path_exists(path):
             raise FileNotFoundError(f"Path {path} does not exist")
 
-    def setup_bispectra(self, path, ellmax=4000, Nell=1000):
+    def setup_bispectra(self, path, ellmax=4000, Nell=100):    #4100 200
         """
 
         Parameters
@@ -78,7 +78,8 @@ class Fisher:
 
         """
         self.mode_path = path
-        M_types = ["kappa-kappa", "kappa-gal", "gal-kappa", "gal-gal"]
+        M_types = ["kk", "gg", "gk", "kg", "II", "Ik", "kI", "gI", "Ig"]
+        # M_types = Modecoupling().get_M_types()
         M_dir = f"{ellmax}_{Nell}_s"
         sep = getFileSep()
         for M_type in M_types:
@@ -106,7 +107,7 @@ class Fisher:
         if use_bins:
             return self.power.get_gal_ps(ells, gal_win_zmin_a=gal_win_zmin_a, gal_win_zmax_a=gal_win_zmax_a, gal_win_zmin_b=gal_win_zmin_b, gal_win_zmax_b=gal_win_zmax_b)
         return self.power.get_gal_ps(ells)
-    def _get_Cl_cib(self,ellmax, nu=857e9):
+    def _get_Cl_cib(self,ellmax, nu=353e9):
         ells = np.arange(ellmax + 1)
         return self.power.get_cib_ps(ells, nu=nu)
 
@@ -116,17 +117,17 @@ class Fisher:
             return self.power.get_gal_kappa_ps(ells, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
         return self.power.get_gal_kappa_ps(ells)
 
-    def _get_Cl_cib_kappa(self,ellmax, nu=857e9):
+    def _get_Cl_cib_kappa(self,ellmax, nu=353e9):
         ells = np.arange(ellmax + 1)
         return self.power.get_cib_kappa_ps(ells, nu=nu)
 
-    def _get_Cl_cib_gal(self,ellmax, nu=857e9, gal_win_zmin=None, gal_win_zmax=None, use_bins=True):
+    def _get_Cl_cib_gal(self,ellmax, nu=353e9, gal_win_zmin=None, gal_win_zmax=None, use_bins=True):
         ells = np.arange(ellmax + 1)
         if use_bins:
             return self.power.get_cib_gal_ps(ells, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax)
         return self.power.get_cib_gal_ps(ells, nu=nu)
 
-    def _get_Cl(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None), use_bins=False):
+    def _get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False):
         if typ == "kk":
             return self._get_Cl_kappa(ellmax)
         elif typ == "gk" or typ == "kg":
@@ -165,7 +166,7 @@ class Fisher:
                 gal_win_zmax_1 = gal_bins[index_2 + 1]
         return self._get_Cl(typ, ellmax, nu, (gal_win_zmin_1, gal_win_zmax_1, gal_win_zmin_2, gal_win_zmax_2), use_bins=True)
 
-    def _get_Cov(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None), use_bins=False):
+    def _get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False):
         if typ[0] != typ[1]:
             return self._get_Cl(typ, ellmax, nu, gal_bins, use_bins)
         if typ[0] == "k":
@@ -189,7 +190,7 @@ class Fisher:
             raise ValueError(f"Could not get Cov for type {typ}")
         return self._get_Cl(typ, ellmax, nu, gal_bins) + N
 
-    def _get_Covs(self, typ, Lmax, all_splines=False, nu=857e9, gal_bins=(None,None,None,None), include_N0_kappa="both"):
+    def _get_Covs(self, typ, Lmax, all_splines=False, nu=353e9, gal_bins=(None,None,None,None), include_N0_kappa="both"):
         N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, ell_factors=self.N0_ell_factors))
         C3_spline = N0_omega_spline
         if typ == "kkw":
@@ -407,9 +408,9 @@ class Fisher:
         F_L *= 1 / ((2 * np.pi) ** 2)
         return F_L
 
-    def _get_F_L(self, typs, Ls, dL2, Ntheta, nu, gal_bins):
+    def _get_F_L(self, typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv):
         typs = np.char.array(typs)
-        Lmax = np.max(Ls)
+        Lmax = np.int(np.max(Ls))
         C_inv = self._get_C_inv(typs, Lmax, nu, gal_bins)
         all_combos = typs[:, None] + typs[None, :]
         combos = all_combos.flatten()
@@ -430,15 +431,17 @@ class Fisher:
                 F_L += factor * F_L_tmp
         if perms != np.size(typs) ** 4:
             raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
+        if return_C_inv:
+            return Ls, F_L, C_inv
         return Ls, F_L
 
-    def get_bispectrum_Fisher(self, typ, Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1, arr=False, Lmin=30, nu=857e9, gal_bins=(None,None,None,None), include_N0_kappa="both"):
+    def get_bispectrum_Fisher(self, typ, Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1, arr=False, Lmin=30, nu=353e9, gal_bins=(None,None,None,None), include_N0_kappa="both"):
         self.bi.check_type(typ)
         if Ls is not None:
             return self._get_bispectrum_Fisher_sample(typ, Ls, dL2, Ntheta, f_sky, arr, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa)
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa)
 
-    def get_F_L(self, typs, Ls, dL2=2, Ntheta=100, nu=857e9, gal_bins=(None,None,None,None)):
+    def get_F_L(self, typs, Ls, dL2=2, Ntheta=100, nu=353e9, gal_bins=(None,None,None,None), return_C_inv=False):
         """
 
         Parameters
@@ -453,9 +456,9 @@ class Fisher:
 
         """
         typs = list(typs)
-        return self._get_F_L(typs, Ls, dL2, Ntheta, nu, gal_bins)
+        return self._get_F_L(typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv)
 
-    def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1, verbose=False, arr=False, nu=857e9, gal_bins=(None,None,None,None), save_array=False):
+    def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1, verbose=False, arr=False, nu=353e9, gal_bins=(None,None,None,None), save_array=False):
         """
 
         Parameters
@@ -488,8 +491,39 @@ class Fisher:
         """
         return self._get_C_inv(typs, Lmax, nu, gal_bins)
 
-    def get_Cov(self, typ, ellmax, nu=857e9, gal_bins=(None,None,None,None), use_bins=False):
+    def get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False):
+        """
+
+        Parameters
+        ----------
+        typ
+        ellmax
+        nu
+        gal_bins
+        use_bins
+
+        Returns
+        -------
+
+        """
         return self._get_Cov(typ, ellmax, nu, gal_bins, use_bins)
+
+    def get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False):
+        """
+
+        Parameters
+        ----------
+        typ
+        ellmax
+        nu
+        gal_bins
+        use_bins
+
+        Returns
+        -------
+
+        """
+        return self._get_Cl(typ, ellmax, nu, gal_bins, use_bins)
 
     def _get_ell_prim_prim(self, ell, ell_prim, theta):
         ell_prim_prim = self._maths.cosine_rule(ell, ell_prim, theta)
