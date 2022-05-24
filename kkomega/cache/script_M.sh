@@ -1,6 +1,7 @@
-declare -a arr=("kappa-kappa" "gal-gal" "gal-kappa" "kappa-gal")
+declare -a arr=("kk" "gg" "gk" "kg" "II" "Ik" "kI" "gI" "Ig")
+#declare -a arr=("II" "Ik" "kI" "gI" "Ig")
 for typ in "${arr[@]}"
 do
 echo "$typ"
-python M.py 4000 1000 "True" "$typ"
+python M.py 4100 200 "True" "$typ"
 done
