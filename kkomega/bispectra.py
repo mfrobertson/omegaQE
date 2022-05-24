@@ -46,7 +46,7 @@ class Bispectra:
             return -1
         return 1
 
-    def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None)):
+    def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None)):
         L12_dot = None
         if L3 is not None:
             L12_dot = self._triangle_dot_product(L1, L2, L3)
@@ -83,7 +83,7 @@ class Bispectra:
         spline = self._mode.spline(ells_sample, typ=typ, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins)
         return self.M_spline(spline, nu, gal_bins)
 
-    def build_M_spline(self, typ="kk", ells_sample=None, M_matrix=None, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None)):
+    def build_M_spline(self, typ="kk", ells_sample=None, M_matrix=None, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None)):
         """
         Generates and stores/replaces spline for the mode-coupling matrix.
 
@@ -147,7 +147,7 @@ class Bispectra:
         M1, M2, _, sign = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins)
         return sign * np.sin(2 * theta) * (M1 - M2)
 
-    def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None)):
+    def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None)):
         """
         Calculates cmb lensing bispectrum for the combination of observables specified.
 

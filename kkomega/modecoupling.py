@@ -132,11 +132,17 @@ class Modecoupling:
         return True
 
     def get_M_types(self):
+        """
+
+        Returns
+        -------
+
+        """
         observables = np.char.array(list("kgI")+self.binned_gal_types)
         return (observables[:, None] + observables[None, :]).flatten()
 
 
-    def components(self, ells1, ells2, typ="kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None), extended=True, recalc_PK=False):
+    def components(self, ells1, ells2, typ="kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=True, recalc_PK=False):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
 
@@ -169,7 +175,7 @@ class Modecoupling:
         self._check_type(typ)
         return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK)
 
-    def spline(self, ells_sample=None, M_matrix=None, typ = "kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=857e9, gal_bins=(None,None,None,None), extended=True, recalc_PK=False):
+    def spline(self, ells_sample=None, M_matrix=None, typ = "kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=True, recalc_PK=False):
         """
         Produces 2D spline of the mode coupling matrix.
 
