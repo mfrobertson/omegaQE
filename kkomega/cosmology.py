@@ -5,6 +5,7 @@ import os
 from scipy.constants import Planck, physical_constants
 from cache import tools
 from maths import Maths
+from pathlib import Path
 
 class Cosmology:
     """
@@ -19,7 +20,8 @@ class Cosmology:
         dir_current = os.path.dirname(os.path.realpath(__file__))
         sep = tools.getFileSep()
         self._pars = camb.read_ini(rf"{dir_current}{sep}data{sep}Lensit_fiducial_flatsky_params.ini")
-        self._results = camb.get_background(self._pars)
+        # self._results = camb.get_background(self._pars)
+        self._results = camb.get_results(self._pars)
         self.cib_norms = None
 
 
@@ -169,7 +171,7 @@ class Cosmology:
 
     def _get_cib_norm(self, nu):
         if self.cib_norms is None:
-            self.cib_norms = np.load("data/planck_cib/b_c.npy")
+            self.cib_norms = np.load(Path(__file__).parent/"data/planck_cib/b_c.npy")
         if nu == 353e9:
             return self.cib_norms[0]
             #return 8.24989321e-71
@@ -205,16 +207,16 @@ class Cosmology:
         window = (Chi ** 2) / (H * (1 + z) ** 2) * np.exp(-((z - z_c) ** 2) / (2 * sig_z ** 2)) * self._SED_func(nu*(z + 1))
         return b_c*window
 
-    def _cib_window_Chi_sSED(self, Chi, nu=857e9, b_c=None):
+    def _cib_window_Chi_sSED(self, Chi, nu=353e9, b_c=None):
         #"1801.05396 uses 857 GHz (pg. 2)"
         #"1705.02332 uses 353 GHz (pg. 4)"
         z = self.Chi_to_z(Chi)
         return self._cib_window_z_sSED(z, nu, b_c) * self.get_hubble(z)
 
-    def cib_window_Chi(self, Chi, nu=857e9, b_c=None):
+    def cib_window_Chi(self, Chi, nu=353e9, b_c=None):
         return self._cib_window_Chi_sSED(Chi, nu, b_c)
 
-    def cib_window_z(self, z, nu=857e9, b_c=None):
+    def cib_window_z(self, z, nu=353e9, b_c=None):
         return self._cib_window_z_sSED(z, nu, b_c)
 
 
@@ -404,5 +406,42 @@ class Cosmology:
         return postborn.get_field_rotation_power(self._pars, lmax=ellmax)
 
     def get_cmb_ps(self, ellmax=4000):
+        """
+
+        Parameters
+        ----------
+        ellmax
+
+        Returns
+        -------
+
+        """
         cmb_ps = self._results.get_cmb_power_spectra(self._pars, lmax=ellmax, spectra=['total'],CMB_unit="muK", raw_cl=True)
         return cmb_ps['total'][:,0]
+
+    def get_TT_grad_lens_ps(self, ellmax=4000):
+        """
+
+        Parameters
+        ----------
+        ellmax
+
+        Returns
+        -------
+
+        """
+        return self._results.get_lensed_gradient_cls(ellmax, raw_cl=True)[:,0]
+
+    def get_TT_lens_ps(self, ellmax=4000):
+        """
+
+        Parameters
+        ----------
+        ellmax
+
+        Returns
+        -------
+
+        """
+        spectra = self._results.get_cmb_power_spectra(lmax=ellmax + 10, raw_cl=True)
+        return spectra['total'][:,0]

@@ -142,3 +142,27 @@ class Noise:
         # Important for 353e9 according to 1609.08942
         cmb_ps = self._cosmo.get_cmb_ps(ellmax)
         return self._microK2_to_MJy2(cmb_ps, nu)
+
+    def get_cmb_gaussian_N(self, typ, deltaT=8, beam=1.4, ellmax=4000):
+        """
+
+        Parameters
+        ----------
+        typ
+        deltaT
+        beam
+        ellmax
+
+        Returns
+        -------
+
+        """
+        arcmin_to_radians = 0.000290888
+        deltaT *= arcmin_to_radians
+        beam *= arcmin_to_radians
+        T_cmb = 2.7
+        Ls = np.arange(ellmax+1)
+        if typ == "T":
+            return (deltaT*1e-6/T_cmb)**2 * np.exp(Ls*(Ls+1)*beam**2/(8*np.log(2)))
+        else:
+            return (deltaT * 1e-6 *np.sqrt(2)/ T_cmb) ** 2 * np.exp(Ls * (Ls + 1) * beam / (8 * np.log(2)))
