@@ -81,6 +81,7 @@ class Cosmology:
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
         b = 1 + 0.84*z
+        # b=1
         zs = np.linspace(0, 100, 2000)
         dz = zs[1] - zs[0]
         if zmin is not None and zmax is not None:
@@ -115,6 +116,7 @@ class Cosmology:
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
         b = 1 + 0.84 * z
+        # b=1
         zs = np.linspace(0, 100, 2000)
         dz = zs[1] - zs[0]
         norm = np.sum(dz * z_distr_func(zs))
@@ -173,7 +175,10 @@ class Cosmology:
         if self.cib_norms is None:
             self.cib_norms = np.load(Path(__file__).parent/"data/planck_cib/b_c.npy")
         if nu == 353e9:
+            # return 5.28e-65*1e-6
+            # return 7.75714689e-65* 1e-6
             return self.cib_norms[0]
+
             #return 8.24989321e-71
             # b_c = 8.71253313e-65 * 1e-6   # 1e-6 to change units of window to MJy/sr
         if nu == 545e9:
@@ -419,7 +424,7 @@ class Cosmology:
         cmb_ps = self._results.get_cmb_power_spectra(self._pars, lmax=ellmax, spectra=['total'],CMB_unit="muK", raw_cl=True)
         return cmb_ps['total'][:,0]
 
-    def get_TT_grad_lens_ps(self, ellmax=4000):
+    def get_grad_lens_ps(self, typ, ellmax=4000):
         """
 
         Parameters
@@ -430,9 +435,28 @@ class Cosmology:
         -------
 
         """
-        return self._results.get_lensed_gradient_cls(ellmax, raw_cl=True)[:,0]
+        return_zeros = False
+        if typ == "TT":
+            index = 0
+        elif typ == "EE":
+            index = 1
+        elif typ == "BB":
+            index = 2
+        elif typ == "TE" or typ == "ET":
+            index = 4
+        elif typ == "TB" or typ == "BT":
+            return_zeros = True
+        elif typ == "EB" or typ == "BE":
+            return_zeros = True
+        else:
+            raise ValueError(f"Type {typ} does not exist.")
+        spectra = self._results.get_lensed_gradient_cls(ellmax, raw_cl=True)
+        if return_zeros:
+            return np.zeros(np.shape(spectra[:,0]))
+        return spectra[:,index]
 
-    def get_TT_lens_ps(self, ellmax=4000):
+
+    def get_lens_ps(self, typ, ellmax=4000):
         """
 
         Parameters
@@ -443,5 +467,21 @@ class Cosmology:
         -------
 
         """
+        return_zeros = False
+        if typ == "TT":
+            index = 0
+        elif typ == "EE":
+            index = 1
+        elif typ == "BB":
+            index = 2
+        elif typ == "TE" or typ == "ET":
+            index = 3
+        elif typ == "TB" or typ == "BT" or typ == "EB" or typ == "BE":
+            return_zeros = True
+        else:
+            raise ValueError(f"Type {typ} does not exist.")
         spectra = self._results.get_cmb_power_spectra(lmax=ellmax + 10, raw_cl=True)
-        return spectra['total'][:,0]
+        if return_zeros:
+            return np.zeros(np.shape(spectra['total'][:,0]))
+        return spectra['total'][:,index]
+

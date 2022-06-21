@@ -297,25 +297,51 @@ class Fisher:
         dLs[-1] = dLs[-2]
         return Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline
 
+    # def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins):
+    #     Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta,typ, nu, gal_bins, include_N0_kappa=include_N0_kappa)
+    #     Cl_xy_spline = self._interpolate(self._get_Cl(typ[:2], Lmax, nu, gal_bins))
+    #     I = np.zeros(np.size(Ls))
+    #     Ls2 = np.arange(Lmin, Lmax+1, dL2)
+    #     for iii, L1 in enumerate(Ls):
+    #         I_tmp = 0
+    #         L2 = Ls2[None, :]
+    #         L3 = self._get_third_L(L1, L2, thetas[:, None])
+    #         w = np.ones(np.shape(L3))
+    #         w[L1 > Lmax] = 0
+    #         w[L1 < Lmin] = 0
+    #         bispectrum = self.bi.get_bispectrum(typ, L1, L2, theta=thetas[:, None], M_spline=True, nu=nu, gal_bins=gal_bins)
+    #         if typ[0] == typ[1]:
+    #             denom = 2 * C1_spline(L1) * C2_spline(L2) * C3_spline(L3)
+    #         else:
+    #             denom = ((C1_spline(L1) * C2_spline(L2)) + (Cl_xy_spline(L1) * Cl_xy_spline(L2))) * C3_spline(L3)
+    #         I_tmp += dL2 * 2 * np.sum(L2 * w * dTheta * bispectrum ** 2 / denom)
+    #         I[iii] = 2 * np.pi * L1 * I_tmp
+    #     I *= f_sky / np.pi * 1 / ((2 * np.pi) ** 2)
+    #     if arr:
+    #         return I
+    #     I_spline = InterpolatedUnivariateSpline(Ls, I)
+    #     return I_spline.integral(Lmin, Lmax)
+
     def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins):
         Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta,typ, nu, gal_bins, include_N0_kappa=include_N0_kappa)
         Cl_xy_spline = self._interpolate(self._get_Cl(typ[:2], Lmax, nu, gal_bins))
         I = np.zeros(np.size(Ls))
         Ls2 = np.arange(Lmin, Lmax+1, dL2)
-        for iii, L1 in enumerate(Ls):
+        for iii, L3 in enumerate(Ls):
             I_tmp = 0
             L2 = Ls2[None, :]
-            L3 = self._get_third_L(L1, L2, thetas[:, None])
-            w = np.ones(np.shape(L3))
+            L1 = self._get_third_L(L3, L2, thetas[:, None])
+            w = np.ones(np.shape(L1))
             w[L1 > Lmax] = 0
             w[L1 < Lmin] = 0
-            bispectrum = self.bi.get_bispectrum(typ, L1, L2, theta=thetas[:, None], M_spline=True, nu=nu, gal_bins=gal_bins)
+            thetas12 = np.arcsin(L3 * np.sin(thetas[:, None]) / L1)
+            bispectrum = self.bi.get_bispectrum(typ, L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
             if typ[0] == typ[1]:
                 denom = 2 * C1_spline(L1) * C2_spline(L2) * C3_spline(L3)
             else:
                 denom = ((C1_spline(L1) * C2_spline(L2)) + (Cl_xy_spline(L1) * Cl_xy_spline(L2))) * C3_spline(L3)
             I_tmp += dL2 * 2 * np.sum(L2 * w * dTheta * bispectrum ** 2 / denom)
-            I[iii] = 2 * np.pi * L1 * I_tmp
+            I[iii] = 2 * np.pi * L3 * I_tmp
         I *= f_sky / np.pi * 1 / ((2 * np.pi) ** 2)
         if arr:
             return I
@@ -436,6 +462,27 @@ class Fisher:
         return Ls, F_L
 
     def get_bispectrum_Fisher(self, typ, Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1, arr=False, Lmin=30, nu=353e9, gal_bins=(None,None,None,None), include_N0_kappa="both"):
+        """
+
+        Parameters
+        ----------
+        typ
+        Lmax
+        dL
+        Ls
+        dL2
+        Ntheta
+        f_sky
+        arr
+        Lmin
+        nu
+        gal_bins
+        include_N0_kappa
+
+        Returns
+        -------
+
+        """
         self.bi.check_type(typ)
         if Ls is not None:
             return self._get_bispectrum_Fisher_sample(typ, Ls, dL2, Ntheta, f_sky, arr, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa)

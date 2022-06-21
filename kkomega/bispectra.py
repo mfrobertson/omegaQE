@@ -116,7 +116,7 @@ class Bispectra:
 
     def _check_type(self, typ):
         typs = self._mode.get_M_types() + "w"
-        if typ not in typs:
+        if typ not in typs and typ != "kkk":
             raise ValueError(f"Bispectrum type {typ} not from accepted types: {typs}")
 
     def check_type(self, typ):

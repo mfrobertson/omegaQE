@@ -124,15 +124,27 @@ class Noise:
         # alpha = 0.387             # parameters from 1609.08942 pg 8
         # l_c = 162.9
         # gamma = 0.168
+
+        # return 0.00029989393*ells**(-2.17)
+
         alpha = 0.169              # parameters from 1303.5075 pg 6
         l_c = 905
         gamma = 0.427
+
         if nu == 353e9:
             A = 6e2              # Tuned to match 1705.02332 fig 2 and 3, and 2110.09730 fig 2
         elif nu == 545e9:
             A = 2e5              # Complete guess
         elif nu == 857e9:
             A = 6e8         # from 1303.5075 pg 6
+        D_l = self._microK2_to_MJy2(A, nu) * ((100 / ells) ** alpha / ((1 + (ells / l_c) ** 2) ** (gamma / 2)))
+        N_dust = 2*np.pi * D_l/(ells*(ells+1))
+        N_dust[0] = 0
+        return N_dust
+
+    def get_dust_N_fit(self, nu, alpha, l_c, gamma, A, ellmax=4000):
+        # 1303.5075 eq 9,
+        ells = np.arange(ellmax + 1)
         D_l = self._microK2_to_MJy2(A, nu) * ((100 / ells) ** alpha / ((1 + (ells / l_c) ** 2) ** (gamma / 2)))
         N_dust = 2*np.pi * D_l/(ells*(ells+1))
         N_dust[0] = 0
@@ -162,7 +174,9 @@ class Noise:
         beam *= arcmin_to_radians
         T_cmb = 2.7
         Ls = np.arange(ellmax+1)
-        if typ == "T":
+        if typ == "TT":
             return (deltaT*1e-6/T_cmb)**2 * np.exp(Ls*(Ls+1)*beam**2/(8*np.log(2)))
+        elif typ == "EE" or typ == "BB":
+            return (deltaT * 1e-6 *np.sqrt(2)/ T_cmb) ** 2 * np.exp(Ls * (Ls + 1) * beam**2 / (8 * np.log(2)))
         else:
-            return (deltaT * 1e-6 *np.sqrt(2)/ T_cmb) ** 2 * np.exp(Ls * (Ls + 1) * beam / (8 * np.log(2)))
+            return np.zeros(np.size(Ls))
