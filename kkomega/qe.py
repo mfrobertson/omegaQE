@@ -4,6 +4,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from noise import Noise
 from sympy.matrices import Matrix
 from sympy import lambdify
+import vector
 
 
 class QE:
@@ -35,66 +36,89 @@ class QE:
         if not self.cmb[typ].initialised:
             self._initialise(typ, Lmax)
 
-    def response(self, typ, L1, L2, theta):
-        L3 = self._get_third_L(L1,L2,theta)
-        w = np.ones(np.shape(L3))
-        w[L3 < 30] = 0
-        theta3 = np.arcsin(L1*np.sin(theta)/L3)
-        h1 = self._get_response_geo_fac(typ, 1, theta, theta3)
-        h2 = self._get_response_geo_fac(typ, 2, theta, theta3)
+
+    def response_phi(self, typ, l, L, theta):
+        L4 = self._get_third_L(l,L,theta)
+        w = np.ones(np.shape(L4))
+        w[L4 < 3] = 0
+        w[L4 > 6000] = 0
+        theta4L = np.arcsin(l*np.sin(theta)/L4)
+        thetal4 = 2*np.pi - theta4L - theta
+        h1 = self._get_response_geo_fac(typ, 1, theta12=thetal4)
+        h2 = self._get_response_geo_fac(typ, 2, theta12=thetal4)
         self._initialisation_check(typ)
         if typ == "BT" or typ == "TB":
-            return w * L1 * L2 * np.sin(theta) * (h1 * self.cmb["TE"].gradCl_spline(L1) - h2 * self.cmb["TE"].gradCl_spline(L3))
+            return w * (L * l * np.cos(theta) * h1 * self.cmb["TE"].gradCl_spline(l)) + (L * L4 * np.cos(theta4L) * h2 * self.cmb["TE"].gradCl_spline(L4))
         elif typ == "EB":
-            return w * L1 * L2 * np.sin(theta) * (h1 * self.cmb["EE"].gradCl_spline(L1) - h2 * self.cmb["BB"].gradCl_spline(L3))
+            return w * (L * l * np.cos(theta) * h1 * self.cmb["EE"].gradCl_spline(l)) + (L * L4 * np.cos(theta4L) * h2 * self.cmb["BB"].gradCl_spline(L4))
         elif typ == "BE":
-            return w * L1 * L2 * np.sin(theta) * (h1 * self.cmb["BB"].gradCl_spline(L1) - h2 * self.cmb["EE"].gradCl_spline(L3))
-        return w*L1*L2*np.sin(theta)*(h1*self.cmb[typ].gradCl_spline(L1) - h2*self.cmb[typ].gradCl_spline(L3))
+            return w * (L * l * np.cos(theta) * h1 * self.cmb["BB"].gradCl_spline(l)) + (L * L4 * np.cos(theta4L) * h2 * self.cmb["EE"].gradCl_spline(L4))
+        return w*(L * l * np.cos(theta)*h1*self.cmb[typ].gradCl_spline(l)) + (L * L4 * np.cos(theta4L) * h2*self.cmb[typ].gradCl_spline(L4))
 
-    def geo_fac(self, typ, theta1=None, theta2=None, theta12=None):
+    def response(self, typ, l, L, theta, curl):
+        if not curl:
+            return self.response_phi(typ, l, L, theta)
+        L4 = self._get_third_L(l, L, theta)
+        w = np.ones(np.shape(L4))
+        w[L4 < 3] = 0
+        w[L4 > 6000] = 0
+        theta4L = np.arcsin(l * np.sin(theta) / L4)
+        thetal4 = 2 * np.pi - theta4L - theta
+        h1 = self._get_response_geo_fac(typ, 1, theta12=thetal4)
+        h2 = self._get_response_geo_fac(typ, 2, theta12=thetal4)
+        self._initialisation_check(typ)
+        if typ == "BT" or typ == "TB":
+            return w * L * l * np.sin(theta) * (h1 * self.cmb["TE"].gradCl_spline(l) - h2 * self.cmb["TE"].gradCl_spline(L4))
+        elif typ == "EB":
+            return w * L * l * np.sin(theta) * (h1 * self.cmb["EE"].gradCl_spline(l) - h2 * self.cmb["BB"].gradCl_spline(L4))
+        elif typ == "BE":
+            return w * L * l * np.sin(theta) * (h1 * self.cmb["BB"].gradCl_spline(l) - h2 * self.cmb["EE"].gradCl_spline(L4))
+        # print(f"theta : {theta}")
+        # print(f"L4: {L4}")
+        return w * L * l * np.sin(theta) * (h1 * self.cmb[typ].gradCl_spline(l) - h2 * self.cmb[typ].gradCl_spline(L4))
+
+    def geo_fac(self, typ, theta12):
+        shape = np.shape(theta12)
         if typ == "T":
-            return self._geo_fac_T()
+            return self._geo_fac_T(shape)
         elif typ == "E":
-            if theta12 is None:
-                return self._geo_fac_E(theta1,theta2)
-            return np.cos(2*theta12)
+            return self._geo_fac_E(theta12)
         elif typ == "B":
-            if theta12 is None:
-                return self._geo_fac_B(theta1,theta2)
-            return np.sin(2*theta12)
+            return self._geo_fac_B(theta12)
 
-    def _geo_fac_T(self):
-        return 1
+    def _geo_fac_T(self, shape):
+        return np.ones(shape)
 
-    def _geo_fac_E(self, theta1, theta2):
-        return np.cos(2*(theta1 - theta2))
+    def _geo_fac_E(self, theta12):
+        return np.cos(2*(theta12))
 
-    def _geo_fac_B(self, theta1, theta2):
-        return np.sin(2*(theta1-theta2))
+    def _geo_fac_B(self, theta12):
+        return np.sin(2*(theta12))
 
-    def _get_response_geo_fac(self, typ, num, theta1, theta2):
+    def _get_response_geo_fac(self, typ, num, theta12):
+        shape = np.shape(theta12)
         if typ == "TT":
-            return self._geo_fac_T()
+            return self._geo_fac_T(shape)
         elif typ == "EE" or typ == "BB":
-            return self._geo_fac_E(theta1,theta2)
+            return self._geo_fac_E(theta12)
         elif typ == "EB" or typ == "BE":
-            return self._geo_fac_B(theta1,theta2)
+            return self._geo_fac_B(theta12)
         elif typ == "TE":
             if num == 1:
-                return self._geo_fac_E(theta1,theta2)
-            return self._geo_fac_T()
+                return self._geo_fac_E(theta12)
+            return self._geo_fac_T(shape)
         elif typ == "ET":
             if num == 1:
-                return self._geo_fac_T()
-            return self._geo_fac_E(theta1,theta2)
+                return self._geo_fac_T(shape)
+            return self._geo_fac_E(theta12)
         elif typ == "TB":
             if num == 1:
-                return self._geo_fac_B(theta1,theta2)
+                return self._geo_fac_B(theta12)
             return 0
         elif typ == "BT":
             if num == 1:
                 return 0
-            return self._geo_fac_B(theta1,theta2)
+            return self._geo_fac_B(theta12)
         else:
             raise ValueError(f"Type {typ} does not exist.")
 
@@ -148,16 +172,16 @@ class QE:
             return 2 * D2 * self._get_cmb_cov_spline("BB")(L1)
         return 2*D1*D2
 
-    def _gmv_weight_numer(self, typ, L1, L2, theta, C_TT, C_EE, C_TE):
+    def _gmv_weight_numer(self, typ, L1, L2, theta, curl, C_TT, C_EE, C_TE):
         L3 = self._get_third_L(L1, L2, theta)
-        f_TT = self.response("TT", L1, L2, theta)
-        f_TE = self.response("TE", L1, L2, theta)
-        f_ET = self.response("ET", L1, L2, theta)
-        f_EE = self.response("EE", L1, L2, theta)
-        f_TB = self.response("TB", L1, L2, theta)
-        f_EB = self.response("EB", L1, L2, theta)
-        f_BT = self.response("BT", L1, L2, theta)
-        f_BE = self.response("BE", L1, L2, theta)
+        f_TT = self.response("TT", L1, L2, theta, curl)
+        f_TE = self.response("TE", L1, L2, theta, curl)
+        f_ET = self.response("ET", L1, L2, theta, curl)
+        f_EE = self.response("EE", L1, L2, theta, curl)
+        f_TB = self.response("TB", L1, L2, theta, curl)
+        f_EB = self.response("EB", L1, L2, theta, curl)
+        f_BT = self.response("BT", L1, L2, theta, curl)
+        f_BE = self.response("BE", L1, L2, theta, curl)
         if typ == "TT":
             return C_EE(L1)*C_EE(L3)*f_TT + C_TE(L1)*C_TE(L3)*f_EE - C_EE(L1)*C_TE(L3)*f_TE - C_TE(L1)*C_EE(L3)*f_ET
         elif typ == "EE":
@@ -191,13 +215,13 @@ class QE:
         cov_inv = self.C_inv_splines[idx1][idx2]
         return cov_inv
 
-    def gmv_weight_function(self, typ, L1, L2, theta, explicit=True):
+    def gmv_weight_function(self, typ, L1, L2, theta, curl, explicit=True):
         if explicit:
             C_TT = self._get_cmb_cov_spline("TT")
             C_EE = self._get_cmb_cov_spline("EE")
             C_TE = self._get_cmb_cov_spline("TE")
             denom = self._gmv_weight_denom(typ, L1, L2, theta, C_TT, C_EE, C_TE)
-            numer = self._gmv_weight_numer(typ, L1, L2, theta, C_TT, C_EE, C_TE)
+            numer = self._gmv_weight_numer(typ, L1, L2, theta, curl, C_TT, C_EE, C_TE)
             return numer/denom
         typs = np.char.array(list("TEB"))
         C = typs[:, None] + typs[None, :]
@@ -209,17 +233,106 @@ class QE:
             jq = arg[1]+typ[1]
             C_inv_ip_spline = self._get_cmb_Cov_inv_spline(ip)
             C_inv_jq_spline = self._get_cmb_Cov_inv_spline(jq)
-            weight += self.response(arg, L1, L2, theta)*C_inv_ip_spline(L1)*C_inv_jq_spline(L3)
+            weight += self.response(arg, L1, L2, theta, curl)*C_inv_ip_spline(L1)*C_inv_jq_spline(L3)
         return weight/2
 
-    def weight_function(self, typ, L1, L2, theta):
+    def weight_function_vector(self, typ, L3_vec, L_vec, curl):
+        L = L_vec.rho
+        L4_vec = L_vec - L3_vec
+        L4 = L4_vec.rho
+        w = np.ones(np.shape(L4))
+        w[L4<3] = 0
+        w[L4 > 6000] = 0
+        typ1 = typ[0]+typ[0]
+        typ2 = typ[1]+typ[1]
+        denom = 2*(self.cmb[typ1].Cl_spline(L)+self.cmb[typ1].N_spline(L))*(self.cmb[typ2].Cl_spline(L4)+self.cmb[typ2].N_spline(L4))
+        return w*self.response_vector(typ, L_vec, L3_vec, curl)/denom
+
+    def response_vector_phi(self, typ, L3_vec, L_vec):
+        L = L_vec.rho
+        L3 = L3_vec.rho
+        L4_vec = L_vec - L3_vec
+        L4 = L4_vec.rho
+        w = np.ones(np.shape(L4))
+        w[L4 < 3] = 0
+        w[L4 > 6000] = 0
+        h1 = self._get_response_geo_fac(typ, 1, theta12=L3_vec.deltaphi(L4_vec))
+        h2 = self._get_response_geo_fac(typ, 2, theta12=L3_vec.deltaphi(L4_vec))
+        self._initialisation_check(typ)
+        if typ == "BT" or typ == "TB":
+            return w * (L * L3 * np.cos(L_vec.deltaphi(L3_vec)) * h1 * self.cmb["TE"].gradCl_spline(L3)) + (L * L4 * np.cos(L_vec.deltaphi(L4_vec)) * h2 * self.cmb["TE"].gradCl_spline(L4))
+        elif typ == "EB":
+            return w * (L * L3 * np.cos(L_vec.deltaphi(L3_vec)) * h1 * self.cmb["EE"].gradCl_spline(L3)) + (L * L4 * np.cos(L_vec.deltaphi(L4_vec)) * h2 * self.cmb["BB"].gradCl_spline(L4))
+        elif typ == "BE":
+            return w * (L * L3 * np.cos(L_vec.deltaphi(L3_vec)) * h1 * self.cmb["BB"].gradCl_spline(L3)) + (L * L4 * np.cos(L_vec.deltaphi(L4_vec)) * h2 * self.cmb["EE"].gradCl_spline(L4))
+        return w*(L * L3 * np.cos(L_vec.deltaphi(L3_vec))*h1*self.cmb[typ].gradCl_spline(L3)) + (L * L4 * np.cos(L_vec.deltaphi(L4_vec)) * h2*self.cmb[typ].gradCl_spline(L4))
+
+    def response_vector(self, typ, L3_vec, L_vec, curl):
+        if not curl:
+            return self.response_vector_phi(typ, L3_vec, L_vec)
+        L = L_vec.rho
+        L3 = L3_vec.rho
+        L4_vec = L_vec - L3_vec
+        L4 = L4_vec.rho
+        w = np.ones(np.shape(L4))
+        w[L4 < 3] = 0
+        w[L4 > 6000] = 0
+        h1 = self._get_response_geo_fac(typ, 1, theta12=L3_vec.deltaphi(L4_vec))
+        h2 = self._get_response_geo_fac(typ, 2, theta12=L3_vec.deltaphi(L4_vec))
+        self._initialisation_check(typ)
+        if typ == "BT" or typ == "TB":
+            return w * L * L3 * np.sin(L_vec.deltaphi(L3_vec)) * (h1 * self.cmb["TE"].gradCl_spline(L3) - h2 * self.cmb["TE"].gradCl_spline(L4))
+        elif typ == "EB":
+            return w * L * L3 * np.sin(L_vec.deltaphi(L3_vec)) * (h1 * self.cmb["EE"].gradCl_spline(L3) - h2 * self.cmb["BB"].gradCl_spline(L4))
+        elif typ == "BE":
+            return w * L * L3 * np.sin(L_vec.deltaphi(L3_vec)) * (h1 * self.cmb["BB"].gradCl_spline(L3) - h2 * self.cmb["EE"].gradCl_spline(L4))
+        # print(f"theta: {L_vec.deltaphi(L3_vec)}")
+        # print(f"L4 (vector): {L4}")
+        return w * L * L3 * np.sin(L_vec.deltaphi(L3_vec)) * (h1 * self.cmb[typ].gradCl_spline(L3) - h2 * self.cmb[typ].gradCl_spline(L4))
+
+    def normalisation_vector(self, typ, Ls, dL=2, Ntheta=100, curl=True):
+        """
+
+        Parameters
+        ----------
+        Ls
+        dL
+        Ntheta
+
+        Returns
+        -------
+
+        """
+        Lmax = 4000
+        Lmin = 30
+        self._initialisation_check(typ, Lmax)
+        Ls3 = np.arange(Lmin, Lmax+1, dL)
+        dTheta = np.pi / Ntheta
+        thetas = np.arange(dTheta, np.pi + dTheta, dTheta, dtype=float)
+        N_Ls = np.size(Ls)
+        A = np.zeros(N_Ls)
+        if N_Ls == 1:
+            Ls = np.ones(1)*Ls
+        for iii, L in enumerate(Ls):
+            I = np.zeros(np.size(Ls3))
+            for jjj, L3 in enumerate(Ls3):
+                L3_vec = vector.obj(rho=L3, phi=thetas)
+                L_vec =  vector.obj(rho=L, phi=0)
+                g = self.weight_function_vector(typ, L3_vec, L_vec, curl)
+                f = self.response_vector(typ, L3_vec, L_vec, curl)
+                I[jjj] = 2 * dTheta *np.sum(L3 * g * f)
+            A[iii] = InterpolatedUnivariateSpline(Ls3,I).integral(Lmin,Lmax)/((2*np.pi)**2)
+        return A
+
+    def weight_function(self, typ, L1, L2, theta, curl):
         L3 = self._get_third_L(L1,L2,theta)
         w = np.ones(np.shape(L3))
         w[L3<3] = 0
+        w[L3 > 6000] = 0
         typ1 = typ[0]+typ[0]
         typ2 = typ[1]+typ[1]
         denom = 2*(self.cmb[typ1].Cl_spline(L1)+self.cmb[typ1].N_spline(L1))*(self.cmb[typ2].Cl_spline(L3)+self.cmb[typ2].N_spline(L3))
-        return w*self.response(typ, L1, L2, theta)/denom
+        return w*self.response(typ, L1, L2, theta, curl)/denom
 
     def _initialise(self, typ, Lmax=6000):
         if self.cmb[typ].initialised:
@@ -245,7 +358,7 @@ class QE:
         for arg in args:
             self._initialise(arg,Lmax)
 
-    def gmv_normalisation(self, Ls, dL=10, Ntheta=100):
+    def gmv_normalisation(self, Ls, dL=10, Ntheta=100, curl=True, explicit=False):
         typs = np.char.array(list("TEB"))
         Lmax = 4000
         Lmin = 30
@@ -260,13 +373,15 @@ class QE:
             I = 0
             for i in typs:
                 for j in typs:
-                    g_ij = self.gmv_weight_function(i+j, L_prims,L,thetas)
-                    f_ji = self.response(j + i, L_prims,L,thetas)
-                    I += 2 * dTheta * dL * np.sum(L_prims * g_ij * f_ji)
+                    g_ij = self.gmv_weight_function(i+j, L_prims,L,thetas, curl, explicit)
+                    # f_ji = self.response(j + i, L_prims,L,thetas, curl)
+                    # I += 2 * dTheta * dL * np.sum(L_prims * g_ij * f_ji)
+                    f_ij = self.response(i+j, L_prims,L,thetas, curl)
+                    I += 2 * dTheta * dL * np.sum(L_prims * g_ij * f_ij)
             A[iii] = I / ((2 * np.pi) ** 2)
         return A/2
 
-    def normalisation(self, typ, Ls, dL=10, Ntheta=100):
+    def normalisation(self, typ, Ls, dL=2, Ntheta=100, curl=True):
         """
 
         Parameters
@@ -290,64 +405,129 @@ class QE:
         if N_Ls == 1:
             Ls = np.ones(1)*Ls
         for iii, L in enumerate(Ls):
-            g = self.weight_function(typ, L_prims, L, thetas)
-            f = self.response(typ, L_prims, L, thetas)
+            g = self.weight_function(typ, L_prims, L, thetas, curl)
+            f = self.response(typ, L_prims, L, thetas, curl)
             I = 2 * dTheta * dL *np.sum(L_prims * g * f)
             A[iii] = I/((2*np.pi)**2)
+        return A
+
+    def normalisation2(self, typ, Ls, dL=2, Ntheta=100, curl=True):
+        """
+
+        Parameters
+        ----------
+        Ls
+        dL
+        Ntheta
+
+        Returns
+        -------
+
+        """
+        Lmax = 4000
+        Lmin = 30
+        self._initialisation_check(typ, Lmax)
+        L_prims = np.arange(Lmin, Lmax+1, dL)
+        dTheta = np.pi / Ntheta
+        thetas = np.arange(dTheta, np.pi + dTheta, dTheta, dtype=float)
+        N_Ls = np.size(Ls)
+        A = np.zeros(N_Ls)
+        if N_Ls == 1:
+            Ls = np.ones(1)*Ls
+        for iii, L in enumerate(Ls):
+            I = np.zeros(np.size(L_prims))
+            for jjj, L_prim in enumerate(L_prims):
+                g = self.weight_function(typ, L_prim, L, thetas, curl)
+                f = self.response(typ, L_prim, L, thetas, curl)
+                I[jjj] = 2 * dTheta *np.sum(L_prim * g * f)
+            A[iii] = InterpolatedUnivariateSpline(L_prims,I).integral(Lmin,Lmax)/((2*np.pi)**2)
         return A
 
 if __name__ == '__main__':
     import time
     qe = QE()
-    Ls = np.arange(30,4000,100)
-    # print(qe.gmv_normalisation(Ls))
+    # samp1 = np.arange(30, 40, 5)
+    # samp2 = np.logspace(1, 3, 10) * 4
+    # Ls = np.concatenate((samp1, samp2))
+    # print((Ls*(Ls+1))**2/qe.normalisation("TT",Ls,dL=2,Ntheta=100)/4)
+    # print((Ls * (Ls + 1))**2 / qe.normalisation2("TT", Ls, dL=2, Ntheta=100) / 4)
+    # import matplotlib.pyplot as plt
+    # plt.plot(Ls, (Ls * (Ls + 1))**2 / qe.gmv_normalisation(Ls, dL=2, Ntheta=100) / 4)
+    # plt.show()
     t1 = time.time()
+    L=100
+    print(L)
+    norm = qe.gmv_normalisation(L, 2, 100, True, True)
+    print(norm)
+    print(L ** 4 / norm / 4)
+    norm = qe.gmv_normalisation(L, 2, 100, True, False)
+    print(norm)
+    print(L**4/norm/4)
+    print("----------")
+    L = 1000
+    print(L)
+    norm = qe.gmv_normalisation(L, 2, 100, True, True)
+    print(norm)
+    print(L ** 4 / norm / 4)
+    norm = qe.gmv_normalisation(L, 2, 100, True, False)
+    print(norm)
+    print(L ** 4 / norm / 4)
+    print("----------")
+    L = 750
+    print(L)
+    norm = qe.gmv_normalisation(L, 2, 100, True, True)
+    print(norm)
+    print(L ** 4 / norm / 4)
+    norm = qe.gmv_normalisation(L, 2, 100, True, False)
+    print(norm)
+    print(L ** 4 / norm / 4)
+    print("----------")
     print("TT")
-    weight = qe.gmv_weight_function("TT", 100, 150, 1.5)
+    weight = qe.gmv_weight_function("TT", 1000, 1500, 3, True, True)
     print(weight)
-    weight = qe.gmv_weight_function("TT", 100, 150, 1.5, False)
+    weight = qe.gmv_weight_function("TT", 1000, 1500, 3, True, False)
     print(weight)
     print("----------------")
     print("TE")
-    weight = qe.gmv_weight_function("TE", 100, 150, 1.5)
+    weight = qe.gmv_weight_function("TE", 1000, 2500, 1.5, True, True)
     print(weight)
-    weight = qe.gmv_weight_function("TE", 100, 150, 1.5, False)
+    weight = qe.gmv_weight_function("TE", 1000, 2500, 1.5, True, False)
     print(weight)
     print("----------------")
     print("ET")
-    weight = qe.gmv_weight_function("ET", 100, 150, 1.5)
+    weight = qe.gmv_weight_function("ET", 1000, 1500, 1.5, True, True)
     print(weight)
-    weight = qe.gmv_weight_function("ET", 100, 150, 1.5, False)
+    weight = qe.gmv_weight_function("ET", 1000, 1500, 1.5, True, False)
     print(weight)
     print("----------------")
     print("EE")
-    weight = qe.gmv_weight_function("EE", 100, 150, 1.5)
+    weight = qe.gmv_weight_function("EE", 1000, 1500, 0.5, True, True)
     print(weight)
-    weight = qe.gmv_weight_function("EE", 100, 150, 1.5, False)
+    weight = qe.gmv_weight_function("EE", 1000, 1500, 0.5, True, False)
     print(weight)
     print("----------------")
     print("EB")
-    weight = qe.gmv_weight_function("EB", 100, 150, 1.5)
+    weight = qe.gmv_weight_function("EB", 980, 1530, 2.9, True, True)
     print(weight)
-    weight = qe.gmv_weight_function("EB", 100, 150, 1.5, False)
+    weight = qe.gmv_weight_function("EB", 980, 1530, 2.9, True, False)
     print(weight)
     print("----------------")
     print("BE")
-    weight = qe.gmv_weight_function("BE", 100, 150, 1.5)
+    weight = qe.gmv_weight_function("BE", 1000, 1500, 1.5, True, True)
     print(weight)
-    weight = qe.gmv_weight_function("BE", 100, 150, 1.5, False)
+    weight = qe.gmv_weight_function("BE", 1000, 1500, 1.5, True, False)
     print(weight)
     print("----------------")
     print("BT")
-    weight = qe.gmv_weight_function("BT", 100, 150, 1.5)
+    weight = qe.gmv_weight_function("BT", 1000, 1500, 1.5, True, True)
     print(weight)
-    weight = qe.gmv_weight_function("BT", 100, 150, 1.5, False)
+    weight = qe.gmv_weight_function("BT", 1000, 1500, 1.5, True, False)
     print(weight)
     print("----------------")
     print("TB")
-    weight = qe.gmv_weight_function("TB", 100, 150, 1.5)
+    weight = qe.gmv_weight_function("TB", 1000, 1500, 1.5, True, True)
     print(weight)
-    weight = qe.gmv_weight_function("TB", 100, 150, 1.5, False)
+    weight = qe.gmv_weight_function("TB", 1000, 1500, 1.5, True, False)
     print(weight)
     print("----------------")
     t2 = time.time()
