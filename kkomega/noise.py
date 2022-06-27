@@ -155,7 +155,7 @@ class Noise:
         cmb_ps = self._cosmo.get_cmb_ps(ellmax)
         return self._microK2_to_MJy2(cmb_ps, nu)
 
-    def get_cmb_gaussian_N(self, typ, deltaT=8, beam=1.4, ellmax=4000):
+    def get_cmb_gaussian_N(self, typ, deltaT=3, beam=3, ellmax=4000):
         """
 
         Parameters

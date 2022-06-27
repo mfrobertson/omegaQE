@@ -424,7 +424,7 @@ class Cosmology:
         cmb_ps = self._results.get_cmb_power_spectra(self._pars, lmax=ellmax, spectra=['total'],CMB_unit="muK", raw_cl=True)
         return cmb_ps['total'][:,0]
 
-    def get_grad_lens_ps(self, typ, ellmax=4000):
+    def get_grad_lens_ps(self, typ, ellmax=8000):
         """
 
         Parameters
