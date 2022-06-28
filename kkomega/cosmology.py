@@ -485,3 +485,32 @@ class Cosmology:
             return np.zeros(np.shape(spectra['total'][:,0]))
         return spectra['total'][:,index]
 
+    def get_unlens_ps(self, typ, ellmax=4000):
+        """
+
+        Parameters
+        ----------
+        ellmax
+
+        Returns
+        -------
+
+        """
+        return_zeros = False
+        if typ == "TT":
+            index = 0
+        elif typ == "EE":
+            index = 1
+        elif typ == "BB":
+            index = 2
+        elif typ == "TE" or typ == "ET":
+            index = 3
+        elif typ == "TB" or typ == "BT" or typ == "EB" or typ == "BE":
+            return_zeros = True
+        else:
+            raise ValueError(f"Type {typ} does not exist.")
+        spectra = self._results.get_cmb_power_spectra(lmax=ellmax + 10, raw_cl=True)
+        if return_zeros:
+            return np.zeros(np.shape(spectra['total'][:,0]))
+        return spectra['unlensed_scalar'][:,index]
+
