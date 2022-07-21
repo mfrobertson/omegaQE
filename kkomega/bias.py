@@ -2,7 +2,7 @@ from fisher import Fisher
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 from cosmology import Cosmology
-from qe_vec import QE
+from qe import QE
 import vector
 
 
@@ -171,7 +171,7 @@ class Bias:
     def _get_third_L(self, L1, L2, theta):
         return np.sqrt(L1**2 + L2**2 + (2*L1*L2*np.cos(theta).astype("double"))).astype("double")
 
-    def bias_prep(self, N_L1, N_L3, Ntheta12, Ntheta13, curl):
+    def bias_prep(self, N_L1, dL3, Ntheta12, Ntheta13, curl):
         if curl:
             bi_typ = "theory"
         else:
@@ -179,9 +179,7 @@ class Bias:
         samp1_1 = np.arange(30, 40, 5)
         samp2_1 = np.logspace(1, 3, N_L1) * 4
         Ls1 = np.concatenate((samp1_1, samp2_1))
-        samp1_2 = np.arange(30, 40, 5)
-        samp2_2 = np.logspace(1, 3, N_L3) * 4
-        Ls3 = np.concatenate((samp1_2, samp2_2))
+        Ls3 = np.arange(30, 4001, dL3)
         dTheta1 = np.pi / Ntheta12
         thetas1 = np.arange(0, np.pi, dTheta1, dtype=float)
         dtheta3 = np.pi / Ntheta13
@@ -189,6 +187,8 @@ class Bias:
         return bi_typ, Ls1, thetas1, Ls3, thetas3, curl
 
     def _bias_calc(self, XY, L, gmv, bi_typ, Ls1, thetas1, Ls3, thetas3, curl):
+        dTheta3 = thetas3[1] - thetas3[0]
+        dL3 = Ls3[1] = Ls3[0]
         L_vec = vector.obj(rho=L, phi=0)
         I_A1_L1 = np.zeros(np.size(Ls1))
         I_C1_L1 = np.zeros(np.size(Ls1))
@@ -201,37 +201,31 @@ class Bias:
                 L2 = L2_vec.rho
                 w2 = 0 if (L2 < 3 or L2 > 4000) else 1
                 bi = w2 * self.mixed_bispectrum(bi_typ, L1, L2, L1_vec.deltaphi(L2_vec))
-                I_A1_L3 = np.zeros(np.size(Ls3))
-                I_C1_L3 = np.zeros(np.size(Ls3))
                 if w2 != 0:
-                    for kkk, L3 in enumerate(Ls3):
-                        L3_vec = vector.obj(rho=L3, phi=thetas3)
-                        L5_vec = L1_vec - L3_vec
-                        Ls5 = L5_vec.rho
-                        w5 = np.ones(np.shape(Ls5))
-                        w5[Ls5 < 3] = 0
-                        w5[Ls5 > 4000] = 0
-                        Xbar_Ybar = XY.replace("B", "E")
-                        X_Ybar = XY[0] + XY[1].replace("B", "E")
-                        Xbar_Y = XY[0].replace("B", "E") + XY[1]
-                        C_L5 = self._qe.cmb[Xbar_Ybar].unlenCl_spline(Ls5)
-                        C_Ybar_L3 = self._qe.cmb[X_Ybar].unlenCl_spline(L3)
-                        C_Xbar_L3 = self._qe.cmb[Xbar_Y].unlenCl_spline(L3)
-                        L_A1_fac = (L5_vec @ L1_vec) * (L5_vec @ L2_vec)
-                        L_C1_fac = (L3_vec @ L1_vec) * (L3_vec @ L2_vec)
-                        g_XY = self._qe.weight_function(XY, L_vec, L3_vec, curl=curl, gmv=gmv)
-                        g_YX = self._qe.weight_function(XY[::-1], L_vec, L3_vec, curl=curl, gmv=gmv)
-                        L4_vec = L_vec - L3_vec
-                        h_X_A1 = self._qe.geo_fac(XY[0], theta12=L5_vec.deltaphi(L4_vec))
-                        h_Y_A1 = self._qe.geo_fac(XY[1], theta12=L5_vec.deltaphi(L3_vec))
-                        h_X_C1 = self._qe.geo_fac(XY[0], theta12=L3_vec.deltaphi(L4_vec))
-                        h_Y_C1 = self._qe.geo_fac(XY[1], theta12=L3_vec.deltaphi(L4_vec))
+                    L3_vec = vector.obj(rho=Ls3[None,:], phi=thetas3[:,None])
+                    L5_vec = L1_vec - L3_vec
+                    Ls5 = L5_vec.rho
+                    w5 = np.ones(np.shape(Ls5))
+                    w5[Ls5 < 3] = 0
+                    w5[Ls5 > 4000] = 0
+                    Xbar_Ybar = XY.replace("B", "E")
+                    X_Ybar = XY[0] + XY[1].replace("B", "E")
+                    Xbar_Y = XY[0].replace("B", "E") + XY[1]
+                    C_L5 = self._qe.cmb[Xbar_Ybar].unlenCl_spline(Ls5)
+                    C_Ybar_L3 = self._qe.cmb[X_Ybar].unlenCl_spline(Ls3[None,:])
+                    C_Xbar_L3 = self._qe.cmb[Xbar_Y].unlenCl_spline(Ls3[None,:])
+                    L_A1_fac = (L5_vec @ L1_vec) * (L5_vec @ L2_vec)
+                    L_C1_fac = (L3_vec @ L1_vec) * (L3_vec @ L2_vec)
+                    g_XY = self._qe.weight_function(XY, L_vec, L3_vec, curl=curl, gmv=gmv)
+                    g_YX = self._qe.weight_function(XY[::-1], L_vec, L3_vec, curl=curl, gmv=gmv)
+                    L4_vec = L_vec - L3_vec
+                    h_X_A1 = self._qe.geo_fac(XY[0], theta12=L5_vec.deltaphi(L4_vec))
+                    h_Y_A1 = self._qe.geo_fac(XY[1], theta12=L5_vec.deltaphi(L3_vec))
+                    h_X_C1 = self._qe.geo_fac(XY[0], theta12=L3_vec.deltaphi(L4_vec))
+                    h_Y_C1 = self._qe.geo_fac(XY[1], theta12=L3_vec.deltaphi(L4_vec))
+                    I_A1_theta1[jjj] = 2 * dTheta3 * dL3 * np.sum(bi * Ls3[None,:] * w5 * L_A1_fac * C_L5 * g_XY * h_X_A1 * h_Y_A1)
+                    I_C1_theta1[jjj] = 2 * dTheta3 * dL3 * np.sum(bi * Ls3[None,:] * L_C1_fac * ((C_Ybar_L3 * g_XY * h_Y_C1) + (C_Xbar_L3 * g_YX * h_X_C1)))
 
-                        I_A1_L3[kkk] = L3 * 2 * InterpolatedUnivariateSpline(thetas3,w5 * L_A1_fac * C_L5 * g_XY * h_X_A1 * h_Y_A1).integral(0, np.pi)
-                        I_C1_L3[kkk] = L3 * 2 * InterpolatedUnivariateSpline(thetas3, L_C1_fac * ((C_Ybar_L3 * g_XY * h_Y_C1) + (C_Xbar_L3 * g_YX * h_X_C1))).integral(0, np.pi)
-
-                    I_A1_theta1[jjj] = bi * InterpolatedUnivariateSpline(Ls3, I_A1_L3).integral(30, 4000)
-                    I_C1_theta1[jjj] = bi * InterpolatedUnivariateSpline(Ls3, I_C1_L3).integral(30, 4000)
             I_A1_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_A1_theta1).integral(0, np.pi)
             I_C1_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_C1_theta1).integral(0, np.pi)
         N_A1 = -1 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_A1_L1).integral(30, 4000)
@@ -261,9 +255,10 @@ class Bias:
         XYs = ["TT", "TE", "EE", "TB", "EB"]
         for iii, L in enumerate(Ls):
             for XY in XYs:
+                fac = 1 if XY[0] == XY[1] else 2
                 N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, True, *self.bias_prep(N_L1, N_L3, Ntheta12, Ntheta13, curl))
-                N_A1[iii] += A[iii] * N_A1_tmp
-                N_C1[iii] += A[iii] * N_C1_tmp
+                N_A1[iii] += fac * A[iii] * N_A1_tmp
+                N_C1[iii] += fac * A[iii] * N_C1_tmp
         return N_A1, N_C1
 
 

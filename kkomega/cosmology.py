@@ -424,7 +424,7 @@ class Cosmology:
         cmb_ps = self._results.get_cmb_power_spectra(self._pars, lmax=ellmax, spectra=['total'],CMB_unit="muK", raw_cl=True)
         return cmb_ps['total'][:,0]
 
-    def get_grad_lens_ps(self, typ, ellmax=8000):
+    def get_grad_lens_ps(self, typ, ellmax=6000):
         """
 
         Parameters
@@ -456,7 +456,7 @@ class Cosmology:
         return spectra[:,index]
 
 
-    def get_lens_ps(self, typ, ellmax=4000):
+    def get_lens_ps(self, typ, ellmax=6000):
         """
 
         Parameters
@@ -480,12 +480,12 @@ class Cosmology:
             return_zeros = True
         else:
             raise ValueError(f"Type {typ} does not exist.")
-        spectra = self._results.get_cmb_power_spectra(lmax=ellmax + 10, raw_cl=True)
+        spectra = self._results.get_lensed_scalar_cls(lmax=ellmax + 10, raw_cl=True)
         if return_zeros:
-            return np.zeros(np.shape(spectra['total'][:,0]))
-        return spectra['total'][:,index]
+            return np.zeros(np.shape(spectra[:,0]))
+        return spectra[:,index]
 
-    def get_unlens_ps(self, typ, ellmax=4000):
+    def get_unlens_ps(self, typ, ellmax=6000):
         """
 
         Parameters
@@ -509,8 +509,8 @@ class Cosmology:
             return_zeros = True
         else:
             raise ValueError(f"Type {typ} does not exist.")
-        spectra = self._results.get_cmb_power_spectra(lmax=ellmax + 10, raw_cl=True)
+        spectra = self._results.get_unlensed_scalar_cls(lmax=ellmax + 10, raw_cl=True)
         if return_zeros:
-            return np.zeros(np.shape(spectra['total'][:,0]))
-        return spectra['unlensed_scalar'][:,index]
+            return np.zeros(np.shape(spectra[:,0]))
+        return spectra[:,index]
 

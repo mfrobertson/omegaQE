@@ -37,11 +37,11 @@ class Noise:
 
     def _get_N0_kappa(self, ellmax):
         ells = np.arange(ellmax + 1)
-        return self._get_N0_phi(ellmax) * 0.25 * (ells + 0.5) ** 4
+        return self._get_N0_phi(ellmax) * 0.25 * (ells) ** 4
 
     def _get_N0_omega(self, ellmax):
         ells = np.arange(ellmax + 1)
-        return self._get_N0_curl(ellmax) * 0.25 * (ells + 0.5) ** 4
+        return self._get_N0_curl(ellmax) * 0.25 * (ells) ** 4
 
     def _replace_bad_Ls(self, N0):
         bad_Ls = np.where(N0 <= 0.)[0]
