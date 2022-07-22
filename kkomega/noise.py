@@ -172,7 +172,7 @@ class Noise:
         arcmin_to_radians = 0.000290888
         deltaT *= arcmin_to_radians
         beam *= arcmin_to_radians
-        T_cmb = 2.7
+        T_cmb = 2.7255               #arXiv:0911.1955
         Ls = np.arange(ellmax+1)
         if typ == "TT":
             return (deltaT*1e-6/T_cmb)**2 * np.exp(Ls*(Ls+1)*beam**2/(8*np.log(2)))
