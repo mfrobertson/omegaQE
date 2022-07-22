@@ -55,7 +55,7 @@ class QE:
         -------
 
         """
-        samp1 = np.arange(30, 40, 2)
+        samp1 = np.arange(10, 40, 1)
         samp2 = np.logspace(1, 3, 300) * 4
         ells = np.concatenate((samp1, samp2))
         dTheta = 0.01
@@ -82,7 +82,7 @@ class QE:
                         g = self.gmv_weight_function(i + j, L_vec, ell_vec, curl, fields, resp_ps)
                         I2 += w * resp * g
                 I1[jjj] = 2 * ell * InterpolatedUnivariateSpline(thetas, I2).integral(0, np.pi)
-            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(30, 4000) / ((2 * np.pi) ** 2)
+            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(10, 4000) / ((2 * np.pi) ** 2)
         return 1 / A
 
     def normalisation(self, typ, Ls, curl, resp_ps="gradient"):
@@ -99,8 +99,8 @@ class QE:
 
         """
         if typ == "gmv":
-            return self.gmv_normalisation(Ls, curl)
-        samp1 = np.arange(30, 40, 2)
+            return self.gmv_normalisation(Ls, curl, resp_ps=resp_ps)
+        samp1 = np.arange(10, 40, 1)
         samp2 = np.logspace(1, 3, 300) * 4
         ells = np.concatenate((samp1, samp2))
         dTheta = 0.01
@@ -118,7 +118,7 @@ class QE:
                 g = self.weight_function(typ, L_vec, ell_vec, curl, gmv=False, resp_ps=resp_ps)
                 I2 = g * resp
                 I1[jjj] = 2 * ell * InterpolatedUnivariateSpline(thetas, I2).integral(0, np.pi)
-            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(30, 4000) / ((2 * np.pi) ** 2)
+            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(10, 4000) / ((2 * np.pi) ** 2)
         return 1 / A
 
     def gmv_weight_function(self, typ, L_vec, ell_vec, curl, fields="TEB", resp_ps="gradient"):
@@ -144,9 +144,11 @@ class QE:
         q = typ[1]
         for i in typs:
             for j in typs:
-                C_inv_ip_spline = self._get_cmb_Cov_inv_spline(i + p)
-                C_inv_jq_spline = self._get_cmb_Cov_inv_spline(j + q)
+                C_inv_ip_spline = self._get_cmb_Cov_inv_spline(i + p, fields)
+                C_inv_jq_spline = self._get_cmb_Cov_inv_spline(j + q, fields)
+                # denom = 1/((self.cmb[i + p].lenCl_spline(ell)+self.cmb[i + p].N_spline(ell))*(self.cmb[j + q].lenCl_spline(L3)+self.cmb[j + q].N_spline(L3)))
                 weight += self._response(i + j, L_vec, ell_vec, curl, resp_ps) * C_inv_ip_spline(ell) * C_inv_jq_spline(L3)
+                # weight += self._response(i + j, L_vec, ell_vec, curl, resp_ps)*denom
         return weight / 2
 
     def weight_function(self, typ, L_vec, ell_vec, curl, gmv=False, resp_ps="gradient"):
@@ -180,12 +182,12 @@ class QE:
         L3_vec = L_vec - ell_vec
         L3 = L3_vec.rho
         w = np.ones(np.shape(L3))
-        w[L3 < 30] = 0
+        w[L3 < 3] = 0
         w[L3 > 4000] = 0
         h1 = self._get_response_geo_fac(typ, 1, theta12=ell_vec.deltaphi(L3_vec))
         h2 = self._get_response_geo_fac(typ, 2, theta12=ell_vec.deltaphi(L3_vec))
         self._initialisation_check(typ)
-        if typ == "BT" or typ == "TB":
+        if typ == "BT" or typ == "TB" or typ == "TE" or typ == "ET":
             typ1 = typ2 = "TE"
         else:
             typ1 = typ[0] + typ[0]
@@ -206,7 +208,7 @@ class QE:
         h2 = self._get_response_geo_fac(typ, 2, theta12=ell_vec.deltaphi(L3_vec))
         self._initialisation_check(typ)
         self._initialisation_check(typ)
-        if typ == "BT" or typ == "TB":
+        if typ == "BT" or typ == "TB" or typ == "TE" or typ == "ET":
             typ1 = typ2 = "TE"
         else:
             typ1 = typ[0] + typ[0]
@@ -278,7 +280,6 @@ class QE:
         C = typs[:, None] + typs[None, :]
         args = C.flatten()
         C_sym = Matrix(C)
-        print(C_sym)
         C_inv = C_sym.inv()
         C_inv_func = lambdify(args, C_inv)
         Covs = [self._get_cmb_cov(arg) for arg in args]
@@ -286,13 +287,14 @@ class QE:
 
     def _build_cmb_Cov_inv_splines(self, fields):
         self._cov_inv_fields = fields
+        N_fields = len(self._cov_inv_fields)
         C_inv = self._cmb_Cov_inv(fields)
-        C_inv_splines = np.empty((3,3), dtype=InterpolatedUnivariateSpline)
-        for iii in range(3):
-            for jjj in range(3):
+        C_inv_splines = np.empty((N_fields,N_fields), dtype=InterpolatedUnivariateSpline)
+        for iii in range(N_fields):
+            for jjj in range(N_fields):
                 C_inv_ij = C_inv[iii,jjj]
                 Ls = np.arange(np.size(C_inv_ij))
-                C_inv_splines[iii, jjj] = InterpolatedUnivariateSpline(Ls[1:], C_inv_ij[1:])
+                C_inv_splines[iii, jjj] = InterpolatedUnivariateSpline(Ls[2:], C_inv_ij[2:])
         return C_inv_splines
 
 
