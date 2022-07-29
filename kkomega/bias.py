@@ -239,7 +239,7 @@ class Bias:
     def _bias(self, XY, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
         A = self._qe.normalisation(XY, Ls, curl=curl)
         N_Ls = np.size(Ls)
-        if N_Ls == 1: Ls = np.asarray(Ls)
+        if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
         N_C1 = np.zeros(np.shape(Ls))
         for iii, L in enumerate(Ls):
@@ -251,8 +251,7 @@ class Bias:
     def _bias_gmv(self, typ, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
         A = self._qe.gmv_normalisation(Ls, curl=curl, fields=typ)
         N_Ls = np.size(Ls)
-        if N_Ls == 1:
-            Ls = np.ones(1) * Ls
+        if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
         N_C1 = np.zeros(np.shape(Ls))
         typs = np.char.array(list(typ))
