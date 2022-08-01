@@ -154,7 +154,7 @@ class Bias:
         -------
 
         """
-        if typs == "theory":
+        if typs == "rot":
             return 4*self.fisher.bi.get_bispectrum("kkw", L1, L2, theta=theta12, M_spline=True)/(L1**2 * L2**2)
         if typs == "conv":
             L = self._get_third_L(L1, L2, theta12)
@@ -166,11 +166,12 @@ class Bias:
     def _get_third_L(self, L1, L2, theta):
         return np.sqrt(L1**2 + L2**2 + (2*L1*L2*np.cos(theta).astype("double"))).astype("double")
 
-    def bias_prep(self, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
-        if curl:
-            bi_typ = "theory"
-        else:
-            bi_typ = "conv"
+    def bias_prep(self, bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
+        if bi_typ == "theory":
+            if curl:
+                bi_typ = "rot"
+            else:
+                bi_typ = "conv"
         samp1_1 = np.arange(Lmin, 40, 5)
         samp2_1 = np.logspace(1, 3, N_L1) * 4
         Ls1 = np.concatenate((samp1_1, samp2_1))
@@ -231,39 +232,36 @@ class Bias:
         N_C1 = 0.25 * L**2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_C1_L1).integral(Lmin, 4000)
         return N_A1, N_C1
 
-    def _bias(self, XY, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
+    def _bias(self, bi_typ, XY, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
         A = self.qe.normalisation(XY, Ls, curl=curl)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
         N_C1 = np.zeros(np.shape(Ls))
         for iii, L in enumerate(Ls):
-            N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, False, "TEB", *self.bias_prep(N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin))
+            N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, False, "TEB", *self.bias_prep(bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin))
             N_A1[iii] = A[iii] * N_A1_tmp
             N_C1[iii] = A[iii] * N_C1_tmp
         return N_A1, N_C1
 
-    def _bias_gmv(self, typ, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
-        A = self.qe.gmv_normalisation(Ls, curl=curl, fields=typ)
+    def _bias_gmv(self, bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
+        A = self.qe.gmv_normalisation(Ls, curl=curl, fields=fields)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
         N_C1 = np.zeros(np.shape(Ls))
-        typs = np.char.array(list(typ))
-        XYs = np.triu(typs[:,None] + typs[None,:]).flatten()
-        XYs = XYs[XYs != ""]
+        XYs = self.qe.parse_fields(fields)
         XYs = XYs[XYs != "BB"]
-        # XYs = ["TT", "TE", "EE", "TB", "EB"]
         for iii, L in enumerate(Ls):
             for XY in XYs:
                 fac = 1 if XY[0] == XY[1] else 2
-                N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, True, typ, *self.bias_prep(N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin))
+                N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, True, fields, *self.bias_prep(bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin))
                 N_A1[iii] += fac * A[iii] * N_A1_tmp
                 N_C1[iii] += fac * A[iii] * N_C1_tmp
         return N_A1, N_C1
 
 
-    def bias(self, typ, Ls, gmv=False, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, curl=True, Lmin=10):
+    def bias(self, bi_typ, fields, Ls, gmv=False, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, curl=True, Lmin=10):
         """
 
         Parameters
@@ -281,5 +279,5 @@ class Bias:
 
         """
         if gmv:
-            return self._bias_gmv(typ, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin)
-        return self._bias(typ, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin)
+            return self._bias_gmv(bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin)
+        return self._bias(bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin)
