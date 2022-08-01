@@ -119,9 +119,14 @@ class QE:
             L_vec = vector.obj(rho=L, phi=0)
             for jjj, ell in enumerate(ells):
                 ell_vec = vector.obj(rho=ell, phi=thetas)
+                Ls3_vec = L_vec - ell_vec
+                Ls3 = Ls3_vec.rho
+                w = np.ones(np.shape(Ls3))
+                w[Ls3 < 10] = 0
+                w[Ls3 > 4000] = 0
                 resp = self._response(typ, L_vec, ell_vec, curl, resp_ps)
                 g = self.weight_function(typ, L_vec, ell_vec, curl, gmv=False, resp_ps=resp_ps)
-                I2 = g * resp
+                I2 = w * g * resp
                 I1[jjj] = 2 * ell * InterpolatedUnivariateSpline(thetas, I2).integral(0, np.pi)
             A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(10, 4000) / ((2 * np.pi) ** 2)
         return 1 / A
