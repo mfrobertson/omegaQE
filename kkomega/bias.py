@@ -155,10 +155,10 @@ class Bias:
 
         """
         if typs == "theory":
-            return 4*self.fisher.bi.get_bispectrum("kkw", L1, L2, theta=theta12)/(L1**2 * L2**2)
+            return 4*self.fisher.bi.get_bispectrum("kkw", L1, L2, theta=theta12, M_spline=True)/(L1**2 * L2**2)
         if typs == "conv":
             L = self._get_third_L(L1, L2, theta12)
-            return 4*self.fisher.bi.get_bispectrum("kkk", L1, L2, L)/(L1**2 * L2**2)
+            return 4*self.fisher.bi.get_bispectrum("kkk", L1, L2, L, M_spline=True)/(L1**2 * L2**2)
         if self._cache is None or self._cache.typs != typs or self._cache.nu != nu:
             self._build_F_L(typs, nu)
         return self._mixed_bispectrum(list(typs), L1, L2, theta12, nu)
