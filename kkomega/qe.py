@@ -44,7 +44,7 @@ class QE:
 
     def _initialisation_check(self):
         if self._cov_inv_fields == "uninitialised":
-            raise ValueError("QE class uninitialised, first call 'initialise' or iteratively 'initialise_manual'.")
+            raise ValueError("QE class uninitialised, first call 'initialise'.")
 
     def gmv_normalisation(self, Ls, curl, fields="TEB", resp_ps="gradient"):
         """
