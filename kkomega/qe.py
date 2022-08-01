@@ -14,17 +14,18 @@ class QE:
         def __init__(self):
             self.initialised = False
             self.lenCl_spline = None
-            self.unlenCl_spline = None
             self.gradCl_spline = None
             self.N_spline = None
 
-    def __init__(self, deltaT=3, beam=3):
+    def __init__(self, deltaT=3, beam=3, init=True, fields="TEB"):
         self._cosmo = Cosmology()
         self._noise = Noise()
         self.cmb = dict.fromkeys(self._cmb_types(), self.CMBsplines())
-        self.initialise(deltaT, beam)
-        self._cov_inv_fields = "TEB"
-        self._build_cmb_Cov_inv_splines(fields=self._cov_inv_fields)
+        if init:
+            self.initialise(deltaT, beam, fields=fields)
+        else:
+            self._cov_inv_fields = "uninitialised"
+
 
     def _cmb_types(self):
         types = np.char.array(list("TEB"))
@@ -33,14 +34,17 @@ class QE:
     def _get_cmb_cl(self, ells, fields, typ):
         if typ == "lensed":
             return self.cmb[fields].lenCl_spline(ells)
-        elif typ == "unlensed":
-            return self.cmb[fields].unlenCl_spline(ells)
         elif typ == "gradient":
             return self.cmb[fields].gradCl_spline(ells)
 
-    def _initialisation_check(self, typ, Lmax=4000):
-        if not self.cmb[typ].initialised:
-            self._initialise(typ, Lmax)
+    def _parse_fields(self, fields="TEB"):
+        typs = np.char.array(list(fields))
+        C = np.triu(typs[:, None] + typs[None, :]).flatten()
+        return C[C != '']
+
+    def _initialisation_check(self):
+        if self._cov_inv_fields == "uninitialised":
+            raise ValueError("QE class uninitialised, first call 'initialise' or iteratively 'initialise_manual'.")
 
     def gmv_normalisation(self, Ls, curl, fields="TEB", resp_ps="gradient"):
         """
@@ -54,12 +58,12 @@ class QE:
         -------
 
         """
+        self._initialisation_check()
         samp1 = np.arange(10, 40, 1)
-        samp2 = np.logspace(1, 3, 300) * 4
+        samp2 = np.logspace(1, 3, 500) * 4
         ells = np.concatenate((samp1, samp2))
         Ntheta = 1000
-        dTheta = np.pi/Ntheta
-        thetas = np.linspace(0, np.pi-dTheta, Ntheta)
+        thetas = np.linspace(0, np.pi, Ntheta)
         I1 = np.zeros(np.size(ells))
         typs = np.char.array(list(fields))
         N_Ls = np.size(Ls)
@@ -100,12 +104,12 @@ class QE:
         """
         if typ == "gmv":
             return self.gmv_normalisation(Ls, curl, resp_ps=resp_ps)
+        self._initialisation_check()
         samp1 = np.arange(10, 40, 1)
-        samp2 = np.logspace(1, 3, 300) * 4
+        samp2 = np.logspace(1, 3, 500) * 4
         ells = np.concatenate((samp1, samp2))
         Ntheta = 1000
-        dTheta = np.pi / Ntheta
-        thetas = np.linspace(0, np.pi-dTheta, Ntheta)
+        thetas = np.linspace(0, np.pi, Ntheta)
         I1 = np.zeros(np.size(ells))
         N_Ls = np.size(Ls)
         A = np.zeros(N_Ls)
@@ -136,15 +140,14 @@ class QE:
         -------
 
         """
+        self._initialisation_check()
         weight = 0
         ell = ell_vec.rho
         L3_vec = L_vec - ell_vec
         L3 = L3_vec.rho
         p = typ[0]
         q = typ[1]
-        typs = np.char.array(list(fields))
-        XYs = np.triu(typs[:, None] + typs[None, :]).flatten()
-        XYs = XYs[XYs != ""]
+        XYs = self._parse_fields(fields)
         XYs = XYs[XYs != "BB"]
         for ij in XYs:
             i = ij[0]
@@ -173,6 +176,7 @@ class QE:
         """
         if gmv:
             return self.gmv_weight_function(typ, L_vec, ell_vec, curl, fields, resp_ps)
+        self._initialisation_check()
         ell = ell_vec.rho
         L3_vec = L_vec - ell_vec
         L3 = L3_vec.rho
@@ -191,7 +195,6 @@ class QE:
         w[L3 > 4000] = 0
         h1 = self._get_response_geo_fac(typ, 1, theta12=ell_vec.deltaphi(L3_vec))
         h2 = self._get_response_geo_fac(typ, 2, theta12=ell_vec.deltaphi(L3_vec))
-        # self._initialisation_check(typ)
         if typ == "BT" or typ == "TB" or typ == "TE" or typ == "ET":
             typ1 = typ2 = "TE"
         else:
@@ -211,8 +214,6 @@ class QE:
         w[L3 > 4000] = 0
         h1 = self._get_response_geo_fac(typ, 1, theta12=ell_vec.deltaphi(L3_vec))
         h2 = self._get_response_geo_fac(typ, 2, theta12=ell_vec.deltaphi(L3_vec))
-        # self._initialisation_check(typ)
-        # self._initialisation_check(typ)
         if typ == "BT" or typ == "TB" or typ == "TE" or typ == "ET":
             typ1 = typ2 = "TE"
         else:
@@ -325,11 +326,6 @@ class QE:
         Cl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], Cl_lens[2:])
         self.cmb[typ].lenCl_spline = Cl_lens_spline
 
-        Cl_unlens = self._cosmo.get_unlens_ps(typ, 2*Lmax)
-        Ls = np.arange(np.size(Cl_unlens))
-        Cl_unlens_spline = InterpolatedUnivariateSpline(Ls[2:], Cl_unlens[2:])
-        self.cmb[typ].unlenCl_spline = Cl_unlens_spline
-
         gradCl_lens = self._cosmo.get_grad_lens_ps(typ, 2*Lmax)
         Ls = np.arange(np.size(gradCl_lens))
         gradCl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], gradCl_lens[2:])
@@ -341,7 +337,7 @@ class QE:
         self.cmb[typ].initialised = True
         self._initialise(typ[::-1], deltaT, beam, Lmax)
 
-    def initialise(self, deltaT, beam, Lmax=4000):
+    def initialise(self, deltaT=3, beam=3, Lmax=4000, fields="TEB"):
         """
 
         Parameters
@@ -352,11 +348,45 @@ class QE:
         -------
 
         """
-        typs = np.char.array(list("TEB"))
-        C = np.triu(typs[:, None] + typs[None, :]).flatten()
-        args = C[C!='']
+        args = self._parse_fields(fields)
         for arg in args:
             self._initialise(arg, deltaT, beam, Lmax)
+        self._cov_inv_fields = fields
+        self._build_cmb_Cov_inv_splines(fields=self._cov_inv_fields)
+
+
+    def _initialise_manual(self, typ, Cl_lens, gradCl_lens, N):
+        if self.cmb[typ].initialised:
+            return
+        self.cmb[typ] = self.CMBsplines()
+        Ls = np.arange(np.size(Cl_lens))
+        Cl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], Cl_lens[2:])
+        self.cmb[typ].lenCl_spline = Cl_lens_spline
+
+        Ls = np.arange(np.size(gradCl_lens))
+        gradCl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], gradCl_lens[2:])
+        self.cmb[typ].gradCl_spline = gradCl_lens_spline
+
+        N_spline = InterpolatedUnivariateSpline(np.arange(np.size(N))[2:], N[2:])
+        self.cmb[typ].N_spline = N_spline
+        self.cmb[typ].initialised = True
+        self._initialise(typ[::-1], Cl_lens, gradCl_lens, N)
+
+    def initialise_manual(self, typ, Cl_lens, gradCl_lens, N):
+        """
+
+        Parameters
+        ----------
+        typ
+        Cl_lens
+        gradCl_lens
+        N
+
+        Returns
+        -------
+
+        """
+        self._initialise_manual(typ, Cl_lens, gradCl_lens, N)
 
 
 if __name__ == '__main__': pass
