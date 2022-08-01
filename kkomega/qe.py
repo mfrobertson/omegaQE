@@ -370,7 +370,7 @@ class QE:
         N_spline = InterpolatedUnivariateSpline(np.arange(np.size(N))[2:], N[2:])
         self.cmb[typ].N_spline = N_spline
         self.cmb[typ].initialised = True
-        self._initialise(typ[::-1], Cl_lens, gradCl_lens, N)
+        self._initialise_manual(typ[::-1], Cl_lens, gradCl_lens, N)
 
     def initialise_manual(self, typ, Cl_lens, gradCl_lens, N):
         """
