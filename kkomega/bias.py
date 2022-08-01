@@ -60,12 +60,12 @@ class Bias:
                 raise ValueError(f"Type {typ} does not exist.")
 
 
-    def __init__(self, N0_file, N0_offset=0, N0_ell_factors=True, M_path=None, deltaT=3, beam=3):
+    def __init__(self, N0_file, N0_offset=0, N0_ell_factors=True, M_path=None, deltaT=3, beam=3, init_qe=True):
         self.fisher = Fisher(N0_file, N0_offset, N0_ell_factors)
         self.N0_offset = N0_offset
         self.N0_ell_factors = N0_ell_factors
         self._cache = self.Holder()
-        self._qe = QE(deltaT, beam)
+        self.qe = QE(deltaT, beam, init=init_qe)
         if M_path is not None:
             self.fisher.setup_bispectra(M_path, 4000, 100)
 
@@ -206,22 +206,22 @@ class Bias:
                     Xbar_Ybar = XY.replace("B", "E")
                     X_Ybar = XY[0] + XY[1].replace("B", "E")
                     Xbar_Y = XY[0].replace("B", "E") + XY[1]
-                    C_L5 = self._qe.cmb[Xbar_Ybar].gradCl_spline(Ls5)
-                    C_Ybar_L3 = self._qe.cmb[X_Ybar].gradCl_spline(Ls3[None,:])
-                    C_Xbar_L3 = self._qe.cmb[Xbar_Y].gradCl_spline(Ls3[None,:])
+                    C_L5 = self.qe.cmb[Xbar_Ybar].gradCl_spline(Ls5)
+                    C_Ybar_L3 = self.qe.cmb[X_Ybar].gradCl_spline(Ls3[None,:])
+                    C_Xbar_L3 = self.qe.cmb[Xbar_Y].gradCl_spline(Ls3[None,:])
                     L_A1_fac = (L5_vec @ L1_vec) * (L5_vec @ L2_vec)
                     L_C1_fac = (L3_vec @ L1_vec) * (L3_vec @ L2_vec)
-                    g_XY = self._qe.weight_function(XY, L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields)
-                    g_YX = self._qe.weight_function(XY[::-1], L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields)
+                    g_XY = self.qe.weight_function(XY, L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields)
+                    g_YX = self.qe.weight_function(XY[::-1], L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields)
                     L4_vec = L_vec - L3_vec
                     Ls4 = L4_vec.rho
                     w4 = np.ones(np.shape(Ls4))
                     w4[Ls4 < Lmin] = 0
                     w4[Ls4 > 4000] = 0
-                    h_X_A1 = self._qe.geo_fac(XY[0], theta12=L5_vec.deltaphi(L4_vec))
-                    h_Y_A1 = self._qe.geo_fac(XY[1], theta12=L5_vec.deltaphi(L3_vec))
-                    h_X_C1 = self._qe.geo_fac(XY[0], theta12=L3_vec.deltaphi(L4_vec))
-                    h_Y_C1 = self._qe.geo_fac(XY[1], theta12=L3_vec.deltaphi(L4_vec))
+                    h_X_A1 = self.qe.geo_fac(XY[0], theta12=L5_vec.deltaphi(L4_vec))
+                    h_Y_A1 = self.qe.geo_fac(XY[1], theta12=L5_vec.deltaphi(L3_vec))
+                    h_X_C1 = self.qe.geo_fac(XY[0], theta12=L3_vec.deltaphi(L4_vec))
+                    h_Y_C1 = self.qe.geo_fac(XY[1], theta12=L3_vec.deltaphi(L4_vec))
                     I_A1_theta1[jjj] = dTheta3 * dL3 * np.sum(bi * Ls3[None,:] * w4 * w5 * L_A1_fac * C_L5 * g_XY * h_X_A1 * h_Y_A1)
                     I_C1_theta1[jjj] = dTheta3 * dL3 * np.sum(bi * Ls3[None,:] * w4 * L_C1_fac * ((C_Ybar_L3 * g_XY * h_Y_C1) + (C_Xbar_L3 * g_YX * h_X_C1)))
 
@@ -232,7 +232,7 @@ class Bias:
         return N_A1, N_C1
 
     def _bias(self, XY, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
-        A = self._qe.normalisation(XY, Ls, curl=curl)
+        A = self.qe.normalisation(XY, Ls, curl=curl)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
@@ -244,7 +244,7 @@ class Bias:
         return N_A1, N_C1
 
     def _bias_gmv(self, typ, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
-        A = self._qe.gmv_normalisation(Ls, curl=curl, fields=typ)
+        A = self.qe.gmv_normalisation(Ls, curl=curl, fields=typ)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))

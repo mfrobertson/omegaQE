@@ -37,7 +37,7 @@ class QE:
         elif typ == "gradient":
             return self.cmb[fields].gradCl_spline(ells)
 
-    def _parse_fields(self, fields="TEB"):
+    def parse_fields(self, fields="TEB"):
         typs = np.char.array(list(fields))
         C = np.triu(typs[:, None] + typs[None, :]).flatten()
         return C[C != '']
@@ -147,7 +147,7 @@ class QE:
         L3 = L3_vec.rho
         p = typ[0]
         q = typ[1]
-        XYs = self._parse_fields(fields)
+        XYs = self.parse_fields(fields)
         XYs = XYs[XYs != "BB"]
         for ij in XYs:
             i = ij[0]
@@ -348,7 +348,7 @@ class QE:
         -------
 
         """
-        args = self._parse_fields(fields)
+        args = self.parse_fields(fields)
         for arg in args:
             self._initialise(arg, deltaT, beam, Lmax)
         self._cov_inv_fields = fields
