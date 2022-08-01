@@ -1,7 +1,6 @@
 from fisher import Fisher
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
-from cosmology import Cosmology
 from qe import QE
 import vector
 
@@ -19,9 +18,6 @@ class Bias:
             self.Cov_kk = None
             self.Cl_gk = None
             self.Cl_Ik = None
-            self.Cl_TT_spline = None
-            self.Cl_gradT_spline = None
-            self.N_T_spline = None
 
         def get_Cl(self, typ):
             """
@@ -69,7 +65,6 @@ class Bias:
         self.N0_offset = N0_offset
         self.N0_ell_factors = N0_ell_factors
         self._cache = self.Holder()
-        self._cosmo = Cosmology()
         self._qe = QE(deltaT, beam)
         if M_path is not None:
             self.fisher.setup_bispectra(M_path, 4000, 100)
