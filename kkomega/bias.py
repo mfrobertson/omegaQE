@@ -3,7 +3,7 @@ import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 from qe import QE
 import vector
-
+from cache.tools import getFileSep, path_exists
 
 class Bias:
 
@@ -60,22 +60,34 @@ class Bias:
                 raise ValueError(f"Type {typ} does not exist.")
 
 
-    def __init__(self, N0_file, N0_offset=0, N0_ell_factors=True, M_path=None, deltaT=3, beam=3, init_qe=True):
+    def __init__(self, N0_file, N0_offset=0, N0_ell_factors=True, M_path=None, F_L_path=None, deltaT=3, beam=3, init_qe=True):
         self.fisher = Fisher(N0_file, N0_offset, N0_ell_factors)
         self.N0_offset = N0_offset
         self.N0_ell_factors = N0_ell_factors
         self._cache = self.Holder()
         self.qe = QE(deltaT, beam, init=init_qe)
+        self._F_L_path = F_L_path
         if M_path is not None:
             self.fisher.setup_bispectra(M_path, 4000, 100)
 
+    def _check_path(self, path):
+        if not path_exists(path):
+            raise FileNotFoundError(f"Path {path} does not exist")
 
-    def _build_F_L(self, typs, nu):
-        print("F_L_build")
-        Ls1 = np.arange(30, 40, 2)
-        Ls2 = np.logspace(1, 3, 100) * 4
-        sample_Ls = np.concatenate((Ls1, Ls2))
-        _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
+    def _build_F_L(self, typs, nu, Nell=300):
+        if self._F_L_path is not None:
+            print("Using F_L cache, only C_inv build...")
+            self._check_path(self._F_L_path)
+            sep = getFileSep()
+            sample_Ls = np.load(self._F_L_path+sep+typs+sep+str(Nell)+sep+"ells.npy")
+            F_L = np.load(self._F_L_path+sep+typs+sep+str(Nell)+sep+"F_L.npy")
+            C_inv = self.fisher.get_C_inv(typs, Lmax=4000, nu=nu)
+        else:
+            print("Full F_L_build...")
+            Ls1 = np.arange(30, 40, 2)
+            Ls2 = np.logspace(1, 3, 100) * 4
+            sample_Ls = np.concatenate((Ls1, Ls2))
+            _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
         self._cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=4000, nu=nu)
         self._cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=4000, nu=nu)
         self._cache.Cl_gk = self.fisher.get_Cl("gk", ellmax=4000, nu=nu)
