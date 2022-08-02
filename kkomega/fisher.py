@@ -536,7 +536,7 @@ class Fisher:
         -------
 
         """
-        return self._get_C_inv(typs, Lmax, nu, gal_bins)
+        return self._get_C_inv(np.char.array(list(typs)), Lmax, nu, gal_bins)
 
     def get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False):
         """
