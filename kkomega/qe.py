@@ -60,9 +60,9 @@ class QE:
         """
         self._initialisation_check()
         samp1 = np.arange(Lmin, 40, 1)
-        samp2 = np.logspace(1, 3, 500) * 4
+        samp2 = np.logspace(1, 3, 300) * 4
         ells = np.concatenate((samp1, samp2))
-        Ntheta = 1000
+        Ntheta = 100
         thetas = np.linspace(0, np.pi, Ntheta)
         I1 = np.zeros(np.size(ells))
         typs = np.char.array(list(fields))
@@ -106,9 +106,9 @@ class QE:
             return self.gmv_normalisation(Ls, curl, resp_ps=resp_ps)
         self._initialisation_check()
         samp1 = np.arange(Lmin, 40, 1)
-        samp2 = np.logspace(1, 3, 500) * 4
+        samp2 = np.logspace(1, 3, 300) * 4
         ells = np.concatenate((samp1, samp2))
-        Ntheta = 1000
+        Ntheta = 100
         thetas = np.linspace(0, np.pi, Ntheta)
         I1 = np.zeros(np.size(ells))
         N_Ls = np.size(Ls)
