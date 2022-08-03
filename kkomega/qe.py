@@ -46,7 +46,7 @@ class QE:
         if self._cov_inv_fields == "uninitialised":
             raise ValueError("QE class uninitialised, first call 'initialise'.")
 
-    def gmv_normalisation(self, Ls, curl, fields="TEB", resp_ps="gradient"):
+    def gmv_normalisation(self, Ls, curl, fields="TEB", resp_ps="gradient", Lmin=10):
         """
 
         Parameters
@@ -59,7 +59,7 @@ class QE:
 
         """
         self._initialisation_check()
-        samp1 = np.arange(10, 40, 1)
+        samp1 = np.arange(Lmin, 40, 1)
         samp2 = np.logspace(1, 3, 500) * 4
         ells = np.concatenate((samp1, samp2))
         Ntheta = 1000
@@ -77,7 +77,7 @@ class QE:
                 Ls3_vec = L_vec - ell_vec
                 Ls3 = Ls3_vec.rho
                 w = np.ones(np.size(Ls3))
-                w[Ls3 < 10] = 0
+                w[Ls3 < Lmin] = 0
                 w[Ls3 > 4000] = 0
                 I2 = 0
                 for i in typs:
@@ -86,10 +86,10 @@ class QE:
                         g = self.gmv_weight_function(i + j, L_vec, ell_vec, curl, fields, resp_ps)
                         I2 += w * resp * g
                 I1[jjj] = 2 * ell * InterpolatedUnivariateSpline(thetas, I2).integral(0, np.pi)
-            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(10, 4000) / ((2 * np.pi) ** 2)
+            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(Lmin, 4000) / ((2 * np.pi) ** 2)
         return 1 / A
 
-    def normalisation(self, typ, Ls, curl, resp_ps="gradient"):
+    def normalisation(self, typ, Ls, curl, resp_ps="gradient", Lmin=10):
         """
 
         Parameters
@@ -105,7 +105,7 @@ class QE:
         if typ == "gmv":
             return self.gmv_normalisation(Ls, curl, resp_ps=resp_ps)
         self._initialisation_check()
-        samp1 = np.arange(10, 40, 1)
+        samp1 = np.arange(Lmin, 40, 1)
         samp2 = np.logspace(1, 3, 500) * 4
         ells = np.concatenate((samp1, samp2))
         Ntheta = 1000
@@ -122,13 +122,13 @@ class QE:
                 Ls3_vec = L_vec - ell_vec
                 Ls3 = Ls3_vec.rho
                 w = np.ones(np.shape(Ls3))
-                w[Ls3 < 10] = 0
+                w[Ls3 < Lmin] = 0
                 w[Ls3 > 4000] = 0
                 resp = self._response(typ, L_vec, ell_vec, curl, resp_ps)
                 g = self.weight_function(typ, L_vec, ell_vec, curl, gmv=False, resp_ps=resp_ps)
                 I2 = w * g * resp
                 I1[jjj] = 2 * ell * InterpolatedUnivariateSpline(thetas, I2).integral(0, np.pi)
-            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(10, 4000) / ((2 * np.pi) ** 2)
+            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(Lmin, 4000) / ((2 * np.pi) ** 2)
         return 1 / A
 
     def gmv_weight_function(self, typ, L_vec, ell_vec, curl, fields="TEB", resp_ps="gradient"):
@@ -195,9 +195,6 @@ class QE:
         ell = ell_vec.rho
         L3_vec = L_vec - ell_vec
         L3 = L3_vec.rho
-        w = np.ones(np.shape(L3))
-        w[L3 < 10] = 0
-        w[L3 > 4000] = 0
         h1 = self._get_response_geo_fac(typ, 1, theta12=ell_vec.deltaphi(L3_vec))
         h2 = self._get_response_geo_fac(typ, 2, theta12=ell_vec.deltaphi(L3_vec))
         if typ == "BT" or typ == "TB" or typ == "TE" or typ == "ET":
@@ -205,7 +202,7 @@ class QE:
         else:
             typ1 = typ[0] + typ[0]
             typ2 = typ[1] + typ[1]
-        return w*((L_vec @ ell_vec) * h1 * self._get_cmb_cl(ell, typ1, cl)) + ((L_vec @ L3_vec) * h2 * self._get_cmb_cl(L3, typ2, cl))
+        return ((L_vec @ ell_vec) * h1 * self._get_cmb_cl(ell, typ1, cl)) + ((L_vec @ L3_vec) * h2 * self._get_cmb_cl(L3, typ2, cl))
 
     def _response(self, typ, L_vec, ell_vec, curl=True, cl="gradient"):
         if not curl:
@@ -214,9 +211,6 @@ class QE:
         ell = ell_vec.rho
         L3_vec = L_vec - ell_vec
         L3 = L3_vec.rho
-        w = np.ones(np.shape(L3))
-        w[L3 < 10] = 0
-        w[L3 > 4000] = 0
         h1 = self._get_response_geo_fac(typ, 1, theta12=ell_vec.deltaphi(L3_vec))
         h2 = self._get_response_geo_fac(typ, 2, theta12=ell_vec.deltaphi(L3_vec))
         if typ == "BT" or typ == "TB" or typ == "TE" or typ == "ET":
@@ -224,7 +218,7 @@ class QE:
         else:
             typ1 = typ[0] + typ[0]
             typ2 = typ[1] + typ[1]
-        return w*L * ell * np.sin(ell_vec.deltaphi(L_vec)) * (h1 * self._get_cmb_cl(ell, typ1, cl) - h2 * self._get_cmb_cl(L3, typ2, cl))
+        return L * ell * np.sin(ell_vec.deltaphi(L_vec)) * (h1 * self._get_cmb_cl(ell, typ1, cl) - h2 * self._get_cmb_cl(L3, typ2, cl))
 
     def geo_fac(self, typ, theta12):
         """
