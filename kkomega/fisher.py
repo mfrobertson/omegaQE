@@ -92,7 +92,7 @@ class Fisher:
             self.bi.build_M_spline(M_type, ells, M)
 
     def _get_third_L(self, L1, L2, theta):
-        return np.sqrt(L1**2 + L2**2 - (2*L1*L2*np.cos(theta).astype("double"))).astype("double")
+        return np.sqrt(L1**2 + L2**2 + (2*L1*L2*np.cos(theta).astype("double"))).astype("double")
 
     def _interpolate(self, arr):
         ells_sample = np.arange(np.size(arr))
