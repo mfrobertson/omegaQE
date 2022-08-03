@@ -13,6 +13,8 @@ class Bias:
             self.F_L_spline = None
             self.typs = None
             self.nu = None
+            self.fields = None
+            self.gmv = None
             self.C_inv = None
             self.Cl_kk = None
             self.Cov_kk = None
@@ -59,14 +61,13 @@ class Bias:
             else:
                 raise ValueError(f"Type {typ} does not exist.")
 
-
-    def __init__(self, N0_file, N0_offset=0, N0_ell_factors=True, M_path=None, F_L_path=None, deltaT=3, beam=3, init_qe=True):
-        self.fisher = Fisher(N0_file, N0_offset, N0_ell_factors)
-        self.N0_offset = N0_offset
-        self.N0_ell_factors = N0_ell_factors
+    def __init__(self, N0_path, M_path=None, init_qe=True, exp="SO"):
+        self.N0_path = N0_path
         self._cache = self.Holder()
-        self.qe = QE(deltaT, beam, init=init_qe)
-        self._F_L_path = F_L_path
+        self.exp = exp
+        self.qe = QE(exp=self.exp, init=init_qe)
+        N0_file = self._get_N0_file(gmv=True, fields="TEB")
+        self.fisher = Fisher(N0_file, 2, True)
         if M_path is not None:
             self.fisher.setup_bispectra(M_path, 4000, 100)
 
@@ -74,20 +75,21 @@ class Bias:
         if not path_exists(path):
             raise FileNotFoundError(f"Path {path} does not exist")
 
-    def _build_F_L(self, typs, nu, Nell=300):
-        if self._F_L_path is not None:
-            print("Using F_L cache, only C_inv build...")
-            self._check_path(self._F_L_path)
-            sep = getFileSep()
-            sample_Ls = np.load(self._F_L_path+sep+typs+sep+str(Nell)+sep+"ells.npy")
-            F_L = np.load(self._F_L_path+sep+typs+sep+str(Nell)+sep+"F_L.npy")
-            C_inv = self.fisher.get_C_inv(typs, Lmax=4000, nu=nu)
-        else:
-            print("Full F_L_build...")
-            Ls1 = np.arange(30, 40, 2)
-            Ls2 = np.logspace(1, 3, 100) * 4
-            sample_Ls = np.concatenate((Ls1, Ls2))
-            _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
+    def _get_N0_file(self, gmv, fields):
+        gmv_str = "gmv" if gmv else "single"
+        sep = getFileSep()
+        return self.N0_path + sep + self.exp + sep + gmv_str + sep + f"N0_{fields}_gradient.npy"
+    def _reset_fisher_noise(self, gmv, fields):
+        N0_file = self._get_N0_file(gmv, fields)
+        self.fisher.reset_noise(N0_file, 2, True)
+
+    def _build_F_L(self, typs, nu, fields, gmv):
+        print("Full F_L_build...")
+        Ls1 = np.arange(3, 40, 2)
+        Ls2 = np.logspace(1, 3, 100) * 4
+        sample_Ls = np.concatenate((Ls1, Ls2))
+        self._reset_fisher_noise(gmv, fields)
+        _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
         self._cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=4000, nu=nu)
         self._cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=4000, nu=nu)
         self._cache.Cl_gk = self.fisher.get_Cl("gk", ellmax=4000, nu=nu)
@@ -95,6 +97,8 @@ class Bias:
         self._cache.F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
         self._cache.typs = typs
         self._cache.nu = nu
+        self._cache.fields = fields
+        self._cache.gmv = gmv
         self._cache.C_inv = C_inv
 
     def _get_cov_invs(self, typ, typs, C_inv):
@@ -151,7 +155,7 @@ class Bias:
             raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
         return 4 / (F_L * L1 ** 2 * L2 ** 2) * mixed_bi
 
-    def mixed_bispectrum(self, typs, L1, L2, theta12, nu=353e9):
+    def mixed_bispectrum(self, typs, L1, L2, theta12, nu=353e9, fields="TEB", gmv=True):
         """
         phi phi omega and phi phi kappa
         Parameters
@@ -171,8 +175,8 @@ class Bias:
         if typs == "conv":
             L = self._get_third_L(L1, L2, theta12)
             return 4*self.fisher.bi.get_bispectrum("kkk", L1, L2, L, M_spline=True)/(L1**2 * L2**2)
-        if self._cache is None or self._cache.typs != typs or self._cache.nu != nu:
-            self._build_F_L(typs, nu)
+        if self._cache is None or self._cache.typs != typs or self._cache.nu != nu or self._cache.fields != fields or self._cache.gmv != gmv:
+            self._build_F_L(typs, nu, fields, gmv)
         return self._mixed_bispectrum(list(typs), L1, L2, theta12, nu)
 
     def _get_third_L(self, L1, L2, theta):
@@ -209,7 +213,7 @@ class Bias:
                 L2 = L2_vec.rho
                 w2 = 0 if (L2 < Lmin or L2 > 4000) else 1
                 if w2 != 0:
-                    bi = w2 * self.mixed_bispectrum(bi_typ, L1, L2, L1_vec.deltaphi(L2_vec))
+                    bi = w2 * self.mixed_bispectrum(bi_typ, L1, L2, L1_vec.deltaphi(L2_vec), fields=fields, gmv=gmv)
                     L3_vec = vector.obj(rho=Ls3[None,:], phi=thetas3[:,None])
                     L5_vec = L1_vec - L3_vec
                     Ls5 = L5_vec.rho
