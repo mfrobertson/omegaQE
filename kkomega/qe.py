@@ -17,12 +17,12 @@ class QE:
             self.gradCl_spline = None
             self.N_spline = None
 
-    def __init__(self, deltaT=3, beam=3, init=True, fields="TEB"):
+    def __init__(self, exp="SO", deltaT=None, beam=None, init=True, fields="TEB"):
         self._cosmo = Cosmology()
         self._noise = Noise()
         self.cmb = dict.fromkeys(self._cmb_types(), self.CMBsplines())
         if init:
-            self.initialise(deltaT, beam, fields=fields)
+            self.initialise(exp, deltaT, beam, fields=fields)
         else:
             self._cov_inv_fields = "uninitialised"
 
@@ -336,7 +336,15 @@ class QE:
         self.cmb[typ].initialised = True
         self._initialise(typ[::-1], deltaT, beam, Lmax)
 
-    def initialise(self, deltaT=3, beam=3, Lmax=4000, fields="TEB"):
+    def get_noise_args(self, exp):
+        if exp == "SO":
+            return 3, 3
+        elif exp == "S4":
+            return 1, 1
+        else:
+            raise ValueError(f"Experiment {exp} unexpected.")
+
+    def initialise(self, exp="SO", deltaT=None, beam=None, Lmax=4000, fields="TEB"):
         """
 
         Parameters
@@ -347,6 +355,8 @@ class QE:
         -------
 
         """
+        if deltaT is None or beam is None:
+            deltaT, beam = self.get_noise_args(exp)
         args = self.parse_fields(fields)
         for arg in args:
             self._initialise(arg, deltaT, beam, Lmax)
