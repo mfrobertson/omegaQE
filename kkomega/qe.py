@@ -60,9 +60,9 @@ class QE:
         """
         self._initialisation_check()
         samp1 = np.arange(Lmin, 40, 1)
-        samp2 = np.logspace(1, 3, 300) * 4
+        samp2 = np.logspace(1, 3, 500) * 4
         ells = np.concatenate((samp1, samp2))
-        Ntheta = 100
+        Ntheta = 300
         thetas = np.linspace(0, np.pi, Ntheta)
         I1 = np.zeros(np.size(ells))
         typs = np.char.array(list(fields))
@@ -106,9 +106,9 @@ class QE:
             return self.gmv_normalisation(Ls, curl, resp_ps=resp_ps)
         self._initialisation_check()
         samp1 = np.arange(Lmin, 40, 1)
-        samp2 = np.logspace(1, 3, 300) * 4
+        samp2 = np.logspace(1, 3, 500) * 4
         ells = np.concatenate((samp1, samp2))
-        Ntheta = 100
+        Ntheta = 300
         thetas = np.linspace(0, np.pi, Ntheta)
         I1 = np.zeros(np.size(ells))
         N_Ls = np.size(Ls)
@@ -339,8 +339,14 @@ class QE:
     def get_noise_args(self, exp):
         if exp == "SO":
             return 3, 3
+        elif exp == "SO_base":
+            return 8, 1.4
+        elif exp == "SO_goal":
+            return 5.6, 1.4
         elif exp == "S4":
             return 1, 1
+        elif exp == "HD":
+            return 0.5, 0.25
         else:
             raise ValueError(f"Experiment {exp} unexpected.")
 
