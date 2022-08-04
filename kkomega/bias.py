@@ -79,6 +79,7 @@ class Bias:
         gmv_str = "gmv" if gmv else "single"
         sep = getFileSep()
         return self.N0_path + sep + self.exp + sep + gmv_str + sep + f"N0_{fields}_gradient.npy"
+
     def _reset_fisher_noise(self, gmv, fields):
         N0_file = self._get_N0_file(gmv, fields)
         self.fisher.reset_noise(N0_file, 2, True)
@@ -248,20 +249,30 @@ class Bias:
         N_C1 = 0.25 * L**2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_C1_L1).integral(Lmin, 4000)
         return N_A1, N_C1
 
+    def _get_normalisation(self, fields, Ls, curl, gmv):
+        self._reset_fisher_noise(gmv, fields)
+        if curl:
+            typ = "curl"
+        else:
+            typ = "phi"
+        N0 = self.fisher.noise.get_N0(typ, ellmax=4000, ell_factors=False)
+        sample_Ls = np.arange(np.size(N0))
+        return InterpolatedUnivariateSpline(sample_Ls, N0)(Ls)
+
     def _bias(self, bi_typ, XY, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
-        A = self.qe.normalisation(XY, Ls, curl=curl)
+        A = self._get_normalisation(fields=XY, Ls=Ls, curl=curl, gmv=False)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
         N_C1 = np.zeros(np.shape(Ls))
         for iii, L in enumerate(Ls):
-            N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, False, "TEB", *self.bias_prep(bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin))
+            N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, False, XY, *self.bias_prep(bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin))
             N_A1[iii] = A[iii] * N_A1_tmp
             N_C1[iii] = A[iii] * N_C1_tmp
         return N_A1, N_C1
 
     def _bias_gmv(self, bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
-        A = self.qe.gmv_normalisation(Ls, curl=curl, fields=fields)
+        A = self._get_normalisation(fields=fields, Ls=Ls, curl=curl, gmv=True)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
