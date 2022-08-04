@@ -10,6 +10,7 @@ from sympy import lambdify
 from cache.tools import getFileSep, path_exists
 import copy
 import warnings
+import vector
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
@@ -297,31 +298,6 @@ class Fisher:
         dLs[-1] = dLs[-2]
         return Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline
 
-    # def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins):
-    #     Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta,typ, nu, gal_bins, include_N0_kappa=include_N0_kappa)
-    #     Cl_xy_spline = self._interpolate(self._get_Cl(typ[:2], Lmax, nu, gal_bins))
-    #     I = np.zeros(np.size(Ls))
-    #     Ls2 = np.arange(Lmin, Lmax+1, dL2)
-    #     for iii, L1 in enumerate(Ls):
-    #         I_tmp = 0
-    #         L2 = Ls2[None, :]
-    #         L3 = self._get_third_L(L1, L2, thetas[:, None])
-    #         w = np.ones(np.shape(L3))
-    #         w[L1 > Lmax] = 0
-    #         w[L1 < Lmin] = 0
-    #         bispectrum = self.bi.get_bispectrum(typ, L1, L2, theta=thetas[:, None], M_spline=True, nu=nu, gal_bins=gal_bins)
-    #         if typ[0] == typ[1]:
-    #             denom = 2 * C1_spline(L1) * C2_spline(L2) * C3_spline(L3)
-    #         else:
-    #             denom = ((C1_spline(L1) * C2_spline(L2)) + (Cl_xy_spline(L1) * Cl_xy_spline(L2))) * C3_spline(L3)
-    #         I_tmp += dL2 * 2 * np.sum(L2 * w * dTheta * bispectrum ** 2 / denom)
-    #         I[iii] = 2 * np.pi * L1 * I_tmp
-    #     I *= f_sky / np.pi * 1 / ((2 * np.pi) ** 2)
-    #     if arr:
-    #         return I
-    #     I_spline = InterpolatedUnivariateSpline(Ls, I)
-    #     return I_spline.integral(Lmin, Lmax)
-
     def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins):
         Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta,typ, nu, gal_bins, include_N0_kappa=include_N0_kappa)
         Cl_xy_spline = self._interpolate(self._get_Cl(typ[:2], Lmax, nu, gal_bins))
@@ -330,11 +306,14 @@ class Fisher:
         for iii, L3 in enumerate(Ls):
             I_tmp = 0
             L2 = Ls2[None, :]
-            L1 = self._get_third_L(L3, L2, thetas[:, None])
+            L3_vec = vector.obj(rho=L3, phi=0)
+            L2_vec = vector.obj(rho=L2, phi=thetas[:, None])
+            L1_vec = -L3_vec - L2_vec
+            L1 = L1_vec.rho
             w = np.ones(np.shape(L1))
             w[L1 > Lmax] = 0
             w[L1 < Lmin] = 0
-            thetas12 = np.arcsin(L3 * np.sin(thetas[:, None]) / L1)
+            thetas12 = L1_vec.deltaphi(L2_vec)
             bispectrum = self.bi.get_bispectrum(typ, L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
             if typ[0] == typ[1]:
                 denom = 2 * C1_spline(L1) * C2_spline(L2) * C3_spline(L3)
@@ -365,11 +344,14 @@ class Fisher:
         for iii, L3 in enumerate(Ls):
             I_tmp = 0
             L2 = Ls2[None, :]
-            L1 = self._get_third_L(L3, L2, thetas[:, None])
+            L3_vec = vector.obj(rho=L3, phi=0)
+            L2_vec = vector.obj(rho=L2, phi=thetas[:, None])
+            L1_vec = -L3_vec - L2_vec
+            L1 = L1_vec.rho
             w = np.ones(np.shape(L1))
             w[L1 > Lmax] = 0
             w[L1 < Lmin] = 0
-            thetas12 = np.arcsin(L3 * np.sin(thetas[:, None]) / L1)
+            thetas12 = L1_vec.deltaphi(L2_vec)
             bi1 = self.bi.get_bispectrum(typ[4:6] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
             bi2 = self.bi.get_bispectrum(typ[6:] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
             covs = C1_spline(L1) * C2_spline(L2) / C3_spline(L3)
@@ -421,11 +403,14 @@ class Fisher:
         for iii, L3 in enumerate(Ls):
             I_tmp = 0
             L2 = Ls2[None, :]
-            L1 = self._get_third_L(L3, L2, thetas[:, None])
+            L3_vec = vector.obj(rho=L3, phi=0)
+            L2_vec = vector.obj(rho=L2, phi=thetas[:,None])
+            L1_vec = L3_vec + L2_vec
+            L1 = L1_vec.rho
             w = np.ones(np.shape(L1))
             w[L1 > Lmax] = 0
             w[L1 < Lmin] = 0
-            thetas12 = np.arcsin(L3 * np.sin(thetas[:, None]) / L1)
+            thetas12 = L1_vec.deltaphi(L2_vec)
             bi1 = self.bi.get_bispectrum(typ[4:6] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
             bi2 = self.bi.get_bispectrum(typ[6:] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins)
             covs = C1_spline(L1) * C2_spline(L2)
