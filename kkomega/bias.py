@@ -10,6 +10,8 @@ class Bias:
     class Holder:
 
         def __init__(self):
+            self.sample_F_L_Ls = None
+            self.F_L = None
             self.F_L_spline = None
             self.typs = None
             self.nu = None
@@ -61,9 +63,10 @@ class Bias:
             else:
                 raise ValueError(f"Type {typ} does not exist.")
 
-    def __init__(self, N0_path, M_path=None, init_qe=True, exp="SO"):
+    def __init__(self, N0_path, M_path=None, F_L_path=None, init_qe=True, exp="SO"):
         self.N0_path = N0_path
-        self._cache = self.Holder()
+        self.F_L_path = F_L_path
+        self.cache = self.Holder()
         self.exp = exp
         self.qe = QE(exp=self.exp, init=init_qe)
         N0_file = self._get_N0_file(gmv=True, fields="TEB")
@@ -85,22 +88,39 @@ class Bias:
         self.fisher.reset_noise(N0_file, 2, True)
 
     def _build_F_L(self, typs, nu, fields, gmv):
-        print("Full F_L_build...")
-        Ls1 = np.arange(3, 40, 2)
-        Ls2 = np.logspace(1, 3, 100) * 4
-        sample_Ls = np.concatenate((Ls1, Ls2))
-        self._reset_fisher_noise(gmv, fields)
-        _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
-        self._cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=4000, nu=nu)
-        self._cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=4000, nu=nu)
-        self._cache.Cl_gk = self.fisher.get_Cl("gk", ellmax=4000, nu=nu)
-        self._cache.Cl_Ik = self.fisher.get_Cl("Ik", ellmax=4000, nu=nu)
-        self._cache.F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
-        self._cache.typs = typs
-        self._cache.nu = nu
-        self._cache.fields = fields
-        self._cache.gmv = gmv
-        self._cache.C_inv = C_inv
+        if self.F_L_path is not None:
+            print("Using cached F_L")
+            sep = getFileSep()
+            gmv_str = "gmv_str" if gmv else "single"
+            full_F_L_path = self.F_L_path+sep+self.exp+sep+gmv_str+sep+fields+sep+typs+sep+str(300)
+            sample_Ls = np.load(full_F_L_path+sep+"ells.npy")
+            F_L = np.load(full_F_L_path+sep+"F_L.npy")
+            print("Full C_inv build...")
+            self._reset_fisher_noise(gmv, fields)
+            C_inv = self.fisher.get_C_inv(typs, Lmax=4000, nu=nu)
+        else:
+            print("Full F_L_build...")
+            Ls1 = np.arange(3, 40, 2)
+            Ls2 = np.logspace(1, 3, 100) * 4
+            sample_Ls = np.concatenate((Ls1, Ls2))
+            self._reset_fisher_noise(gmv, fields)
+            _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
+        self.cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=4000, nu=nu)
+        self.cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=4000, nu=nu)
+        self.cache.Cl_gk = self.fisher.get_Cl("gk", ellmax=4000, nu=nu)
+        self.cache.Cl_Ik = self.fisher.get_Cl("Ik", ellmax=4000, nu=nu)
+        self.cache.sample_F_L_Ls = sample_Ls
+        self.cache.F_L = F_L
+        self.cache.F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
+        self.cache.typs = typs
+        self.cache.nu = nu
+        self.cache.fields = fields
+        self.cache.gmv = gmv
+        self.cache.C_inv = C_inv
+
+    def build_F_L(self, typs="kgI", fields="TEB", gmv=True, nu=353e9):
+        self._build_F_L(typs, nu, fields, gmv)
+
 
     def _get_cov_invs(self, typ, typs, C_inv):
         combo1_idx1 = np.where(typs == typ[0])[0][0]
@@ -122,8 +142,8 @@ class Bias:
         Ls = np.arange(np.size(cov_inv1))
         cov_inv1_spline = InterpolatedUnivariateSpline(Ls[1:], cov_inv1[1:])
         cov_inv2_spline = InterpolatedUnivariateSpline(Ls[1:], cov_inv2[1:])
-        Cl_pk = self._cache.get_Cl(p+"k")
-        Cl_qk = self._cache.get_Cl(q+"k")
+        Cl_pk = self.cache.get_Cl(p+"k")
+        Cl_qk = self.cache.get_Cl(q+"k")
         Cl_pk_spline = InterpolatedUnivariateSpline(Ls, Cl_pk)
         Cl_qk_spline = InterpolatedUnivariateSpline(Ls, Cl_qk)
         return bi * cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_pk_spline(L1) * Cl_qk_spline(L2)
@@ -131,9 +151,9 @@ class Bias:
 
     def _mixed_bispectrum(self, typs, L1, L2, theta12, nu):
         L = self._get_third_L(L1, L2, theta12)
-        F_L = self._cache.F_L_spline(L)
+        F_L = self.cache.F_L_spline(L)
         typs = np.char.array(typs)
-        C_inv = self._cache.C_inv
+        C_inv = self.cache.C_inv
         all_combos = typs[:, None] + typs[None, :]
         combos = all_combos.flatten()
         Ncombos = np.size(combos)
@@ -176,7 +196,7 @@ class Bias:
         if typs == "conv":
             L = self._get_third_L(L1, L2, theta12)
             return 4*self.fisher.bi.get_bispectrum("kkk", L1, L2, L, M_spline=True)/(L1**2 * L2**2)
-        if self._cache is None or self._cache.typs != typs or self._cache.nu != nu or self._cache.fields != fields or self._cache.gmv != gmv:
+        if self.cache is None or self.cache.typs != typs or self.cache.nu != nu or self.cache.fields != fields or self.cache.gmv != gmv:
             self._build_F_L(typs, nu, fields, gmv)
         return self._mixed_bispectrum(list(typs), L1, L2, theta12, nu)
 
@@ -293,7 +313,6 @@ class Bias:
 
         Parameters
         ----------
-        typ
         Ls
         N_L1
         N_L3
