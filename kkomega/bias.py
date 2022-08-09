@@ -100,8 +100,8 @@ class Bias:
             C_inv = self.fisher.get_C_inv(typs, Lmax=4000, nu=nu)
         else:
             print("Full F_L_build...")
-            Ls1 = np.arange(3, 40, 2)
-            Ls2 = np.logspace(1, 3, 100) * 4
+            Ls1 = np.arange(3, 40, 1)
+            Ls2 = np.logspace(1, 3, 300-37) * 4
             sample_Ls = np.concatenate((Ls1, Ls2))
             self._reset_fisher_noise(gmv, fields)
             _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
