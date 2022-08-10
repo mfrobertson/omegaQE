@@ -557,31 +557,30 @@ class Fisher:
         """
         return self._get_Cl(typ, ellmax, nu, gal_bins, use_bins)
 
-    def _get_ell_prim_prim(self, ell, ell_prim, theta):
-        ell_prim_prim = self._maths.cosine_rule(ell, ell_prim, theta)
-        theta_prim = self._maths.sine_rule(ell_prim_prim, theta, b=ell)
-        return theta_prim, ell_prim_prim
-
-    def _get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta):
+    def _get_postborn_omega_ps(self, Ls, M_path, Nell_prim, Ntheta, M_ellmax=20000, M_Nell=1000):
         mode = Modecoupling()
-        ells_sample = np.load(ell_file)
-        M = np.load(M_file)
+        sep = getFileSep()
+        ells_sample = np.load(M_path+sep+"kappa-kappa"+sep+f"{M_ellmax}_{M_Nell}"+sep+"ells.npy")
+        M = np.load(M_path+sep+"kappa-kappa"+sep+f"{M_ellmax}_{M_Nell}"+sep+"M.npy")
         M_spline = mode.spline(ells_sample, M)
         dTheta = np.pi / Ntheta
-        thetas = np.arange(dTheta, np.pi, dTheta, dtype=float)
-        Lmax = max(ell_prim_max, 2 * ells[-1])
-        dL = Lmax / Nell_prim
-        Lprims = np.arange(2, Lmax + 1, dL)
-        ells = ells[:, None]
-        thetas = thetas[None, :]
-        I = 0
-        for Lprim in Lprims:
-            theta_prims, Lprimprims = self._get_ell_prim_prim(ells, Lprim, thetas)
-            I_tmp = 2 * Lprim * dL * dTheta * self._maths.cross(ells, Lprim, thetas) ** 2 * self._maths.dot(Lprim, Lprimprims,theta_prims) ** 2 / (Lprim ** 4 * Lprimprims ** 4) * M_spline.ev(Lprim, Lprimprims)
-            I += I_tmp.sum(axis=1)
+        thetas = np.linspace(dTheta, np.pi, Ntheta, dtype=float)
+        samp1_1 = np.arange(3, 80, 1)
+        samp2_1 = np.logspace(1, 3, Nell_prim-77) * 8
+        Lprims = np.concatenate((samp1_1, samp2_1))
+        I = np.zeros(np.size(Ls))
+        for iii, L in enumerate(Ls):
+            L_vec = vector.obj(rho=L, phi=0)
+            I_tmp = np.zeros(np.size(Lprims))
+            for jjj, Lprim in enumerate(Lprims):
+                Lprim_vec = vector.obj(rho=Lprim, phi=thetas)
+                Lprimprim_vec = L_vec - Lprim_vec
+                Lprimprims = Lprimprim_vec.rho
+                I_tmp[jjj] = np.sum(2 * Lprim * dTheta * (L*Lprim*np.sin(thetas))** 2 * (Lprim_vec@Lprimprim_vec)** 2 / (Lprim ** 4 * Lprimprims ** 4) * M_spline.ev(Lprim, Lprimprims))
+            I[iii] = InterpolatedUnivariateSpline(Lprims, I_tmp).integral(3,8000)
         return 4 * I / ((2 * np.pi) ** 2)
 
-    def get_postborn_omega_ps(self, ells, ell_file, M_file, ell_prim_max=8000, Nell_prim=2000, Ntheta=100):
+    def get_postborn_omega_ps(self, ells, M_path=None, Nell_prim=800, Ntheta=100):
         """
 
         Parameters
@@ -597,7 +596,7 @@ class Fisher:
         -------
 
         """
-        return self._get_postborn_omega_ps(ells, ell_file, M_file, ell_prim_max, Nell_prim, Ntheta)
+        return self._get_postborn_omega_ps(ells, M_path, Nell_prim, Ntheta)
 
     def get_rotation_ps_Fisher(self, Lmax, ell_file=None, M_file=None, f_sky=1, auto=True, camb=False):
         """
