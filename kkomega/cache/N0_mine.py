@@ -20,12 +20,6 @@ def save(N0, fields, gmv, resp_ps, exp):
     filename_N0 = f"N0_{fields}_{resp_ps}.npy"
     tools.save_array(folder, filename_N0, N0)
 
-def get_noise_args(exp):
-    if exp == "SO":
-        return 3, 3
-    elif exp == "S4":
-        return 1, 1
-
 def main(exp, fields, gmv, resp_ps, Nell):
     qe = QE(exp=exp)
     samp1 = np.arange(2, 40, 1)
