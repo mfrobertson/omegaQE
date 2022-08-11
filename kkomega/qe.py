@@ -17,9 +17,10 @@ class QE:
             self.gradCl_spline = None
             self.N_spline = None
 
-    def __init__(self, exp="SO", deltaT=None, beam=None, init=True, fields="TEB"):
+    def __init__(self, exp="SO", deltaT=None, beam=None, init=True, fields="TEB", N0_path=None):
         self._cosmo = Cosmology()
         self._noise = Noise()
+        self.N0_path = N0_path
         self.cmb = dict.fromkeys(self._cmb_types(), self.CMBsplines())
         if init:
             self.initialise(exp, deltaT, beam, fields=fields)
@@ -316,7 +317,7 @@ class QE:
 
 
 
-    def _initialise(self, typ, deltaT, beam, Lmax=4000):
+    def _initialise(self, typ, deltaT, beam, Lmax=4000, exp="SO"):
         if self.cmb[typ].initialised:
             return
         self.cmb[typ] = self.CMBsplines()
@@ -330,21 +331,21 @@ class QE:
         gradCl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], gradCl_lens[2:])
         self.cmb[typ].gradCl_spline = gradCl_lens_spline
 
-        N = self._noise.get_cmb_gaussian_N(typ, ellmax=Lmax, deltaT=deltaT, beam=beam)
+        N = self._noise.get_cmb_gaussian_N(typ, ellmax=Lmax, deltaT=deltaT, beam=beam, exp=exp, N0_path=self.N0_path)
         N_spline = InterpolatedUnivariateSpline(np.arange(np.size(N))[2:], N[2:])
         self.cmb[typ].N_spline = N_spline
         self.cmb[typ].initialised = True
-        self._initialise(typ[::-1], deltaT, beam, Lmax)
+        self._initialise(typ[::-1], deltaT, beam, Lmax, exp)
 
     def get_noise_args(self, exp):
         if exp == "SO":
             return 3, 3
         elif exp == "SO_base":
-            return 8, 1.4
+            return None, None
         elif exp == "SO_goal":
-            return 5.6, 1.4
+            return None, None
         elif exp == "S4":
-            return 1, 1
+            return 1, 3
         elif exp == "HD":
             return 0.5, 0.25
         else:
@@ -365,7 +366,7 @@ class QE:
             deltaT, beam = self.get_noise_args(exp)
         args = self.parse_fields(fields)
         for arg in args:
-            self._initialise(arg, deltaT, beam, Lmax)
+            self._initialise(arg, deltaT, beam, Lmax, exp)
         self._cov_inv_fields = fields
         self._build_cmb_Cov_inv_splines(fields=self._cov_inv_fields)
 

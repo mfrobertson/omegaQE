@@ -1,6 +1,6 @@
 import numpy as np
 from cosmology import Cosmology
-
+from cache.tools import getFileSep
 
 class Noise:
     """
@@ -155,7 +155,15 @@ class Noise:
         cmb_ps = self._cosmo.get_cmb_ps(ellmax)
         return self._microK2_to_MJy2(cmb_ps, nu)
 
-    def get_cmb_gaussian_N(self, typ, deltaT=3, beam=3, ellmax=4000):
+    def _get_cached_cmb_gaussian_N(self, typ, ellmax, exp, N0_path):
+        if N0_path is None:
+            raise ValueError("N0_path not given.")
+        if typ[0] != typ[1]:
+            return np.zeros(ellmax + 1)
+        sep = getFileSep()
+        return np.load(N0_path + sep + exp + sep + 'exp' + sep + f"N_{typ}.npy")
+
+    def get_cmb_gaussian_N(self, typ, deltaT=3, beam=3, ellmax=4000, exp="SO", N0_path=None):
         """
 
         Parameters
@@ -169,6 +177,9 @@ class Noise:
         -------
 
         """
+        if deltaT is None or beam is None:
+            return self._get_cached_cmb_gaussian_N(typ, ellmax, exp, N0_path)
+
         arcmin_to_radians = 0.000290888
         deltaT *= arcmin_to_radians
         beam *= arcmin_to_radians
