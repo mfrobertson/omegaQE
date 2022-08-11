@@ -68,7 +68,7 @@ class Bias:
         self.F_L_path = F_L_path
         self.cache = self.Holder()
         self.exp = exp
-        self.qe = QE(exp=self.exp, init=init_qe)
+        self.qe = QE(exp=self.exp, init=init_qe, N0_path=self.N0_path)
         N0_file = self._get_N0_file(gmv=True, fields="TEB")
         self.fisher = Fisher(N0_file, 2, True)
         if M_path is not None:
@@ -79,9 +79,13 @@ class Bias:
             raise FileNotFoundError(f"Path {path} does not exist")
 
     def _get_N0_file(self, gmv, fields):
+        if self.exp != "SO" and self.exp != "S4":
+            resp_func = "unlensed"
+        else:
+            resp_func = "gradient"
         gmv_str = "gmv" if gmv else "single"
         sep = getFileSep()
-        return self.N0_path + sep + self.exp + sep + gmv_str + sep + f"N0_{fields}_gradient.npy"
+        return self.N0_path + sep + self.exp + sep + gmv_str + sep + f"N0_{fields}_{resp_func}.npy"
 
     def _reset_fisher_noise(self, gmv, fields):
         N0_file = self._get_N0_file(gmv, fields)
