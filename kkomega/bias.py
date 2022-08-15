@@ -83,6 +83,9 @@ class Bias:
             resp_func = "unlensed"
         else:
             resp_func = "gradient"
+        if len(fields) == 1:
+            gmv = False
+            fields += fields
         gmv_str = "gmv" if gmv else "single"
         sep = getFileSep()
         return self.N0_path + sep + self.exp + sep + gmv_str + sep + f"N0_{fields}_{resp_func}.npy"
@@ -101,18 +104,16 @@ class Bias:
             F_L = np.load(full_F_L_path+sep+"F_L.npy")
             print("Full C_inv build...")
             self._reset_fisher_noise(gmv, fields)
-            C_inv = self.fisher.get_C_inv(typs, Lmax=4000, nu=nu)
+            C_inv = self.fisher.get_C_inv(typs, Lmax=np.max(sample_Ls), nu=nu)
         else:
             print("Full F_L_build...")
-            Ls1 = np.arange(3, 40, 1)
-            Ls2 = np.logspace(1, 3, 300-37) * 4
-            sample_Ls = np.concatenate((Ls1, Ls2))
+            sample_Ls = self.qe.get_log_sample_Ls(Lmin=3, Lmax=6000, Nells=300)
             self._reset_fisher_noise(gmv, fields)
             _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
-        self.cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=4000, nu=nu)
-        self.cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=4000, nu=nu)
-        self.cache.Cl_gk = self.fisher.get_Cl("gk", ellmax=4000, nu=nu)
-        self.cache.Cl_Ik = self.fisher.get_Cl("Ik", ellmax=4000, nu=nu)
+        self.cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=6000, nu=nu)
+        self.cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=6000, nu=nu)
+        self.cache.Cl_gk = self.fisher.get_Cl("gk", ellmax=6000, nu=nu)
+        self.cache.Cl_Ik = self.fisher.get_Cl("Ik", ellmax=6000, nu=nu)
         self.cache.sample_F_L_Ls = sample_Ls
         self.cache.F_L = F_L
         self.cache.F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
@@ -207,23 +208,21 @@ class Bias:
     def _get_third_L(self, L1, L2, theta):
         return np.sqrt(L1**2 + L2**2 + (2*L1*L2*np.cos(theta).astype("double"))).astype("double")
 
-    def bias_prep(self, bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
+    def bias_prep(self, bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin, Lmax):
         if bi_typ == "theory":
             if curl:
                 bi_typ = "rot"
             else:
                 bi_typ = "conv"
-        samp1_1 = np.arange(Lmin, 40, 5)
-        samp2_1 = np.logspace(1, 3, N_L1) * 4
-        Ls1 = np.concatenate((samp1_1, samp2_1))
-        Ls3 = np.linspace(Lmin, 4000, N_L3)
+        Ls1 = self.qe.get_log_sample_Ls(Lmin, Lmax, N_L1)
+        Ls3 = np.linspace(Lmin, Lmax, N_L3)
         dTheta1 = np.pi / Ntheta12
         thetas1 = np.linspace(0, np.pi-dTheta1, Ntheta12)
         dTheta3 = 2*np.pi / Ntheta13
         thetas3 = np.linspace(0, 2*np.pi-dTheta3, Ntheta13)
-        return bi_typ, Ls1, thetas1, Ls3, thetas3, curl, Lmin
+        return bi_typ, Ls1, thetas1, Ls3, thetas3, curl, Lmin, Lmax
 
-    def _bias_calc(self, XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl, Lmin):
+    def _bias_calc(self, XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl, Lmin, Lmax):
         dTheta3 = thetas3[1] - thetas3[0]
         dL3 = Ls3[1] - Ls3[0]
         L_vec = vector.obj(rho=L, phi=0)
@@ -236,7 +235,7 @@ class Bias:
                 L1_vec = vector.obj(rho=L1, phi=theta1)
                 L2_vec = L_vec - L1_vec
                 L2 = L2_vec.rho
-                w2 = 0 if (L2 < Lmin or L2 > 4000) else 1
+                w2 = 0 if (L2 < Lmin or L2 > Lmax) else 1
                 if w2 != 0:
                     bi = w2 * self.mixed_bispectrum(bi_typ, L1, L2, L1_vec.deltaphi(L2_vec), fields=fields, gmv=gmv)
                     L3_vec = vector.obj(rho=Ls3[None,:], phi=thetas3[:,None])
@@ -244,7 +243,7 @@ class Bias:
                     Ls5 = L5_vec.rho
                     w5 = np.ones(np.shape(Ls5))
                     w5[Ls5 < Lmin] = 0
-                    w5[Ls5 > 4000] = 0
+                    w5[Ls5 > Lmax] = 0
                     Xbar_Ybar = XY.replace("B", "E")
                     X_Ybar = XY[0] + XY[1].replace("B", "E")
                     Xbar_Y = XY[0].replace("B", "E") + XY[1]
@@ -259,7 +258,7 @@ class Bias:
                     Ls4 = L4_vec.rho
                     w4 = np.ones(np.shape(Ls4))
                     w4[Ls4 < Lmin] = 0
-                    w4[Ls4 > 4000] = 0
+                    w4[Ls4 > Lmax] = 0
                     h_X_A1 = self.qe.geo_fac(XY[0], theta12=L5_vec.deltaphi(L4_vec))
                     h_Y_A1 = self.qe.geo_fac(XY[1], theta12=L5_vec.deltaphi(L3_vec))
                     h_X_C1 = self.qe.geo_fac(XY[0], theta12=L3_vec.deltaphi(L4_vec))
@@ -269,8 +268,8 @@ class Bias:
 
             I_A1_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_A1_theta1).integral(0, np.pi)
             I_C1_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_C1_theta1).integral(0, np.pi)
-        N_A1 = -0.5 * L**2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_A1_L1).integral(Lmin, 4000)
-        N_C1 = 0.25 * L**2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_C1_L1).integral(Lmin, 4000)
+        N_A1 = -0.5 * L**2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_A1_L1).integral(Lmin, Lmax)
+        N_C1 = 0.25 * L**2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_C1_L1).integral(Lmin, Lmax)
         return N_A1, N_C1
 
     def _get_normalisation(self, fields, Ls, curl, gmv):
@@ -279,40 +278,38 @@ class Bias:
             typ = "curl"
         else:
             typ = "phi"
-        N0 = self.fisher.noise.get_N0(typ, ellmax=4000, ell_factors=False)
+        N0 = self.fisher.noise.get_N0(typ, ellmax=np.max(Ls), ell_factors=False)
         sample_Ls = np.arange(np.size(N0))
         return InterpolatedUnivariateSpline(sample_Ls, N0)(Ls)
 
-    def _bias(self, bi_typ, XY, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
+    def _bias(self, bi_typ, XY, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin, Lmax):
         A = self._get_normalisation(fields=XY, Ls=Ls, curl=curl, gmv=False)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
         N_C1 = np.zeros(np.shape(Ls))
         for iii, L in enumerate(Ls):
-            N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, False, XY, *self.bias_prep(bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin))
+            N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, False, XY, *self.bias_prep(bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin, Lmax))
             N_A1[iii] = A[iii] * N_A1_tmp
             N_C1[iii] = A[iii] * N_C1_tmp
         return N_A1, N_C1
 
-    def _bias_gmv(self, bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin):
+    def _bias_gmv(self, bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin, Lmax):
         A = self._get_normalisation(fields=fields, Ls=Ls, curl=curl, gmv=True)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
         N_C1 = np.zeros(np.shape(Ls))
-        XYs = self.qe.parse_fields(fields)
-        XYs = XYs[XYs != "BB"]
+        XYs = self.qe.parse_fields(fields, unique=False)
         for iii, L in enumerate(Ls):
             for XY in XYs:
-                fac = 1 if XY[0] == XY[1] else 2
-                N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, True, fields, *self.bias_prep(bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin))
-                N_A1[iii] += fac * A[iii] * N_A1_tmp
-                N_C1[iii] += fac * A[iii] * N_C1_tmp
+                N_A1_tmp, N_C1_tmp = self._bias_calc(XY, L, True, fields, *self.bias_prep(bi_typ, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin, Lmax))
+                N_A1[iii] += A[iii] * N_A1_tmp
+                N_C1[iii] += A[iii] * N_C1_tmp
         return N_A1, N_C1
 
 
-    def bias(self, bi_typ, fields, Ls, gmv=False, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, curl=True, Lmin=10):
+    def bias(self, bi_typ, fields, Ls, gmv=False, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, curl=True, Lmin=10, Lmax=4000):
         """
 
         Parameters
@@ -329,5 +326,5 @@ class Bias:
 
         """
         if gmv:
-            return self._bias_gmv(bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin)
-        return self._bias(bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin)
+            return self._bias_gmv(bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin, Lmax)
+        return self._bias(bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, Lmin, Lmax)
