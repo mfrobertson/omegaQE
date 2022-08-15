@@ -25,7 +25,7 @@ def main():
     for field in fields_single:
         N0 = get_N0(key1, field)
         folder = '_N0'+sep+f'S4_base'+sep+'single'
-        filename = f"N0_{field}_unlensed.npy"
+        filename = f"N0_{field}_lensed.npy"
         print(f"Saving {filename} in {folder}")
         tools.save_array(folder, filename, N0)
 
@@ -34,7 +34,7 @@ def main():
         N0 = get_N0(key1, field)
         folder = '_N0' + sep + f'S4_base' + sep + 'gmv'
         field_str = "EB" if field == "Pol" else "TEB"
-        filename = f"N0_{field_str}_unlensed.npy"
+        filename = f"N0_{field_str}_lensed.npy"
         print(f"Saving {filename} in {folder}")
         tools.save_array(folder, filename, N0)
 
