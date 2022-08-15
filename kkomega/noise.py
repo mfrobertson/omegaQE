@@ -161,7 +161,7 @@ class Noise:
         if typ[0] != typ[1]:
             return np.zeros(ellmax + 1)
         sep = getFileSep()
-        return np.load(N0_path + sep + exp + sep + 'exp' + sep + f"N_{typ}.npy")
+        return np.load(N0_path + sep + exp + sep + 'exp' + sep + f"N_{typ}.npy")[:ellmax + 1]
 
     def get_cmb_gaussian_N(self, typ, deltaT=3, beam=3, ellmax=4000, exp="SO", N0_path=None):
         """
