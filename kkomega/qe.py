@@ -38,16 +38,29 @@ class QE:
         elif typ == "gradient":
             return self.cmb[fields].gradCl_spline(ells)
 
-    def parse_fields(self, fields="TEB"):
+    def parse_fields(self, fields="TEB", unique=False, includeBB=False):
         typs = np.char.array(list(fields))
-        C = np.triu(typs[:, None] + typs[None, :]).flatten()
-        return C[C != '']
+        typs_matrix = typs[:, None] + typs[None, :]
+        if unique:
+            XYs = np.triu(typs_matrix).flatten()
+            XYs = XYs[XYs != '']
+        else:
+            XYs = typs_matrix.flatten()
+        if includeBB:
+            return XYs
+        return XYs[XYs != "BB"]
 
     def _initialisation_check(self):
         if self._cov_inv_fields == "uninitialised":
             raise ValueError("QE class uninitialised, first call 'initialise'.")
 
-    def gmv_normalisation(self, Ls, curl, fields="TEB", resp_ps="gradient", Lmin=10):
+    def get_log_sample_Ls(self, Lmin, Lmax, Nells=500):
+        floaty = Lmax / 1000
+        samp1 = np.arange(Lmin, floaty * 10, 1)
+        samp2 = np.logspace(1, 3, Nells-np.size(samp1)) * floaty
+        return np.concatenate((samp1, samp2))
+
+    def gmv_normalisation(self, Ls, curl, fields="TEB", resp_ps="gradient", Lmin=10, Lmax=4000):
         """
 
         Parameters
@@ -60,13 +73,11 @@ class QE:
 
         """
         self._initialisation_check()
-        samp1 = np.arange(Lmin, 40, 1)
-        samp2 = np.logspace(1, 3, 500) * 4
-        ells = np.concatenate((samp1, samp2))
+        ells = self.get_log_sample_Ls(Lmin, Lmax)
         Ntheta = 300
         thetas = np.linspace(0, np.pi, Ntheta)
         I1 = np.zeros(np.size(ells))
-        typs = np.char.array(list(fields))
+        XYs = self.parse_fields(fields, unique=False)
         N_Ls = np.size(Ls)
         A = np.zeros(N_Ls)
         if N_Ls == 1:
@@ -79,18 +90,17 @@ class QE:
                 Ls3 = Ls3_vec.rho
                 w = np.ones(np.size(Ls3))
                 w[Ls3 < Lmin] = 0
-                w[Ls3 > 4000] = 0
+                w[Ls3 > Lmax] = 0
                 I2 = 0
-                for i in typs:
-                    for j in typs:
-                        resp = self._response(i + j, L_vec, ell_vec, curl, resp_ps)
-                        g = self.gmv_weight_function(i + j, L_vec, ell_vec, curl, fields, resp_ps)
-                        I2 += w * resp * g
+                for XY in XYs:
+                    resp = self._response(XY, L_vec, ell_vec, curl, resp_ps)
+                    g = self.gmv_weight_function(XY, L_vec, ell_vec, curl, fields, resp_ps)
+                    I2 += w * resp * g
                 I1[jjj] = 2 * ell * InterpolatedUnivariateSpline(thetas, I2).integral(0, np.pi)
-            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(Lmin, 4000) / ((2 * np.pi) ** 2)
+            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(Lmin, Lmax) / ((2 * np.pi) ** 2)
         return 1 / A
 
-    def normalisation(self, typ, Ls, curl, resp_ps="gradient", Lmin=10):
+    def normalisation(self, typ, Ls, curl, resp_ps="gradient", Lmin=10, Lmax=4000):
         """
 
         Parameters
@@ -106,9 +116,7 @@ class QE:
         if typ == "gmv":
             return self.gmv_normalisation(Ls, curl, resp_ps=resp_ps)
         self._initialisation_check()
-        samp1 = np.arange(Lmin, 40, 1)
-        samp2 = np.logspace(1, 3, 500) * 4
-        ells = np.concatenate((samp1, samp2))
+        ells = self.get_log_sample_Ls(Lmin, Lmax)
         Ntheta = 300
         thetas = np.linspace(0, np.pi, Ntheta)
         I1 = np.zeros(np.size(ells))
@@ -124,12 +132,12 @@ class QE:
                 Ls3 = Ls3_vec.rho
                 w = np.ones(np.shape(Ls3))
                 w[Ls3 < Lmin] = 0
-                w[Ls3 > 4000] = 0
+                w[Ls3 > Lmax] = 0
                 resp = self._response(typ, L_vec, ell_vec, curl, resp_ps)
                 g = self.weight_function(typ, L_vec, ell_vec, curl, gmv=False, resp_ps=resp_ps)
                 I2 = w * g * resp
                 I1[jjj] = 2 * ell * InterpolatedUnivariateSpline(thetas, I2).integral(0, np.pi)
-            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(Lmin, 4000) / ((2 * np.pi) ** 2)
+            A[iii] = InterpolatedUnivariateSpline(ells, I1).integral(Lmin, Lmax) / ((2 * np.pi) ** 2)
         return 1 / A
 
     def gmv_weight_function(self, typ, L_vec, ell_vec, curl, fields="TEB", resp_ps="gradient"):
@@ -153,8 +161,7 @@ class QE:
         L3 = L3_vec.rho
         p = typ[0]
         q = typ[1]
-        XYs = self.parse_fields(fields)
-        XYs = XYs[XYs != "BB"]
+        XYs = self.parse_fields(fields, unique=True)
         for ij in XYs:
             i = ij[0]
             j = ij[1]
@@ -277,7 +284,7 @@ class QE:
         else:
             raise ValueError(f"Type {typ} does not exist.")
 
-    def _get_cmb_cov(self, typ, Lmax=4000):
+    def _get_cmb_cov(self, typ, Lmax=6000):
         Ls = np.arange(Lmax + 1)
         return self.cmb[typ].lenCl_spline(Ls) + self.cmb[typ].N_spline(Ls)
 
@@ -317,25 +324,25 @@ class QE:
 
 
 
-    def _initialise(self, typ, deltaT, beam, Lmax=4000, exp="SO"):
+    def _initialise(self, typ, deltaT, beam, exp="SO"):
         if self.cmb[typ].initialised:
             return
         self.cmb[typ] = self.CMBsplines()
-        Cl_lens = self._cosmo.get_lens_ps(typ, 2*Lmax)
+        Cl_lens = self._cosmo.get_lens_ps(typ, 6000)
         Ls = np.arange(np.size(Cl_lens))
         Cl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], Cl_lens[2:])
         self.cmb[typ].lenCl_spline = Cl_lens_spline
 
-        gradCl_lens = self._cosmo.get_grad_lens_ps(typ, 2*Lmax)
+        gradCl_lens = self._cosmo.get_grad_lens_ps(typ, 6000)
         Ls = np.arange(np.size(gradCl_lens))
         gradCl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], gradCl_lens[2:])
         self.cmb[typ].gradCl_spline = gradCl_lens_spline
 
-        N = self._noise.get_cmb_gaussian_N(typ, ellmax=Lmax, deltaT=deltaT, beam=beam, exp=exp, N0_path=self.N0_path)
+        N = self._noise.get_cmb_gaussian_N(typ, ellmax=6000, deltaT=deltaT, beam=beam, exp=exp, N0_path=self.N0_path)
         N_spline = InterpolatedUnivariateSpline(np.arange(np.size(N))[2:], N[2:])
         self.cmb[typ].N_spline = N_spline
         self.cmb[typ].initialised = True
-        self._initialise(typ[::-1], deltaT, beam, Lmax, exp)
+        self._initialise(typ[::-1], deltaT, beam, exp)
 
     def get_noise_args(self, exp):
         if exp == "SO":
@@ -351,12 +358,11 @@ class QE:
         else:
             raise ValueError(f"Experiment {exp} unexpected.")
 
-    def initialise(self, exp="SO", deltaT=None, beam=None, Lmax=4000, fields="TEB"):
+    def initialise(self, exp="SO", deltaT=None, beam=None, fields="TEB"):
         """
 
         Parameters
         ----------
-        Lmax
 
         Returns
         -------
@@ -364,9 +370,9 @@ class QE:
         """
         if deltaT is None or beam is None:
             deltaT, beam = self.get_noise_args(exp)
-        args = self.parse_fields(fields)
+        args = self.parse_fields(fields, includeBB=True)
         for arg in args:
-            self._initialise(arg, deltaT, beam, Lmax, exp)
+            self._initialise(arg, deltaT, beam, exp)
         self._cov_inv_fields = fields
         self._build_cmb_Cov_inv_splines(fields=self._cov_inv_fields)
 
