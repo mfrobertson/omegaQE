@@ -22,6 +22,7 @@ class Bias:
             self.Cov_kk = None
             self.Cl_gk = None
             self.Cl_Ik = None
+            self.L_cuts = (None, None, None, None)
 
         def get_Cl(self, typ):
             """
@@ -69,7 +70,7 @@ class Bias:
         self.cache = self.Holder()
         self.exp = exp
         self.qe = QE(exp=self.exp, init=init_qe, N0_path=self.N0_path)
-        N0_file = self._get_N0_file(gmv=True, fields="TEB")
+        N0_file = self._get_N0_file(gmv=True, fields="TEB", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000)
         self.fisher = Fisher(N0_file, 2, True)
         if M_path is not None:
             self.fisher.setup_bispectra(M_path, 4000, 100)
@@ -78,9 +79,9 @@ class Bias:
         if not path_exists(path):
             raise FileNotFoundError(f"Path {path} does not exist")
 
-    def _get_N0_file(self, gmv, fields):
+    def _get_N0_file(self, gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
         if self.exp != "SO" and self.exp != "S4":
-            resp_func = "unlensed"
+            resp_func = "lensed"
         else:
             resp_func = "gradient"
         if len(fields) == 1:
@@ -88,13 +89,13 @@ class Bias:
             fields += fields
         gmv_str = "gmv" if gmv else "single"
         sep = getFileSep()
-        return self.N0_path + sep + self.exp + sep + gmv_str + sep + f"N0_{fields}_{resp_func}.npy"
+        return self.N0_path + sep + self.exp + sep + gmv_str + sep + f"N0_{fields}_{resp_func}_T{T_Lmin}-{T_Lmax}_P{P_Lmin}-{P_Lmax}.npy"
 
-    def _reset_fisher_noise(self, gmv, fields):
-        N0_file = self._get_N0_file(gmv, fields)
+    def _reset_fisher_noise(self, gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
+        N0_file = self._get_N0_file(gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
         self.fisher.reset_noise(N0_file, 2, True)
 
-    def _build_F_L(self, typs, nu, fields, gmv):
+    def _build_F_L(self, typs, nu, fields, gmv, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
         if self.F_L_path is not None:
             print("Using cached F_L")
             sep = getFileSep()
@@ -103,12 +104,12 @@ class Bias:
             sample_Ls = np.load(full_F_L_path+sep+"ells.npy")
             F_L = np.load(full_F_L_path+sep+"F_L.npy")
             print("Full C_inv build...")
-            self._reset_fisher_noise(gmv, fields)
+            self._reset_fisher_noise(gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
             C_inv = self.fisher.get_C_inv(typs, Lmax=np.max(sample_Ls), nu=nu)
         else:
             print("Full F_L_build...")
             sample_Ls = self.qe.get_log_sample_Ls(Lmin=3, Lmax=6000, Nells=300)
-            self._reset_fisher_noise(gmv, fields)
+            self._reset_fisher_noise(gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
             _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
         self.cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=6000, nu=nu)
         self.cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=6000, nu=nu)
@@ -122,9 +123,10 @@ class Bias:
         self.cache.fields = fields
         self.cache.gmv = gmv
         self.cache.C_inv = C_inv
+        self.cache.L_cuts = (T_Lmin, T_Lmax, P_Lmin, P_Lmax)
 
-    def build_F_L(self, typs="kgI", fields="TEB", gmv=True, nu=353e9):
-        self._build_F_L(typs, nu, fields, gmv)
+    def build_F_L(self, typs="kgI", fields="TEB", gmv=True, nu=353e9, T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000):
+        self._build_F_L(typs, nu, fields, gmv, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
 
 
     def _get_cov_invs(self, typ, typs, C_inv):
@@ -181,7 +183,7 @@ class Bias:
             raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
         return 4 / (F_L * L1 ** 2 * L2 ** 2) * mixed_bi
 
-    def mixed_bispectrum(self, typs, L1, L2, theta12, nu=353e9, fields="TEB", gmv=True):
+    def mixed_bispectrum(self, typs, L1, L2, theta12, nu=353e9, fields="TEB", gmv=True, T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000):
         """
         phi phi omega and phi phi kappa
         Parameters
@@ -201,8 +203,8 @@ class Bias:
         if typs == "conv":
             L = self._get_third_L(L1, L2, theta12)
             return 4*self.fisher.bi.get_bispectrum("kkk", L1, L2, L, M_spline=True)/(L1**2 * L2**2)
-        if self.cache is None or self.cache.typs != typs or self.cache.nu != nu or self.cache.fields != fields or self.cache.gmv != gmv:
-            self._build_F_L(typs, nu, fields, gmv)
+        if self.cache is None or self.cache.typs != typs or self.cache.nu != nu or self.cache.fields != fields or self.cache.gmv != gmv or self.cache.L_cuts != (T_Lmin, T_Lmax, P_Lmin, P_Lmax):
+            self._build_F_L(typs, nu, fields, gmv, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
         return self._mixed_bispectrum(list(typs), L1, L2, theta12, nu)
 
     def _get_third_L(self, L1, L2, theta):
@@ -224,8 +226,7 @@ class Bias:
         return bi_typ, Ls1, thetas1, Ls3, thetas3, curl, T_Lmin, T_Lmax, P_Lmin, P_Lmax
 
     def _bias_calc(self, XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
-        Lmin = np.min((T_Lmin, P_Lmin))
-        Lmax = np.max((T_Lmax, P_Lmax))
+        Lmin, Lmax = self.qe.get_Lmin_Lmax(fields, gmv, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
         dTheta3 = thetas3[1] - thetas3[0]
         dL3 = Ls3[1] - Ls3[0]
         L_vec = vector.obj(rho=L, phi=0)
@@ -240,7 +241,7 @@ class Bias:
                 L2 = L2_vec.rho
                 w2 = 0 if (L2 < Lmin or L2 > Lmax) else 1
                 if w2 != 0:
-                    bi = w2 * self.mixed_bispectrum(bi_typ, L1, L2, L1_vec.deltaphi(L2_vec), fields=fields, gmv=gmv)
+                    bi = w2 * self.mixed_bispectrum(bi_typ, L1, L2, L1_vec.deltaphi(L2_vec), fields=fields, gmv=gmv, T_Lmin=T_Lmin, T_Lmax=T_Lmax, P_Lmin=P_Lmin, P_Lmax=P_Lmax)
                     L3_vec = vector.obj(rho=Ls3[None,:], phi=thetas3[:,None])
                     L5_vec = L1_vec - L3_vec
                     Ls5 = L5_vec.rho
@@ -275,18 +276,22 @@ class Bias:
         N_C1 = 0.25 * L**2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_C1_L1).integral(Lmin, Lmax)
         return N_A1, N_C1
 
-    def _get_normalisation(self, fields, Ls, curl, gmv):
-        self._reset_fisher_noise(gmv, fields)
+    def _get_normalisation(self, fields, Ls, curl, gmv, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
+        self._reset_fisher_noise(gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
         if curl:
             typ = "curl"
         else:
             typ = "phi"
-        N0 = self.fisher.noise.get_N0(typ, ellmax=np.max(Ls), ell_factors=False)
+        if self.exp != "SO" and self.exp != "S4":
+            ell_factors = True
+        else:
+            ell_factors = False
+        N0 = self.fisher.noise.get_N0(typ, ellmax=np.max(Ls), ell_factors=ell_factors)
         sample_Ls = np.arange(np.size(N0))
-        return InterpolatedUnivariateSpline(sample_Ls, N0)(Ls)
+        return InterpolatedUnivariateSpline(sample_Ls, N0)(Ls)*4/(Ls**4)
 
     def _bias(self, bi_typ, XY, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
-        A = self._get_normalisation(fields=XY, Ls=Ls, curl=curl, gmv=False)
+        A = self._get_normalisation(fields=XY, Ls=Ls, curl=curl, gmv=False, T_Lmin=T_Lmin, T_Lmax=T_Lmax, P_Lmin=P_Lmin, P_Lmax=P_Lmax)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
@@ -298,7 +303,7 @@ class Bias:
         return N_A1, N_C1
 
     def _bias_gmv(self, bi_typ, fields, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
-        A = self._get_normalisation(fields=fields, Ls=Ls, curl=curl, gmv=True)
+        A = self._get_normalisation(fields=fields, Ls=Ls, curl=curl, gmv=True, T_Lmin=T_Lmin, T_Lmax=T_Lmax, P_Lmin=P_Lmin, P_Lmax=P_Lmax)
         N_Ls = np.size(Ls)
         if N_Ls == 1: Ls = np.ones(1) * Ls
         N_A1 = np.zeros(np.shape(Ls))
