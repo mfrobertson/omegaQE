@@ -199,7 +199,7 @@ class QE:
 
         """
         if gmv:
-            return self.gmv_weight_function(typ, L_vec, ell_vec, curl, fields, resp_ps)
+            return self.gmv_weight_function(typ, L_vec, ell_vec, curl, fields, resp_ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
         self._initialisation_check()
         ell = ell_vec.rho
         L3_vec = L_vec - ell_vec
