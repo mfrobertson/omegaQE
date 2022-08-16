@@ -2,13 +2,13 @@ declare -a typs=("TT" "EE" "TE" "TB" "EB")
 for typ in "${typs[@]}"
 do
 echo "$typ"
-python N0_mine.py SO "$typ" False gradient 800
+python N0_mine.py SO "$typ" False gradient 800 30 3000 30 5000
 done
 
 declare -a gmv_typs=("TE" "EB" "TEB")
 for typ in "${gmv_typs[@]}"
 do
 echo "$typ"
-python N0_mine.py SO "$typ" True gradient 400
+python N0_mine.py SO "$typ" True gradient 400 30 3000 30 5000
 done
 

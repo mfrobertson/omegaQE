@@ -34,7 +34,7 @@ def main(sensitivity):
     for field in fields_single:
         N0 = get_N0(key1, key2, key3, field)
         folder = '_N0'+sep+f'SO_{sensitivity}'+sep+'single'
-        filename = f"N0_{field}_lensed.npy"
+        filename = f"N0_{field}_lensed_T30-3000_P30-5000.npy"
         print(f"Saving {filename} in {folder}")
         tools.save_array(folder, filename, N0)
 
@@ -43,7 +43,7 @@ def main(sensitivity):
         N0 = get_N0(key1, key2, key3, field)
         folder = '_N0' + sep + f'SO_{sensitivity}' + sep + 'gmv'
         field_str = "EB" if field == "Pol" else "TEB"
-        filename = f"N0_{field_str}_lensed.npy"
+        filename = f"N0_{field_str}_lensed_T30-3000_P30-5000.npy"
         print(f"Saving {filename} in {folder}")
         tools.save_array(folder, filename, N0)
 
