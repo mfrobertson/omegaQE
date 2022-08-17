@@ -282,10 +282,7 @@ class Bias:
             typ = "curl"
         else:
             typ = "phi"
-        if self.exp != "SO" and self.exp != "S4":
-            ell_factors = True
-        else:
-            ell_factors = False
+        ell_factors = False if (self.exp != "SO" and self.exp != "S4") else True
         N0 = self.fisher.noise.get_N0(typ, ellmax=np.max(Ls), ell_factors=ell_factors)
         sample_Ls = np.arange(np.size(N0))
         return InterpolatedUnivariateSpline(sample_Ls, N0)(Ls)*4/(Ls**4)
