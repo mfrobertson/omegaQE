@@ -88,6 +88,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
             sample_F_L_Ls = bias.cache.sample_F_L_Ls
             F_L = bias.cache.F_L
             C_inv = bias.cache.C_inv
+            L_cuts = bias.cache.L_cuts
         else:
             Cl_kk = np.empty(4001, dtype='d')
             Cov_kk = np.empty(4001, dtype='d')
@@ -96,6 +97,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
             sample_F_L_Ls = np.empty(300, dtype='d')
             F_L = np.empty(300, dtype='d')
             C_inv = np.empty((len(bi_typ), len(bi_typ), 4001), dtype='d')
+            L_cuts = None
 
         _output("F_L build finished. Broadcasting...", my_rank, _id)
 
@@ -113,6 +115,8 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
         _output("  F_L done.", my_rank, _id)
         world_comm.Bcast([C_inv, MPI.DOUBLE], root=0)
         _output("  C_inv done.", my_rank, _id)
+        L_cuts = world_comm.bcast(L_cuts, root=0)
+        _output("  L_cuts done.", my_rank, _id)
 
         _output("Broadcasting finished. Setting up broadcasted F_Ls...", my_rank, _id)
 
@@ -129,6 +133,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
             bias.cache.fields = fields
             bias.cache.gmv = gmv
             bias.cache.nu = nu
+            bias.cache.L_cuts = L_cuts
 
     _output("Setup complete. Calculating bias...", my_rank, _id)
 
