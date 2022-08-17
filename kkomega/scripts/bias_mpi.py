@@ -36,7 +36,7 @@ def _output(message, my_rank, _id):
         f.close()
 
 
-def _main(N_Ls, dir, bi_typ, gmv, fields, _id):
+def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -60,12 +60,12 @@ def _main(N_Ls, dir, bi_typ, gmv, fields, _id):
     _output("Initialising Bias object.", my_rank, _id)
 
     N0_path = "cache/_N0"
-    bias = Bias(N0_path, M_path="cache/_M", init_qe=False)
+    bias = Bias(N0_path, M_path="cache/_M", init_qe=False, exp=exp)
 
     _output("Setting up cached Cls for bias initialisation.", my_rank, _id)
 
-    parsed_fields_all = bias.qe.parse_fields()
-    Cls = np.load("cache/_Cls/Cls_cmb_4000.npy")
+    parsed_fields_all = bias.qe.parse_fields(includeBB=True)
+    Cls = np.load(f"cache/_Cls/{exp}/Cls_cmb_6000.npy")
     for iii, field in enumerate(parsed_fields_all):
         lenCl = Cls[iii, 0, :]
         gradCl = Cls[iii, 1, :]
@@ -164,12 +164,13 @@ def _main(N_Ls, dir, bi_typ, gmv, fields, _id):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 6:
-        raise ValueError("Must supply arguments: bi_typ fields gmv Nell dir id")
-    bi_typ = str(args[0])
-    fields = str(args[1])
-    gmv = parse_boolean(args[2])
-    N_Ls = int(args[3])
-    dir = args[4]
-    _id = args[5]
-    _main(N_Ls, dir, bi_typ, gmv, fields, _id)
+    if len(args) != 7:
+        raise ValueError("Must supply arguments: exp bi_typ fields gmv Nell dir id")
+    exp = str(args[0])
+    bi_typ = str(args[1])
+    fields = str(args[2])
+    gmv = parse_boolean(args[3])
+    N_Ls = int(args[4])
+    dir = args[5]
+    _id = args[6]
+    _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id)
