@@ -384,6 +384,8 @@ class QE:
             return None, None
         elif exp == "S4":
             return 1, 3
+        elif exp == "S4_base":
+            return None, None
         elif exp == "HD":
             return 0.5, 0.25
         else:
