@@ -36,20 +36,22 @@ def main(sensitivity):
     save(N, "TT")
     N_file = rf"../data/SO_noise/exp_noise/SO_LAT_Nell_P_{key2}_fsky0p4_ILC_CMB_E.txt"
     N = get_N(key1, N_file, 10)
+    N[2:10] = N[10]   # Modifying noise at Ls 2 -> 10, setting equal to N at L of 10
     save(N, "EE")
     N_file = rf"../data/SO_noise/exp_noise/SO_LAT_Nell_p_{key2}_fsky0p4_ILC_CMB_B.txt"
     N = get_N(key1, N_file, 10)
+    N[2:10] = N[10]   # Modifying noise at Ls 2 -> 10, setting equal to N at L of 10
     save(N, "BB")
 
 
 if __name__ == "__main__":
-    # TODO: Be aware, N_TT is manually modified between Ls of 2 -> 39
+    # TODO: Be aware, N_TT is manually modified between Ls of 2 -> 39 and N_P is manually modified between Ls of 2 -> 10
     # projection: all
     # sensitivity: base, goal
 
     args = sys.argv[1:]
     if len(args) != 1:
-        print("Must supply arguments: sensitivity")
+        raise ValueError("Must supply arguments: sensitivity")
     # projection = args[0]
     sensitivity = args[0]
     # iterative = tools.parse_boolean(args[2])
