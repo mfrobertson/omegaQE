@@ -17,7 +17,7 @@ class QE:
             self.gradCl_spline = None
             self.N_spline = None
 
-    def __init__(self, exp="SO", deltaT=None, beam=None, init=True, fields="TEB", N0_path=None, T_Lmin=10, T_Lmax=4000, P_Lmin=10, P_Lmax=4000):
+    def __init__(self, exp="SO", deltaT=None, beam=None, init=True, fields="TEB", N0_path=None, T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000):
         self._cosmo = Cosmology()
         self._noise = Noise()
         self.N0_path = N0_path
@@ -389,7 +389,7 @@ class QE:
         else:
             raise ValueError(f"Experiment {exp} unexpected.")
 
-    def initialise(self, exp="SO", deltaT=None, beam=None, fields="TEB", T_Lmin=10, T_Lmax=4000, P_Lmin=10, P_Lmax=4000):
+    def initialise(self, exp="SO", deltaT=None, beam=None, fields="TEB", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000):
         """
 
         Parameters
