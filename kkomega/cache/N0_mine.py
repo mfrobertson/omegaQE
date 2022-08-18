@@ -22,9 +22,7 @@ def save(N0, fields, gmv, resp_ps, exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
 
 def main(exp, fields, gmv, resp_ps, Nell, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
     qe = QE(exp=exp)
-    samp1 = np.arange(2, 40, 1)
-    samp2 = np.logspace(1, 3, Nell-38) * 4
-    Ls = np.concatenate((samp1, samp2))
+    Ls = qe.get_log_sample_Ls(2, 5000, Nell)
     if gmv:
         N0_phi = qe.gmv_normalisation(Ls, curl=False, fields=fields, resp_ps=resp_ps, T_Lmin=T_Lmin, T_Lmax=T_Lmax, P_Lmin=P_Lmin, P_Lmax=P_Lmax)
         N0_curl = qe.gmv_normalisation(Ls, curl=True, fields=fields, resp_ps=resp_ps, T_Lmin=T_Lmin, T_Lmax=T_Lmax, P_Lmin=P_Lmin, P_Lmax=P_Lmax)
@@ -33,7 +31,7 @@ def main(exp, fields, gmv, resp_ps, Nell, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
         N0_curl = qe.normalisation(fields, Ls, curl=True, resp_ps=resp_ps, T_Lmin=T_Lmin, T_Lmax=T_Lmax, P_Lmin=P_Lmin, P_Lmax=P_Lmax)
     N0_phi_spline = InterpolatedUnivariateSpline(Ls, N0_phi)
     N0_curl_spline = InterpolatedUnivariateSpline(Ls, N0_curl)
-    sample_Ls = np.arange(2, 4001)
+    sample_Ls = np.arange(2, 5001)
     N0 = (N0_phi_spline(sample_Ls), N0_curl_spline(sample_Ls))
     save(N0, fields, gmv, resp_ps, exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
 

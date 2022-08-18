@@ -90,13 +90,13 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
             C_inv = bias.cache.C_inv
             L_cuts = bias.cache.L_cuts
         else:
-            Cl_kk = np.empty(4001, dtype='d')
-            Cov_kk = np.empty(4001, dtype='d')
-            Cl_gk = np.empty(4001, dtype='d')
-            Cl_Ik = np.empty(4001, dtype='d')
+            Cl_kk = np.empty(5001, dtype='d')
+            Cov_kk = np.empty(5001, dtype='d')
+            Cl_gk = np.empty(5001, dtype='d')
+            Cl_Ik = np.empty(5001, dtype='d')
             sample_F_L_Ls = np.empty(300, dtype='d')
             F_L = np.empty(300, dtype='d')
-            C_inv = np.empty((len(bi_typ), len(bi_typ), 4001), dtype='d')
+            C_inv = np.empty((len(bi_typ), len(bi_typ), 5001), dtype='d')
             L_cuts = None
 
         _output("F_L build finished. Broadcasting...", my_rank, _id)

@@ -73,7 +73,7 @@ class Bias:
         N0_file = self._get_N0_file(gmv=True, fields="TEB", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000)
         self.fisher = Fisher(N0_file, 2, True)
         if M_path is not None:
-            self.fisher.setup_bispectra(M_path, 4000, 100)
+            self.fisher.setup_bispectra(M_path, 5000, 200)
 
     def _check_path(self, path):
         if not path_exists(path):
@@ -108,13 +108,13 @@ class Bias:
             C_inv = self.fisher.get_C_inv(typs, Lmax=np.max(sample_Ls), nu=nu)
         else:
             print("Full F_L_build...")
-            sample_Ls = self.qe.get_log_sample_Ls(Lmin=3, Lmax=6000, Nells=300)
+            sample_Ls = self.qe.get_log_sample_Ls(Lmin=3, Lmax=5000, Nells=300)
             self._reset_fisher_noise(gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
             _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
-        self.cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=6000, nu=nu)
-        self.cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=6000, nu=nu)
-        self.cache.Cl_gk = self.fisher.get_Cl("gk", ellmax=6000, nu=nu)
-        self.cache.Cl_Ik = self.fisher.get_Cl("Ik", ellmax=6000, nu=nu)
+        self.cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=5000, nu=nu)
+        self.cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=5000, nu=nu)
+        self.cache.Cl_gk = self.fisher.get_Cl("gk", ellmax=5000, nu=nu)
+        self.cache.Cl_Ik = self.fisher.get_Cl("Ik", ellmax=5000, nu=nu)
         self.cache.sample_F_L_Ls = sample_Ls
         self.cache.F_L = F_L
         self.cache.F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)

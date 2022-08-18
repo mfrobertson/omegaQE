@@ -56,7 +56,7 @@ class QE:
             raise ValueError("QE class uninitialised, first call 'initialise'.")
 
     def get_log_sample_Ls(self, Lmin, Lmax, Nells=500):
-        floaty = (Lmax + 1) / 1000
+        floaty = Lmax / 1000
         samp1 = np.arange(Lmin, floaty * 10, 1)
         samp2 = np.logspace(1, 3, Nells-np.size(samp1)) * floaty
         return np.concatenate((samp1, samp2))
