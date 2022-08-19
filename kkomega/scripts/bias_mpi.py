@@ -50,6 +50,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
         except:
             pass
 
+    _output("-------------------------------------", my_rank, _id)
     _output("Setting up parallisation of workload.", my_rank, _id)
 
     Ls = _get_Ls(N_Ls)
@@ -138,7 +139,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     _output("Setup complete. Calculating bias...", my_rank, _id)
 
     start_time = MPI.Wtime()
-    N_A1_curl_TT, N_C1_curl_TT = bias.bias(bi_typ, fields, Ls[my_start: my_end], gmv=gmv, curl=True, N_L1=100, N_L3=100,Ntheta12=100, Ntheta13=100)
+    N_A1_curl_TT, N_C1_curl_TT = bias.bias(bi_typ, fields, Ls[my_start: my_end], gmv=gmv, curl=True, N_L1=100, N_L3=200,Ntheta12=100, Ntheta13=100)
     end_time = MPI.Wtime()
 
     _output("Bias calculation finished.", my_rank, _id)
@@ -157,8 +158,8 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
         dir += f"/{fields}_{gmv_str}/{bi_typ}"
         if not os.path.isdir(dir):
             os.makedirs(dir)
-        np.save(dir, Ls)
-        np.save(dir, N_arr)
+        np.save(dir+"/Ls", Ls)
+        np.save(dir+"/N", N_arr)
         end_time_tot = MPI.Wtime()
         print("Total time: " + str(end_time_tot - start_time_tot))
         _output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
