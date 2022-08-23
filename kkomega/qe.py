@@ -207,7 +207,7 @@ class QE:
         typ1 = typ[0]+typ[0]
         typ2 = typ[1]+typ[1]
         C_typ1 = self._get_cmb_cov(typ1, ell, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
-        C_typ2 = self._get_cmb_cov(typ1, L3, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
+        C_typ2 = self._get_cmb_cov(typ2, L3, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
         fac = 0.5 if typ1 == typ2 else 1
         return fac*self._response(typ, L_vec, ell_vec, curl, resp_ps)/(C_typ1 * C_typ2)
 
