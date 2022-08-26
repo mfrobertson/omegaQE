@@ -312,6 +312,9 @@ class QE:
             Lmin, Lmax = T_Lmin, T_Lmax
         else:
             Lmin, Lmax = P_Lmin, P_Lmax
+        if "B" in typ and typ != "BB":
+            return C
+        # TODO: should these cuts be applied to TE as no noise is being assigned to it?
         C[Ls < Lmin] = 1e10
         C[Ls > Lmax] = 1e10
         return C
