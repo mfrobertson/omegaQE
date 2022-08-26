@@ -56,8 +56,18 @@ class Cosmology:
         z0 = 0.311
         return 1/(2*z0) * (z/z0)**2 * np.exp(-z/z0)
 
+    def _gal_z_CMB_distribution(self, z):
+        return self.cmb_lens_window(self.z_to_Chi(z), self.get_chi_star())/self.get_hubble(z)
+
+    def _gal_z_flat_distribution(self, z):
+        Chi_distro = np.ones(np.shape(z))
+        z_str = self.Chi_to_z(self.get_chi_star())
+        Chi_distro[z>z_str] = 0
+        Chi_distro[z<0] = 0
+        return Chi_distro/self.get_hubble(z)
+
     def _check_z_distr_typ(self, typ):
-        typs = ["LSST_gold"]
+        typs = ["LSST_gold", "CMB", "flat"]
         if typ not in typs:
             raise ValueError(f"Redshift distribution type {typ} not from accepted types: {typs}")
 
@@ -65,8 +75,12 @@ class Cosmology:
         self._check_z_distr_typ(typ)
         if typ == "LSST_gold":
             return self._gal_z_LSST_distribution
+        if typ == "CMB":
+            return self._gal_z_CMB_distribution
+        if typ == "flat":
+            return self._gal_z_flat_distribution
 
-    def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None):
+    def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         """
         1705.02332 equation 14 and B1 (originally from 0912.0201)
         Parameters
@@ -77,12 +91,11 @@ class Cosmology:
         -------
 
         """
-        z0 = 0.311
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
-        b = 1 + 0.84*z
+        b = 1 if bias_unity else 1 + 0.84*z
         # b=1
-        zs = np.linspace(0, 100, 2000)
+        zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)
         dz = zs[1] - zs[0]
         if zmin is not None and zmax is not None:
             norm = np.sum(dz * self._maths.rectangular_pulse_steps(zs, zmin, zmax) * z_distr_func(zs))
@@ -111,13 +124,12 @@ class Cosmology:
         window = window_z * self.get_hubble(z)
         return window
 
-    def _gal_window_z_no_norm(self, z, typ="LSST_gold", zmin=None, zmax=None):
-        z0 = 0.311
+    def _gal_window_z_no_norm(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
-        b = 1 + 0.84 * z
+        b = 1 if bias_unity else 1 + 0.84 * z
         # b=1
-        zs = np.linspace(0, 100, 2000)
+        zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)
         dz = zs[1] - zs[0]
         norm = np.sum(dz * z_distr_func(zs))
         window = (dn_dz * b) / norm
@@ -125,7 +137,7 @@ class Cosmology:
             return self._maths.rectangular_pulse_steps(z, zmin, zmax) * window
         return window
 
-    def gal_window_fraction(self, zmin, zmax):
+    def gal_window_fraction(self, zmin, zmax, typ="LSST_gold"):
         """
 
         Parameters
@@ -137,10 +149,10 @@ class Cosmology:
         -------
 
         """
-        zs = np.linspace(zmin, zmax, 1000)
-        window = self._gal_window_z_no_norm(zs, zmin=zmin, zmax=zmax)
-        total_zs = np.linspace(0, 10, 1000)
-        total_window = self._gal_window_z_no_norm(total_zs)
+        zs = np.linspace(zmin, zmax, 4000)
+        window = self._gal_window_z_no_norm(zs, typ=typ, zmin=zmin, zmax=zmax)
+        total_zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)
+        total_window = self._gal_window_z_no_norm(total_zs, typ=typ)
         dz = zs[1] - zs[0]
         I = np.sum(dz * window)
         dz = total_zs[1] - total_zs[0]
