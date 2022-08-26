@@ -93,7 +93,8 @@ class Bias:
 
     def _reset_fisher_noise(self, gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
         N0_file = self._get_N0_file(gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
-        self.fisher.reset_noise(N0_file, 2, True)
+        ell_factors = False if (self.exp != "SO" and self.exp != "S4") else True
+        self.fisher.reset_noise(N0_file, 2, ell_factors)  # TODO: what should ellfactors be???
 
     def _build_F_L(self, typs, nu, fields, gmv, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
         if self.F_L_path is not None:
