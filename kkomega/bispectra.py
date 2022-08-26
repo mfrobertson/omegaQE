@@ -11,10 +11,11 @@ class Bispectra:
     class M_spline:
 
 
-        def __init__(self, spline, nu, gal_bins):
+        def __init__(self, spline, nu, gal_bins, gal_distro="LSST_gold"):
             self.spline = spline
             self.nu = nu
             self.gal_bins = gal_bins
+            self.gal_distro = gal_distro
 
     def __init__(self):
         """
@@ -46,7 +47,7 @@ class Bispectra:
             return -1
         return 1
 
-    def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None)):
+    def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
         L12_dot = None
         if L3 is not None:
             L12_dot = self._triangle_dot_product(L1, L2, L3)
@@ -57,8 +58,8 @@ class Bispectra:
             M1 = self._M_splines[M_typ1].spline.ev(L1, L2)
             M2 = self._M_splines[M_typ2].spline.ev(L2, L1)
             return M1, M2, L12_dot, sign
-        M1 = self._mode.components(L1, L2, typ=M_typ1, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins)
-        M2 = self._mode.components(L2, L1, typ=M_typ2, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins)
+        M1 = self._mode.components(L1, L2, typ=M_typ1, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+        M2 = self._mode.components(L2, L1, typ=M_typ2, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         return M1, M2, L12_dot, sign
 
     def _kappa1_kappa1_kappa2(self, L1, L2, L3, M_spline, zmin, zmax):
@@ -73,15 +74,15 @@ class Bispectra:
     def _kappa2_kappa1_kappa1(self, L1, L2, L3, M_spline, zmin, zmax):
         return self._kappa1_kappa1_kappa2(L2, L3, L1, M_spline, zmin, zmax)
 
-    def _build_M_spline(self, typ, ells_sample, M_matrix, zmin, zmax, nu, gal_bins):
+    def _build_M_spline(self, typ, ells_sample, M_matrix, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold"):
         if ells_sample is not None and M_matrix is not None:
-            spline = self._mode.spline(ells_sample, M_matrix, typ=typ)
-            return self.M_spline(spline, nu, gal_bins)
+            spline = self._mode.spline(ells_sample, M_matrix, typ=typ, gal_distro=gal_distro)
+            return self.M_spline(spline, nu, gal_bins, gal_distro=gal_distro)
         if ells_sample is None:
-            spline = self._mode.spline(typ=typ, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins)
-            return self.M_spline(spline, nu, gal_bins)
-        spline = self._mode.spline(ells_sample, typ=typ, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins)
-        return self.M_spline(spline, nu, gal_bins)
+            spline = self._mode.spline(typ=typ, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+            return self.M_spline(spline, nu, gal_bins, gal_distro=gal_distro)
+        spline = self._mode.spline(ells_sample, typ=typ, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+        return self.M_spline(spline, nu, gal_bins, gal_distro=gal_distro)
 
     def build_M_spline(self, typ="kk", ells_sample=None, M_matrix=None, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None)):
         """
@@ -101,18 +102,18 @@ class Bispectra:
             raise ValueError(f"Modecoupling type {typ} does not exist")
         self._M_splines[typ] = self._build_M_spline(typ, ells_sample, M_matrix, zmin, zmax, nu, gal_bins)
 
-    def _build_M_splines(self, typ, nu, gal_bins):
+    def _build_M_splines(self, typ, nu, gal_bins, gal_distro="LSST_gold"):
         M_typ1 = typ[:2]
         M_typ2 = M_typ1[::-1]
         if self._M_splines[M_typ1] is not None:
-            if self._M_splines[M_typ1].nu != nu or self._M_splines[M_typ1].gal_bins != gal_bins:
-                self._M_splines[M_typ1] = self._build_M_spline(M_typ1, None, None, 0, None, nu, gal_bins)
+            if self._M_splines[M_typ1].nu != nu or self._M_splines[M_typ1].gal_bins != gal_bins or self._M_splines[M_typ1].gal_distro != gal_distro:
+                self._M_splines[M_typ1] = self._build_M_spline(M_typ1, None, None, 0, None, nu, gal_bins, gal_distro=gal_distro)
                 if M_typ2 != M_typ1:
-                    self._M_splines[M_typ2] = self._build_M_spline(M_typ2, None, None, 0, None, nu, gal_bins)
+                    self._M_splines[M_typ2] = self._build_M_spline(M_typ2, None, None, 0, None, nu, gal_bins, gal_distro=gal_distro)
             return
-        self._M_splines[M_typ1] = self._build_M_spline(M_typ1, None, None, 0, None, nu, gal_bins)
+        self._M_splines[M_typ1] = self._build_M_spline(M_typ1, None, None, 0, None, nu, gal_bins, gal_distro=gal_distro)
         if M_typ2 != M_typ1:
-            self._M_splines[M_typ2] = self._build_M_spline(M_typ2, None, None, 0, None, nu, gal_bins)
+            self._M_splines[M_typ2] = self._build_M_spline(M_typ2, None, None, 0, None, nu, gal_bins, gal_distro=gal_distro)
 
     def _check_type(self, typ):
         typs = self._mode.get_M_types() + "w"
@@ -137,17 +138,17 @@ class Bispectra:
             return False
         return True
 
-    def _bispectrum(self, typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins):
-        M1, M2, L12_dot, sign = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins)
+    def _bispectrum(self, typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold"):
+        M1, M2, L12_dot, sign = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         L13_cross = self._triangle_cross_product(L1, L3, L2)
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return sign * 2 * L12_dot * (L13_cross * M1 - L23_cross * M2)/(L1**2 * L2**2)
 
-    def _bispectrum_angle(self, typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins):
-        M1, M2, _, sign = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins)
+    def _bispectrum_angle(self, typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold"):
+        M1, M2, _, sign = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         return sign * np.sin(2 * theta) * (M1 - M2)
 
-    def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None)):
+    def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
         """
         Calculates cmb lensing bispectrum for the combination of observables specified.
 
@@ -169,12 +170,12 @@ class Bispectra:
         """
         self._check_type(typ)
         if M_spline:
-            self._build_M_splines(typ, nu, gal_bins)
+            self._build_M_splines(typ, nu, gal_bins, gal_distro=gal_distro)
         if L3 is not None:
             if typ == "kkk":
                 b1 = self._kappa2_kappa1_kappa1(L1, L2, L3, M_spline, zmin, zmax)
                 b2 = self._kappa1_kappa2_kappa1(L1, L2, L3, M_spline, zmin, zmax)
                 b3 = self._kappa1_kappa1_kappa2(L1, L2, L3, M_spline, zmin, zmax)
                 return b1 + b2 + b3
-            return self._bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins)
-        return self._bispectrum_angle(typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins)
+            return self._bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
+        return self._bispectrum_angle(typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
