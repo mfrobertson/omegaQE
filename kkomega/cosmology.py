@@ -187,9 +187,9 @@ class Cosmology:
         if self.cib_norms is None:
             self.cib_norms = np.load(Path(__file__).parent/"data/planck_cib/b_c.npy")
         if nu == 353e9:
-            # return 5.28e-65*1e-6
+            return 5.28654e-65*1e-6  # From Toshiya, matching 1705.02332 and 2110.09730
             # return 7.75714689e-65* 1e-6
-            return self.cib_norms[0]
+            # return self.cib_norms[0]
 
             #return 8.24989321e-71
             # b_c = 8.71253313e-65 * 1e-6   # 1e-6 to change units of window to MJy/sr

@@ -102,7 +102,8 @@ class Noise:
         # 1309.0382 Table 9
         ones = np.ones(ellmax + 1)
         if nu == 353e9:
-            N = 262 * 1e-12    # 1e-12 to change units to MJy^2/sr
+            # N = 262 * 1e-12    # 1e-12 to change units to MJy^2/sr
+            N = 225.6 * 1e-12   # From Toshiya, matching 1705.02332 and 2110.09730
         elif nu == 545e9:
             N = 1690 * 1e-12
         elif nu == 857e9:
@@ -119,6 +120,16 @@ class Noise:
         return value * 1e-12 * factor ** 2
 
     def get_dust_N(self, nu, ellmax=4000):
+        # From Toshiya, matching 1705.02332 and 2110.09730
+        ells = np.arange(ellmax + 1)
+        alpha = 2.17
+        if nu == 353e9:
+            A = 0.00029989393
+        else:
+            return self.get_dust_N_old(nu, ellmax)
+        return A * ells**(-alpha)
+
+    def get_dust_N_old(self, nu, ellmax=4000):
         # 1303.5075 eq 9,
         ells = np.arange(ellmax + 1)
         # alpha = 0.387             # parameters from 1609.08942 pg 8
