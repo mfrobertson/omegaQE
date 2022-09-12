@@ -304,16 +304,17 @@ class QE:
         if L < Lmin or L > Lmax:
             return 1e10
         return self.cmb[typ].lenCl_spline(L) + self.cmb[typ].N_spline(L)
+
     def _get_cmb_cov(self, typ, Ls, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
         if np.size(Ls) == 1:
             return self._get_cmb_cov_L(typ, Ls, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
         C = self.cmb[typ].lenCl_spline(Ls) + self.cmb[typ].N_spline(Ls)
+        if typ[0] != typ[1]:
+            return C
         if typ == "TT":
             Lmin, Lmax = T_Lmin, T_Lmax
         else:
             Lmin, Lmax = P_Lmin, P_Lmax
-        if "B" in typ and typ != "BB":
-            return C
         # TODO: should these cuts be applied to TE as no noise is being assigned to it?
         C[Ls < Lmin] = 1e10
         C[Ls > Lmax] = 1e10
