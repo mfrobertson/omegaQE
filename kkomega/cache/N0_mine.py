@@ -18,10 +18,11 @@ def save(N0, fields, gmv, resp_ps, exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
         gmv_str = "single"
     folder = current_folder + sep + "_N0" + sep + exp + sep + gmv_str
     filename_N0 = f"N0_{fields}_{resp_ps}_T{T_Lmin}-{T_Lmax}_P{P_Lmin}-{P_Lmax}.npy"
+    print(f"Saving {filename_N0} at {folder}")
     tools.save_array(folder, filename_N0, N0)
 
 def main(exp, fields, gmv, resp_ps, Nell, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
-    qe = QE(exp=exp)
+    qe = QE(exp=exp, N0_path="_N0/")
     Ls = qe.get_log_sample_Ls(2, 5000, Nell)
     if gmv:
         N0_phi = qe.gmv_normalisation(Ls, curl=False, fields=fields, resp_ps=resp_ps, T_Lmin=T_Lmin, T_Lmax=T_Lmax, P_Lmin=P_Lmin, P_Lmax=P_Lmax)
