@@ -560,11 +560,12 @@ class Fisher:
         """
         return self._get_Cl(typ, ellmax, nu, gal_bins, use_bins, gal_distro=gal_distro)
 
-    def _get_postborn_omega_ps(self, Ls, M_path, Nell_prim, Ntheta, M_ellmax=20000, M_Nell=1000):
+    def _get_postborn_omega_ps(self, Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb):
         mode = Modecoupling()
         sep = getFileSep()
-        ells_sample = np.load(M_path+sep+"kappa-kappa"+sep+f"{M_ellmax}_{M_Nell}"+sep+"ells.npy")
-        M = np.load(M_path+sep+"kappa-kappa"+sep+f"{M_ellmax}_{M_Nell}"+sep+"M.npy")
+        mode_typ = "ww" if cmb else "rr"
+        ells_sample = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "ells.npy")
+        M = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "M.npy")
         M_spline = mode.spline(ells_sample, M)
         dTheta = np.pi / Ntheta
         thetas = np.linspace(dTheta, np.pi, Ntheta, dtype=float)
@@ -583,7 +584,7 @@ class Fisher:
             I[iii] = InterpolatedUnivariateSpline(Lprims, I_tmp).integral(3,8000)
         return 4 * I / ((2 * np.pi) ** 2)
 
-    def get_postborn_omega_ps(self, ells, M_path=None, Nell_prim=800, Ntheta=100):
+    def get_postborn_omega_ps(self, ells, M_path=None, Nell_prim=2000, Ntheta=1000, cmb=True):
         """
 
         Parameters
@@ -596,9 +597,9 @@ class Fisher:
         -------
 
         """
-        return self._get_postborn_omega_ps(ells, M_path, Nell_prim, Ntheta)
+        return self._get_postborn_omega_ps(ells, M_path, Nell_prim, Ntheta, 8000, 100, cmb)
 
-    def get_rotation_ps_Fisher(self, Lmax, M_path, f_sky=1, auto=True, camb=False):
+    def get_rotation_ps_Fisher(self, Lmax, M_path, f_sky=1, auto=True, camb=False, cmb=True):
         """
         TODO: Check equation !!!!!!!!!!!
         Parameters
@@ -615,10 +616,13 @@ class Fisher:
             ells, Cl = self.power.get_camb_postborn_omega_ps(Lmax)
         else:
             ells = np.arange(2, Lmax + 3, 50)
-            Cl = self.get_postborn_omega_ps(ells, M_path)
+            Cl = self.get_postborn_omega_ps(ells, M_path, cmb=cmb)
         Cl_spline = InterpolatedUnivariateSpline(ells, Cl)
         ells = np.arange(2, Lmax + 1)
-        N0 = self.noise.get_N0("curl", Lmax, True, self.N0_ell_factors)
+        if cmb:
+            N0 = self.noise.get_N0("curl", Lmax, True, self.N0_ell_factors)
+        else:
+            N0 = self.noise.get_gal_shot_N(40, Lmax)*0.2**2
         var = self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto)
         return f_sky * np.sum(Cl_spline(ells) ** 2 / var)
 

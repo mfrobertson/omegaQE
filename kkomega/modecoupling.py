@@ -53,6 +53,8 @@ class Modecoupling:
         cmb_lens_window = self._cosmo.cmb_lens_window(Chis, self._cosmo.get_chi_star())
         if typ[0] == "k":
             win1 = win2 = cmb_lens_window
+        elif typ[0] == "s":
+            win1 = win2 = self._cosmo.gal_lens_window(Chis, Chi_max)     # Should set reasonable upper limit for cosmic shear
         elif typ[0] == "g":
             gal_window = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
             win1 = cmb_lens_window
@@ -71,6 +73,8 @@ class Modecoupling:
     def _get_ps(self, ells, Chis, Chi_source2, typ, nu, gal_bins, recalc_PK, gal_distro="LSST_gold"):
         if typ[1] == "k":
             return self._powerspectra.get_kappa_ps_2source(ells, Chis, Chi_source2, recalc_PK=recalc_PK)
+        if typ[1] == "s":
+            return self._powerspectra.get_gal_lens_ps_2source(ells, Chis, Chi_source2, recalc_PK=recalc_PK)
         if typ[1] == "g":
             return (-1) * self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK, gal_distro=gal_distro)
         if typ[1] in self.binned_gal_types:
@@ -80,7 +84,7 @@ class Modecoupling:
             return (-1) * self._powerspectra.get_cib_kappa_ps(ells, nu=nu, Chi_source1=Chis, recalc_PK=recalc_PK)
 
     def _get_matter_ps(self, typ, zs, ks):
-        if typ[0] == "k":
+        if typ[0] == "k" or typ[0] == "s":
             return self._cosmo.get_matter_ps(self.weyl_PK, zs, ks, curly=False, weyl_scaled=False)
         else:
             return self._cosmo.get_matter_ps(self.matter_weyl_PK, zs, ks, curly=False, weyl_scaled=False, typ="matter-weyl")
@@ -105,12 +109,10 @@ class Modecoupling:
         step = self._maths.rectangular_pulse_steps(ks, kmin, kmax)
         matter_ps = self._get_matter_ps(typ, zs, ks)
         I = step * matter_ps / Chis ** 2 * dChi * win1 * win2 * Cl
-        if typ[0] == "k":
+        if typ[0] == "k" or typ[0] == "s":
             ell_power = 4
         else:
             ell_power = 2
-        # if extended:
-        #     return I.sum(axis=1) * (ells1 + 0.5) ** ell_power
         return I.sum(axis=1) * ells1 ** ell_power
 
     def _matrix(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_weyl, gal_distro="LSST_gold"):
@@ -138,7 +140,7 @@ class Modecoupling:
         -------
 
         """
-        observables = np.char.array(list("kgI")+self.binned_gal_types)
+        observables = np.char.array(list("kgIwrs")+self.binned_gal_types)
         return (observables[:, None] + observables[None, :]).flatten()
 
 
@@ -173,6 +175,12 @@ class Modecoupling:
             1D array of the matrix components at [ells, ells2].
         """
         self._check_type(typ)
+        if typ == "ww":
+            typ = "kk"
+            star = False
+        elif typ == "rr":
+            typ = "ss"
+            star = False
         return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro=gal_distro)
 
     def spline(self, ells_sample=None, M_matrix=None, typ = "kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=True, recalc_PK=False, gal_distro="LSST_gold"):

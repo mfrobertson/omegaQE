@@ -51,6 +51,78 @@ class Cosmology:
             return self._maths.heaviside_steps(win) * win
         return win
 
+    def cmb_lens_window_matter(self, Chi1, Chi2, heaviside=True):
+        """
+        Computes the Window function for CMB lensing when using matter power spectrum instead of Weyl spectrum.
+
+        Parameters
+        ----------
+        Chi1 : int or float or ndarray
+            Comoving radial distance [Mpc]. Usually the one being integrated over.
+        Chi2 : int or float
+            Comiving radial distance [Mpc]. Usually the limit, and Chi2 > Chi1.
+        heaviside : bool
+            Perform a Heaviside step where Chi1 > Chi2.
+
+        Returns
+        -------
+        int or float or ndarray
+            Returns the computed Window function. The dimensions will be equivalent to Chi1.
+        """
+        zs = self.Chi_to_z(Chi1)
+        poisson_fac = self.poisson_factor(zs)
+        win = self.cmb_lens_window(Chi1, Chi2, heaviside) * poisson_fac
+        return win
+
+    def gal_lens_window(self, Chi1, Chi2, heaviside=True):
+        """
+        Reference 1411.0115
+
+        Parameters
+        ----------
+        Chi1
+        Chi2
+        heaviside
+
+        Returns
+        -------
+
+        """
+        chis = np.linspace(Chi1, Chi2, 1000)
+        dChi = chis[1] - chis[0]
+        zs = self.Chi_to_z(chis)
+
+        # cancelling bias from gal_window as want n(chi) not b*n(chi)
+        bias = 1 + (0.84 * zs)
+        gal_distro = self.gal_window_z(zs) / bias * self.get_hubble(zs)
+
+        I = gal_distro * self.cmb_lens_window(Chi1, chis, heaviside)
+        q = np.sum(dChi * I, axis=0)
+
+        return q
+
+    def gal_lens_window_matter(self, Chi1, Chi2, heaviside=True):
+        """
+        Reference 1411.0115
+
+        Parameters
+        ----------
+        Chi1
+        Chi2
+        heaviside
+
+        Returns
+        -------
+
+        """
+        zs = self.Chi_to_z(Chi1)
+        poisson_fac = self.poisson_factor(zs)
+        win = self.gal_lens_window(Chi1, Chi2, heaviside) * poisson_fac
+        return win
+
+    def poisson_factor(self, z):
+        return (1 + z) * self.z_to_Chi(z) ** 2 * 3 / 2 * self._pars.omegam * self.get_hubble(0) ** 2
+
     def _gal_z_LSST_distribution(self, z):
         # 1705.02332 equation 14 and B1
         z0 = 0.311
@@ -264,10 +336,18 @@ class Cosmology:
             H[iii] = self.get_hubble(z[iii])
         return H
 
+    def _hubble_3dim(self, z):
+        H = np.zeros(np.shape(z))
+        for iii in range(np.shape(H)[0]):
+            H[iii] = self._hubble_2dim(z[iii])
+        return H
+
     def get_hubble(self, z):
         if np.shape(z) != ():
             if z.ndim == 2:
                 return self._hubble_2dim(z)
+            elif z.ndim == 3:
+                return self._hubble_3dim(z)
         return self._results.h_of_z(z)
 
     def _eta_to_z_2dim(self, eta):
@@ -300,6 +380,12 @@ class Cosmology:
             z[iii] = self.Chi_to_z(Chi[iii])
         return z
 
+    def _Chi_to_z_3dim(self, Chi):
+        z = np.zeros(np.shape(Chi))
+        for iii in range(np.shape(z)[0]):
+            z[iii] = self._Chi_to_z_2dim(Chi[iii])
+        return z
+
     def Chi_to_z(self, Chi):
         """
 
@@ -316,12 +402,20 @@ class Cosmology:
         if np.shape(Chi) != ():
             if Chi.ndim == 2:
                 return self._Chi_to_z_2dim(Chi)
+            elif Chi.ndim == 3:
+                return self._Chi_to_z_3dim(Chi)
         return self._results.redshift_at_comoving_radial_distance(Chi)
 
     def _z_to_Chi_2dim(self, z):
         Chi = np.zeros(np.shape(z))
         for iii in range(np.shape(Chi)[0]):
             Chi[iii] = self.z_to_Chi(z[iii])
+        return Chi
+
+    def _z_to_Chi_3dim(self, z):
+        Chi = np.zeros(np.shape(z))
+        for iii in range(np.shape(Chi)[0]):
+            Chi[iii] = self._z_to_Chi_2dim(z[iii])
         return Chi
 
     def z_to_Chi(self, z):
@@ -340,6 +434,8 @@ class Cosmology:
         if np.shape(z) != ():
             if z.ndim == 2:
                 return self._z_to_Chi_2dim(z)
+            elif z.ndim == 3:
+                return self._z_to_Chi_3dim(z)
         return self._results.comoving_radial_distance(z)
 
     def _get_ps_variables(self, typ):
