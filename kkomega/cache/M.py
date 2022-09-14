@@ -24,7 +24,9 @@ def save(ells, M, star, typ):
         folder += "_s"
     filename_M = "M.npy"
     filename_ells = "ells.npy"
+    print(f"Saving {filename_M} at {folder}")
     tools.save_array(folder, filename_M, M)
+    print(f"Saving {filename_ells} at {folder}")
     tools.save_array(folder, filename_ells, ells)
 
 
