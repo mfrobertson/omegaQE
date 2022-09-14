@@ -622,7 +622,7 @@ class Fisher:
         if cmb:
             N0 = self.noise.get_N0("curl", Lmax, True, self.N0_ell_factors)
         else:
-            N0 = self.noise.get_gal_shot_N(40, Lmax)*0.2**2
+            N0 = self.noise.get_shape_N()
         var = self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto)
         return f_sky * np.sum(Cl_spline(ells) ** 2 / var)
 

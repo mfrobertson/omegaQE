@@ -98,6 +98,9 @@ class Noise:
         ones = np.ones(ellmax + 1)
         return ones/(arcmin2_to_strad * n * fraction)
 
+    def get_shape_N(self, n=40, sig=0.21, ellmax=4000, zmin=None, zmax=None):
+        return self.get_gal_shot_N(n, ellmax, zmin, zmax) * sig**2
+
     def get_cib_shot_N(self, nu, ellmax=4000):
         # 1309.0382 Table 9
         ones = np.ones(ellmax + 1)
