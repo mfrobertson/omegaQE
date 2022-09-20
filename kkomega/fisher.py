@@ -580,7 +580,7 @@ class Fisher:
                 Lprim_vec = vector.obj(rho=Lprim, phi=thetas)
                 Lprimprim_vec = L_vec - Lprim_vec
                 Lprimprims = Lprimprim_vec.rho
-                I_tmp[jjj] = np.sum(2 * Lprim * dTheta * (L*Lprim*np.sin(thetas))** 2 * (Lprim_vec@Lprimprim_vec)** 2 / (Lprim ** 4 * Lprimprims ** 4) * M_spline.ev(Lprim, Lprimprims))
+                I_tmp[jjj] = np.sum(2 * Lprim * dTheta * (L*Lprim*np.sin(thetas))** 2 * (Lprim_vec@Lprimprim_vec)** 2 / ((Lprim + 0.5) ** 4 * (Lprimprims + 0.5) ** 4) * M_spline.ev(Lprim, Lprimprims))
             I[iii] = InterpolatedUnivariateSpline(Lprims, I_tmp).integral(3,8000)
         return 4 * I / ((2 * np.pi) ** 2)
 

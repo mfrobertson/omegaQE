@@ -113,6 +113,7 @@ class Modecoupling:
             ell_power = 4
         else:
             ell_power = 2
+        if extended: ells1 = ells1 + 0.5
         return I.sum(axis=1) * ells1 ** ell_power
 
     def _matrix(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_weyl, gal_distro="LSST_gold"):
