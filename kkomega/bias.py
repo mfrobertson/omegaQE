@@ -106,16 +106,16 @@ class Bias:
             F_L = np.load(full_F_L_path+sep+"F_L.npy")
             print("Full C_inv build...")
             self._reset_fisher_noise(gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
-            C_inv = self.fisher.get_C_inv(typs, Lmax=np.max(sample_Ls), nu=nu)
+            C_inv = self.fisher.covariance.get_C_inv(typs, Lmax=np.max(sample_Ls), nu=nu)
         else:
             print("Full F_L_build...")
             sample_Ls = self.qe.get_log_sample_Ls(Lmin=3, Lmax=5000, Nells=300)
             self._reset_fisher_noise(gmv, fields, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
             _, F_L, C_inv = self.fisher.get_F_L(typs, Ls=sample_Ls, Ntheta=100, nu=nu, return_C_inv=True)
-        self.cache.Cl_kk = self.fisher.get_Cl("kk", ellmax=5000, nu=nu)
-        self.cache.Cov_kk = self.fisher.get_Cov("kk", ellmax=5000, nu=nu)
-        self.cache.Cl_gk = self.fisher.get_Cl("gk", ellmax=5000, nu=nu)
-        self.cache.Cl_Ik = self.fisher.get_Cl("Ik", ellmax=5000, nu=nu)
+        self.cache.Cl_kk = self.fisher.covariance.get_Cl("kk", ellmax=5000, nu=nu)
+        self.cache.Cov_kk = self.fisher.covariance.get_Cov("kk", ellmax=5000, nu=nu)
+        self.cache.Cl_gk = self.fisher.covariance.get_Cl("gk", ellmax=5000, nu=nu)
+        self.cache.Cl_Ik = self.fisher.covariance.get_Cl("Ik", ellmax=5000, nu=nu)
         self.cache.sample_F_L_Ls = sample_Ls
         self.cache.F_L = F_L
         self.cache.F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
@@ -284,7 +284,7 @@ class Bias:
         else:
             typ = "phi"
         ell_factors = False if (self.exp != "SO" and self.exp != "S4") else True
-        N0 = self.fisher.noise.get_N0(typ, ellmax=int(np.max(Ls)), ell_factors=ell_factors)
+        N0 = self.fisher.covariance.noise.get_N0(typ, ellmax=int(np.max(Ls)), ell_factors=ell_factors)
         sample_Ls = np.arange(np.size(N0))
         return InterpolatedUnivariateSpline(sample_Ls, N0)(Ls)*4/(Ls**4)
 

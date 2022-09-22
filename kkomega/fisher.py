@@ -3,10 +3,9 @@ from bispectra import Bispectra
 from powerspectra import Powerspectra
 from noise import Noise
 from maths import Maths
-from modecoupling import Modecoupling
+from covariance import Covariance
+from postborn import Postborn
 from scipy.interpolate import InterpolatedUnivariateSpline
-from sympy.matrices import Matrix
-from sympy import lambdify
 from cache.tools import getFileSep, path_exists
 import copy
 import warnings
@@ -30,7 +29,7 @@ class Fisher:
     power : Powerspectra
     """
 
-    def __init__(self, N0_file, N0_offset=0, N0_ell_factors=True):
+    def __init__(self, N0_file=None, N0_offset=0, N0_ell_factors=True):
         """
         Constructor
 
@@ -43,18 +42,15 @@ class Fisher:
         N0_ell_factors : bool
             Whether to multiply the noise by (1/4)(ell + 1/2)^4
         """
-        self._setup_noise(N0_file, N0_offset, N0_ell_factors)
+        if N0_file is not None:
+            self.setup_covariance(N0_file, N0_offset, N0_ell_factors)
         self.bi = Bispectra()
         self.power = Powerspectra()
         self._maths = Maths()
         self.opt_I_cache = None
-        self.binned_gal_types = list("abcdef")
-        self.test_types = list("xyz")
 
-    def _setup_noise(self, N0_file, N0_offset, N0_ell_factors):
-        self.noise = Noise()
-        self.noise.setup_cmb_noise(N0_file, N0_offset)
-        self.N0_ell_factors = N0_ell_factors
+    def setup_covariance(self, N0_file, N0_offset=0, N0_ell_factors=True):
+        self.covariance = Covariance(N0_file, N0_offset, N0_ell_factors)
 
     def _files_match(self, ell_file, M_file):
         if ell_file[:-8] == M_file[:-5]:
@@ -99,148 +95,35 @@ class Fisher:
         ells_sample = np.arange(np.size(arr))
         return InterpolatedUnivariateSpline(ells_sample[1:], arr[1:])
 
-    def _get_Cl_kappa(self,ellmax):
-        ells = np.arange(ellmax + 1)
-        return self.power.get_kappa_ps(ells)
-
-    def _get_Cl_gal(self,ellmax, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, use_bins=True, gal_distro="LSST_gold"):
-        ells = np.arange(ellmax + 1)
-        if use_bins:
-            return self.power.get_gal_ps(ells, gal_win_zmin_a=gal_win_zmin_a, gal_win_zmax_a=gal_win_zmax_a, gal_win_zmin_b=gal_win_zmin_b, gal_win_zmax_b=gal_win_zmax_b, gal_distro=gal_distro)
-        return self.power.get_gal_ps(ells, gal_distro=gal_distro)
-    def _get_Cl_cib(self,ellmax, nu=353e9):
-        ells = np.arange(ellmax + 1)
-        return self.power.get_cib_ps(ells, nu=nu)
-
-    def _get_Cl_gal_kappa(self,ellmax, gal_win_zmin=None, gal_win_zmax=None, use_bins=True, gal_distro="LSST_gold"):
-        ells = np.arange(ellmax + 1)
-        if use_bins:
-            return self.power.get_gal_kappa_ps(ells, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, gal_distro=gal_distro)
-        return self.power.get_gal_kappa_ps(ells, gal_distro=gal_distro)
-
-    def _get_Cl_cib_kappa(self,ellmax, nu=353e9):
-        ells = np.arange(ellmax + 1)
-        return self.power.get_cib_kappa_ps(ells, nu=nu)
-
-    def _get_Cl_cib_gal(self,ellmax, nu=353e9, gal_win_zmin=None, gal_win_zmax=None, use_bins=True, gal_distro="LSST_gold"):
-        ells = np.arange(ellmax + 1)
-        if use_bins:
-            return self.power.get_cib_gal_ps(ells, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, gal_distro=gal_distro)
-        return self.power.get_cib_gal_ps(ells, nu=nu, gal_distro=gal_distro)
-
-    def _get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
-        if typ == "kk":
-            return self._get_Cl_kappa(ellmax)
-        elif typ == "gk" or typ == "kg":
-            return self._get_Cl_gal_kappa(ellmax, gal_bins[0], gal_bins[1], use_bins, gal_distro=gal_distro)
-        elif typ == "gg":
-            return self._get_Cl_gal(ellmax, gal_bins[0], gal_bins[1], gal_bins[2], gal_bins[3], use_bins, gal_distro=gal_distro)
-        elif typ == "Ik" or typ == "kI":
-            return self._get_Cl_cib_kappa(ellmax, nu)
-        elif typ == "II":
-            return self._get_Cl_cib(ellmax, nu)
-        elif typ == "Ig" or typ == "gI":
-            return self._get_Cl_cib_gal(ellmax, nu, gal_bins[0], gal_bins[1], use_bins, gal_distro=gal_distro)
-        elif typ == "ww":
-            N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
-            return N0_omega
-
-        gal_win_zmin_1 = None
-        gal_win_zmax_1 = None
-        gal_win_zmin_2 = None
-        gal_win_zmax_2 = None
-        type_0_binned = False
-        if typ[0] in self.binned_gal_types:
-            index_1 = 2 * (ord(typ[0]) - ord("a"))
-            gal_win_zmin_1 = gal_bins[index_1]
-            gal_win_zmax_1 = gal_bins[index_1 + 1]
-            typ = "g" + typ[1]
-            type_0_binned = True
-        if typ[1] in self.binned_gal_types:
-            index_2 = 2*(ord(typ[1]) - ord("a"))
-            typ = typ[0] + "g"
-            if type_0_binned:
-                gal_win_zmin_2 = gal_bins[index_2]
-                gal_win_zmax_2 = gal_bins[index_2 + 1]
-            else:
-                gal_win_zmin_1 = gal_bins[index_2]
-                gal_win_zmax_1 = gal_bins[index_2 + 1]
-        return self._get_Cl(typ, ellmax, nu, (gal_win_zmin_1, gal_win_zmax_1, gal_win_zmin_2, gal_win_zmax_2), use_bins=True, gal_distro=gal_distro)
-
-    def _get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
-        if typ[0] != typ[1]:
-            return self._get_Cl(typ, ellmax, nu, gal_bins, use_bins, gal_distro=gal_distro)
-        if typ[0] == "k":
-            N = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-        elif typ[0] in self.test_types:
-            N = 3*self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
-        elif typ[0] == "I":
-            N_cib = self.noise.get_cib_shot_N(ellmax=ellmax, nu=nu)
-            N_dust = self.noise.get_dust_N(ellmax=ellmax, nu=nu)
-            N = N_cib + N_dust
-            N[:111] = 1e10
-            N[2001:] = 1e10
-        elif typ[0] == "g":
-            N = self.noise.get_gal_shot_N(ellmax=ellmax)
-        elif typ[0] in self.binned_gal_types:
-            index = 2 * (ord(typ[0]) - ord("a"))
-            gal_win_zmin = gal_bins[index]
-            gal_win_zmax = gal_bins[index + 1]
-            N = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin, zmax=gal_win_zmax)
-            # N = 1e-100
-            return self._get_Cl_gal(ellmax, gal_win_zmin, gal_win_zmax, gal_win_zmin, gal_win_zmax, gal_distro=gal_distro) + N
-        else:
-            raise ValueError(f"Could not get Cov for type {typ}")
-        return self._get_Cl(typ, ellmax, nu, gal_bins, gal_distro=gal_distro) + N
-
     def _get_Covs(self, typ, Lmax, all_splines=False, nu=353e9, gal_bins=(None,None,None,None), include_N0_kappa="both", gal_distro="LSST_gold"):
-        N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, ell_factors=self.N0_ell_factors))
+        N0_omega_spline = self._interpolate(self.covariance.noise.get_N0("curl", Lmax, ell_factors=self.covariance.N0_ell_factors))
         C3_spline = N0_omega_spline
         if typ == "kkw":
             if include_N0_kappa == "both":
-                C1 = self._get_Cov("kk", Lmax)
+                C1 = self.covariance.get_Cov("kk", Lmax)
                 C2 = copy.deepcopy(C1)
             elif include_N0_kappa == "one":
-                N0_kappa = self.noise.get_N0("phi", Lmax, tidy=True, ell_factors=self.N0_ell_factors)
-                Cl_kappa = self._get_Cl_kappa(Lmax)
+                N0_kappa = self.covariance.noise.get_N0("phi", Lmax, tidy=True, ell_factors=self.covariance.N0_ell_factors)
+                Cl_kappa = self.covariance.get_Cl("kk", Lmax)
                 C1 = Cl_kappa + (0.5*N0_kappa)
                 C2 = Cl_kappa
             else:
-                Cl_kappa = self._get_Cl_kappa(Lmax)
+                Cl_kappa = self.covariance.get_Cl("kk", Lmax)
                 C1 = Cl_kappa
                 C2 = Cl_kappa
         else:
             typ1 = typ[0]
             typ2 = typ[1]
-            C1 = self._get_Cov(typ1 + typ1, Lmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-            C2 = self._get_Cov(typ2 + typ2, Lmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+            C1 = self.covariance.get_Cov(typ1 + typ1, Lmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+            C2 = self.covariance.get_Cov(typ2 + typ2, Lmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         if all_splines:
             C1_spline = self._interpolate(C1)
             C2_spline = self._interpolate(C2)
             return C1_spline, C2_spline, C3_spline
         return C1, C2, C3_spline
 
-    def _get_C_inv(self, typs, Lmax, nu, gal_bins, gal_distro="LSST_gold"):
-        Ntyps = np.size(typs)
-        typs_no_fI = copy.deepcopy(typs)
-        typs_no_fI[typs_no_fI == "f"] = "z"        # Replacing 'f' with 'z' for sympy operations as 'ff' is sympy function
-        typs_no_fI[typs_no_fI == "I"] = "y"
-        C = typs[:, None] + typs[None, :]
-        C_no_fI = typs_no_fI[:, None] + typs_no_fI[None, :]
-        args = C.flatten()
-        args_no_fI = C_no_fI.flatten()
-        C_sym = Matrix(C_no_fI)
-        print(C_sym)
-        if Ntyps > 3:
-            C_inv = C_sym.inv('LU')
-        else:
-            C_inv = C_sym.inv()
-        C_inv_func = lambdify(args_no_fI, C_inv)
-        Covs = [self._get_Cov(arg, Lmax, nu, gal_bins, gal_distro=gal_distro) for arg in args]
-        return C_inv_func(*Covs)
-
     def _get_optimal_Ns_sympy(self, Lmax, typ, typs, C_inv, all_spline=False):
-        N0_omega_spline = self._interpolate(self.noise.get_N0("curl", Lmax, tidy=True, ell_factors=self.N0_ell_factors))
+        N0_omega_spline = self._interpolate(self.covariance.noise.get_N0("curl", Lmax, tidy=True, ell_factors=self.covariance.N0_ell_factors))
         cov3_spline = N0_omega_spline
 
         combo1_idx1 = np.where(typs == typ[0])[0][0]
@@ -274,7 +157,7 @@ class Fisher:
         else:
             C1, C2, C3_spline = self._get_Covs(typ, Lmax, all_splines=False, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
             if typ[0] != typ[1]:
-                Cl = self._get_Cl(typ[:2], Lmax, nu, gal_bins, gal_distro=gal_distro)
+                Cl = self.covariance.get_Cl(typ[:2], Lmax, nu, gal_bins, gal_distro=gal_distro)
                 denom = ((C1[None, Ls, None] * C2[None, None, Ls]) + (Cl[None, Ls, None] * Cl[None, None, Ls])) * C3_spline(L3)
             else:
                 denom = 2 * C1[None, Ls, None] * C2[None, None, Ls] * C3_spline(L3)
@@ -302,7 +185,7 @@ class Fisher:
 
     def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins, gal_distro="LSST_gold"):
         Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta,typ, nu, gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
-        Cl_xy_spline = self._interpolate(self._get_Cl(typ[:2], Lmax, nu, gal_bins, gal_distro=gal_distro))
+        Cl_xy_spline = self._interpolate(self.covariance.get_Cl(typ[:2], Lmax, nu, gal_bins, gal_distro=gal_distro))
         I = np.zeros(np.size(Ls))
         Ls2 = np.arange(Lmin, Lmax+1, dL2)
         for iii, L3 in enumerate(Ls):
@@ -367,7 +250,7 @@ class Fisher:
     def _get_optimal_bispectrum_Fisher(self, typs, Lmax, dL, Ls, dL2, Ntheta, f_sky, verbose, nu, gal_bins, save_array, only_bins, gal_distro="LSST_gold"):
         typs = np.char.array(typs)
         Lmin = 30     # 1808.07445 and https://cmb-s4.uchicago.edu/wiki/index.php/Survey_Performance_Expectations
-        C_inv = self._get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
+        C_inv = self.covariance.get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
         all_combos = typs[:, None] + typs[None, :]
         combos = all_combos.flatten()
         Ncombos = np.size(combos)
@@ -425,7 +308,7 @@ class Fisher:
     def _get_F_L(self, typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro="LSST_gold"):
         typs = np.char.array(typs)
         Lmax = np.int(np.max(Ls))
-        C_inv = self._get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
+        C_inv = self.covariance.get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
         all_combos = typs[:, None] + typs[None, :]
         combos = all_combos.flatten()
         Ncombos = np.size(combos)
@@ -510,96 +393,7 @@ class Fisher:
         typs = list(typs)
         return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ls, dL2, Ntheta, f_sky, verbose, nu, gal_bins, save_array, only_bins, gal_distro=gal_distro)
 
-    def get_C_inv(self, typs, Lmax, nu, gal_bins=(None,None,None,None)):
-        """
-
-        Parameters
-        ----------
-        typs
-        Lmax
-        nu
-        gal_bins
-
-        Returns
-        -------
-
-        """
-        return self._get_C_inv(np.char.array(list(typs)), Lmax, nu, gal_bins)
-
-    def get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
-        """
-
-        Parameters
-        ----------
-        typ
-        ellmax
-        nu
-        gal_bins
-        use_bins
-
-        Returns
-        -------
-
-        """
-        return self._get_Cov(typ, ellmax, nu, gal_bins, use_bins, gal_distro=gal_distro)
-
-    def get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
-        """
-
-        Parameters
-        ----------
-        typ
-        ellmax
-        nu
-        gal_bins
-        use_bins
-
-        Returns
-        -------
-
-        """
-        return self._get_Cl(typ, ellmax, nu, gal_bins, use_bins, gal_distro=gal_distro)
-
-    def _get_postborn_omega_ps(self, Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb):
-        mode = Modecoupling()
-        sep = getFileSep()
-        mode_typ = "ww" if cmb else "rr"
-        ells_sample = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "ells.npy")
-        M = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "M.npy")
-        M_spline = mode.spline(ells_sample, M)
-        dTheta = np.pi / Ntheta
-        thetas = np.linspace(dTheta, np.pi, Ntheta, dtype=float)
-        samp1_1 = np.arange(3, 80, 1)
-        samp2_1 = np.logspace(1, 3, Nell_prim-77) * 8
-        Lprims = np.concatenate((samp1_1, samp2_1))
-        I = np.zeros(np.size(Ls))
-        for iii, L in enumerate(Ls):
-            L_vec = vector.obj(rho=L, phi=0)
-            I_tmp = np.zeros(np.size(Lprims))
-            for jjj, Lprim in enumerate(Lprims):
-                Lprim_vec = vector.obj(rho=Lprim, phi=thetas)
-                Lprimprim_vec = L_vec - Lprim_vec
-                Lprimprims = Lprimprim_vec.rho
-                I_tmp[jjj] = np.sum(2 * Lprim * dTheta * (L*Lprim*np.sin(thetas))** 2 * (Lprim_vec@Lprimprim_vec)** 2 / ((Lprim + 0.5) ** 4 * (Lprimprims + 0.5) ** 4) * M_spline.ev(Lprim, Lprimprims))
-            I[iii] = InterpolatedUnivariateSpline(Lprims, I_tmp).integral(3,8000)
-        return 4 * I / ((2 * np.pi) ** 2)
-
-    def get_postborn_omega_ps(self, ells, M_path=None, Nell_prim=2000, Ntheta=1000, cmb=True):
-        """
-
-        Parameters
-        ----------
-        ells
-        Nell_prim
-        Ntheta
-
-        Returns
-        -------
-
-        """
-        return self._get_postborn_omega_ps(ells, M_path, Nell_prim, Ntheta, 8000, 100, cmb)
-
-    def get_rotation_ps_Fisher(self, Lmax, M_path, f_sky=1, auto=True, camb=False, cmb=True):
+    def get_rotation_ps_Fisher(self, Lmax, M_path, f_sky=1, auto=True, camb=False, cmb=True, Lmin=30):
         """
         TODO: Check equation !!!!!!!!!!!
         Parameters
@@ -615,14 +409,15 @@ class Fisher:
         if camb:
             ells, Cl = self.power.get_camb_postborn_omega_ps(Lmax)
         else:
-            ells = np.arange(2, Lmax + 3, 50)
-            Cl = self.get_postborn_omega_ps(ells, M_path, cmb=cmb)
+            # ells = np.arange(2, Lmax + 3, 50)
+            ells = np.concatenate((np.arange(2,40,10), np.logspace(1, 3, 50)*4))
+            Cl = Postborn().get_postborn_omega_ps(ells, M_path, cmb=cmb)
         Cl_spline = InterpolatedUnivariateSpline(ells, Cl)
-        ells = np.arange(2, Lmax + 1)
+        ells = np.arange(Lmin, Lmax + 1)
         if cmb:
-            N0 = self.noise.get_N0("curl", Lmax, True, self.N0_ell_factors)
+            N0 = self.covariance.noise.get_N0("curl", Lmax, True, self.covariance.N0_ell_factors)
         else:
-            N0 = self.noise.get_shape_N()
+            N0 = self.covariance.noise.get_shape_N()
         var = self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto)
         return f_sky * np.sum(Cl_spline(ells) ** 2 / var)
 
@@ -639,4 +434,4 @@ class Fisher:
         -------
 
         """
-        self._setup_noise(N0_file, N0_offset, N0_ell_factors)
+        self.covariance.setup_cmb_noise(N0_file, N0_offset, N0_ell_factors)
