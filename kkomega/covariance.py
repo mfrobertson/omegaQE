@@ -14,9 +14,14 @@ class Covariance:
         if N0_file is not None:
             self.setup_cmb_noise(N0_file, N0_offset, N0_ell_factors)
         self.power = Powerspectra()
-        self.noise = Noise()
         self.binned_gal_types = list("abcdef")
         self.test_types = list("xyz")
+
+    def get_log_sample_Ls(self, Lmin, Lmax, Nells=500):
+        floaty = Lmax / 1000
+        samp1 = np.arange(Lmin, floaty * 10, 1)
+        samp2 = np.logspace(1, 3, Nells-np.size(samp1)) * floaty
+        return np.concatenate((samp1, samp2))
 
     def setup_cmb_noise(self, N0_file, N0_offset, N0_ell_factors):
         self.noise.setup_cmb_noise(N0_file, N0_offset)
