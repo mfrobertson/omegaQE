@@ -225,6 +225,8 @@ class QE:
         return ((L_vec @ ell_vec) * h1 * self._get_cmb_cl(ell, typ1, cl)) + ((L_vec @ L3_vec) * h2 * self._get_cmb_cl(L3, typ2, cl))
 
     def _response(self, typ, L_vec, ell_vec, curl=True, cl="gradient"):
+        # TODO: if typ = BB then this is wrong - see 1906.08760 (I don't believe that BB is used though...)
+        # TODO: also the curl terms (i.e. C^TP and C^PP) are not implimented
         if not curl:
             return self._response_phi(typ, L_vec, ell_vec, cl)
         L = L_vec.rho
