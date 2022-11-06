@@ -1,6 +1,7 @@
 import numpy as np
 from cosmology import Cosmology
 from cache.tools import getFileSep
+import pandas as pd
 
 class Noise:
     """
@@ -26,7 +27,7 @@ class Noise:
             Essentially the value of ellmin in the file. If the first column represents ell = 2, set offset to 2.
         """
         self.N0 = None
-        self.cmb_offset = None
+        self.cmb_offset = 2
         self._cosmo = Cosmology()
 
     def _get_N0_phi(self, ellmax):
@@ -50,11 +51,18 @@ class Noise:
                 N0[L] = 0.5 * (N0[L-1] + N0[L+1])
         return N0
 
-    def setup_cmb_noise(self, cmb_noise_file, cmb_offset):
-        self.N0 = np.load(cmb_noise_file)
-        self.cmb_offset = cmb_offset
+    def _get_N0(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
+        if gmv: qe += "_gmv"
+        sep = getFileSep()
+        dir = f'data{sep}N0{sep}{exp}{sep}'
+        N0_phi = np.array(pd.read_csv(dir+f'N0_phi_{ps}_T{T_Lmin}-{T_Lmax}_P{P_Lmin}-{P_Lmax}.csv', sep=' ')[qe])
+        N0_curl = np.array(pd.read_csv(dir+f'N0_curl_{ps}_T{T_Lmin}-{T_Lmax}_P{P_Lmin}-{P_Lmax}.csv', sep=' ')[qe])
+        return N0_phi, N0_curl
 
-    def get_N0(self, typ="phi", ellmax=4000, tidy=False, ell_factors=False):
+    def setup_cmb_noise(self, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000):
+        self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
+
+    def get_N0(self, typ, ellmax, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, recalc_N0=False):
         """
         Extracts the noise from the supplied input file.
 
@@ -74,21 +82,19 @@ class Noise:
         ndarray
             1D array of the noise up to desired ellmax, the indices representing ell - offset.
         """
+        if recalc_N0:
+            self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
         if self.N0 is None:
-            raise ValueError(f"N0 has not been created. Please run 'setup_cmb_noise(self, cmb_noise_file, cmb_offset)' first.")
+            raise ValueError(f"N0 has not been created, either call setup_cmb_noise or use recalc_N0 argument.")
         if typ == "phi":
-            if ell_factors:
-                N0 = self._get_N0_kappa(ellmax)
-            else:
-                N0 = self._get_N0_phi(ellmax)
-        elif typ == "curl":
-            if ell_factors:
-                N0 = self._get_N0_omega(ellmax)
-            else:
-                N0 = self._get_N0_curl(ellmax)
-        if tidy:
-            return self._replace_bad_Ls(N0)
-        return N0
+            return self._get_N0_phi(ellmax)
+        if typ == "curl":
+            return self._get_N0_curl(ellmax)
+        if typ == "kappa":
+            return self._get_N0_kappa(ellmax)
+        if typ == "omega":
+            return self._get_N0_omega(ellmax)
+        raise ValueError(f"Supplied type {typ} not in [phi, kappa, curl, omega].")
 
     def get_gal_shot_N(self, n=40, ellmax=4000, zmin=None, zmax=None):
         fraction = 1
@@ -169,15 +175,14 @@ class Noise:
         cmb_ps = self._cosmo.get_cmb_ps(ellmax)
         return self._microK2_to_MJy2(cmb_ps, nu)
 
-    def _get_cached_cmb_gaussian_N(self, typ, ellmax, exp, N0_path):
-        if N0_path is None:
-            raise ValueError("N0_path not given.")
+    def _get_cached_cmb_gaussian_N(self, typ, ellmax, exp):
         if typ[0] != typ[1]:
             return np.zeros(ellmax + 1)
         sep = getFileSep()
-        return np.load(N0_path + sep + exp + sep + 'exp' + sep + f"N_{typ}.npy")[:ellmax + 1]
+        dir = f'data{sep}N0{sep}{exp}{sep}'
+        return np.array(pd.read_csv(dir+f'N.csv', sep=' ')[typ[0]])[:ellmax+1]
 
-    def get_cmb_gaussian_N(self, typ, deltaT=3, beam=3, ellmax=4000, exp="SO", N0_path=None):
+    def get_cmb_gaussian_N(self, typ, deltaT=3, beam=3, ellmax=4000, exp="SO"):
         """
 
         Parameters
@@ -192,7 +197,7 @@ class Noise:
 
         """
         if deltaT is None or beam is None:
-            return self._get_cached_cmb_gaussian_N(typ, ellmax, exp, N0_path)
+            return self._get_cached_cmb_gaussian_N(typ, ellmax, exp)
 
         arcmin_to_radians = 0.000290888
         deltaT *= arcmin_to_radians

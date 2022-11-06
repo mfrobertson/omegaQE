@@ -9,10 +9,8 @@ from sympy import lambdify
 class Covariance:
 
 
-    def __init__(self, N0_file=None, N0_offset=0, N0_ell_factors=True):
+    def __init__(self):
         self.noise = Noise()
-        if N0_file is not None:
-            self.setup_cmb_noise(N0_file, N0_offset, N0_ell_factors)
         self.power = Powerspectra()
         self.binned_gal_types = list("abcdef")
         self.test_types = list("xyz")
@@ -23,9 +21,8 @@ class Covariance:
         samp2 = np.logspace(1, 3, Nells-np.size(samp1)) * floaty
         return np.concatenate((samp1, samp2))
 
-    def setup_cmb_noise(self, N0_file, N0_offset, N0_ell_factors):
-        self.noise.setup_cmb_noise(N0_file, N0_offset)
-        self.N0_ell_factors = N0_ell_factors
+    def setup_cmb_noise(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
+        self.noise.setup_cmb_noise(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
 
     def _interpolate(self, arr):
         ells_sample = np.arange(np.size(arr))
@@ -75,7 +72,7 @@ class Covariance:
         elif typ == "Ig" or typ == "gI":
             return self._get_Cl_cib_gal(ellmax, nu, gal_bins[0], gal_bins[1], use_bins, gal_distro=gal_distro)
         elif typ == "ww":
-            N0_omega = self.noise.get_N0("curl", ellmax, ell_factors=self.N0_ell_factors)
+            N0_omega = self.noise.get_N0("omega", ellmax)
             return N0_omega
 
         gal_win_zmin_1 = None
@@ -104,9 +101,9 @@ class Covariance:
         if typ[0] != typ[1]:
             return self._get_Cl(typ, ellmax, nu, gal_bins, use_bins, gal_distro=gal_distro)
         if typ[0] == "k":
-            N = self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+            N = self.noise.get_N0("kappa", ellmax)
         elif typ[0] in self.test_types:
-            N = 3*self.noise.get_N0("phi", ellmax, tidy=True, ell_factors=self.N0_ell_factors)
+            N = 3*self.noise.get_N0("kappa", ellmax)
         elif typ[0] == "I":
             N_cib = self.noise.get_cib_shot_N(ellmax=ellmax, nu=nu)
             N_dust = self.noise.get_dust_N(ellmax=ellmax, nu=nu)

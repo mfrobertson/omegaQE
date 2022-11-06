@@ -17,7 +17,7 @@ class OmegaQE:
         self.a_bars = dict.fromkeys(self._fields.fields)
         self._power = Powerspectra()
         self._cosmo = Cosmology()
-        self._fish = Fisher("cache/_N0/SO_base/gmv/N0_TEB_gradient_T30-3000_P30-5000.npy", N0_offset=2, N0_ell_factors=True)
+        self._fish = Fisher()
         self.F_L_spline, self.C_inv_spline = self._get_F_L_and_C_inv_splines(Lmax)
         self.populate_a_bars()
 

@@ -22,35 +22,25 @@ class Fisher:
     ----------
     noise : Noise
         Instance of Noise, instantiated with the supplied  N0_file and offset.
-    N0_ell_factors : bool
-        Whether the noise is required to be multiplied by (1/4)(ell + 1/2)^4 during calculations. Note this should be False if the noise supplied is already in the form of N_kappa and N_omega.
     bi : Bispetrum
         Instance of Bispectrum, this instantiation will spline the supplied modecoupling matrix.
     power : Powerspectra
     """
 
-    def __init__(self, N0_file=None, N0_offset=0, N0_ell_factors=True):
+    def __init__(self, exp="SO", qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000)):
         """
         Constructor
 
         Parameters
         ----------
-        N0_file : str
-            Path to .npy file containing the convergence noise in row 0, and the curl noise in row 1. (The same format as Lensit)
-        N0_offset : int
-            Essentially the value of ellmin in the N0_file. If the first column represents ell = 2, set offset to 2.
-        N0_ell_factors : bool
-            Whether to multiply the noise by (1/4)(ell + 1/2)^4
+
         """
-        if N0_file is not None:
-            self.setup_covariance(N0_file, N0_offset, N0_ell_factors)
+        self.covariance = Covariance()
+        self.setup_noise(exp, qe, gmv, ps, L_cuts)
         self.bi = Bispectra()
         self.power = Powerspectra()
         self._maths = Maths()
         self.opt_I_cache = None
-
-    def setup_covariance(self, N0_file, N0_offset=0, N0_ell_factors=True):
-        self.covariance = Covariance(N0_file, N0_offset, N0_ell_factors)
 
     def _files_match(self, ell_file, M_file):
         if ell_file[:-8] == M_file[:-5]:
@@ -60,6 +50,14 @@ class Fisher:
     def _check_path(self, path):
         if not path_exists(path):
             raise FileNotFoundError(f"Path {path} does not exist")
+
+    def setup_noise(self, exp, qe, gmv, ps, L_cuts):
+        self.exp = exp
+        self.qe = qe
+        self.gmv = gmv
+        self.ps = ps
+        self.L_cuts = L_cuts
+        self.reset_noise()
 
     def setup_bispectra(self, path, ellmax=4000, Nell=100):    #4100 200
         """
@@ -96,14 +94,14 @@ class Fisher:
         return InterpolatedUnivariateSpline(ells_sample[1:], arr[1:])
 
     def _get_Covs(self, typ, Lmax, all_splines=False, nu=353e9, gal_bins=(None,None,None,None), include_N0_kappa="both", gal_distro="LSST_gold"):
-        N0_omega_spline = self._interpolate(self.covariance.noise.get_N0("curl", Lmax, ell_factors=self.covariance.N0_ell_factors))
+        N0_omega_spline = self._interpolate(self.covariance.noise.get_N0("omega", Lmax))
         C3_spline = N0_omega_spline
         if typ == "kkw":
             if include_N0_kappa == "both":
                 C1 = self.covariance.get_Cov("kk", Lmax)
                 C2 = copy.deepcopy(C1)
             elif include_N0_kappa == "one":
-                N0_kappa = self.covariance.noise.get_N0("phi", Lmax, tidy=True, ell_factors=self.covariance.N0_ell_factors)
+                N0_kappa = self.covariance.noise.get_N0("kappa", Lmax)
                 Cl_kappa = self.covariance.get_Cl("kk", Lmax)
                 C1 = Cl_kappa + (0.5*N0_kappa)
                 C2 = Cl_kappa
@@ -123,7 +121,7 @@ class Fisher:
         return C1, C2, C3_spline
 
     def _get_optimal_Ns_sympy(self, Lmax, typ, typs, C_inv, all_spline=False):
-        N0_omega_spline = self._interpolate(self.covariance.noise.get_N0("curl", Lmax, tidy=True, ell_factors=self.covariance.N0_ell_factors))
+        N0_omega_spline = self._interpolate(self.covariance.noise.get_N0("omega", Lmax))
         cov3_spline = N0_omega_spline
 
         combo1_idx1 = np.where(typs == typ[0])[0][0]
@@ -415,23 +413,20 @@ class Fisher:
         Cl_spline = InterpolatedUnivariateSpline(ells, Cl)
         ells = np.arange(Lmin, Lmax + 1)
         if cmb:
-            N0 = self.covariance.noise.get_N0("curl", Lmax, True, self.covariance.N0_ell_factors)
+            N0 = self.covariance.noise.get_N0("omega", Lmax)
         else:
             N0 = self.covariance.noise.get_shape_N()
         var = self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto)
         return f_sky * np.sum(Cl_spline(ells) ** 2 / var)
 
-    def reset_noise(self, N0_file, N0_offset=0, N0_ell_factors=True):
+    def reset_noise(self):
         """
 
         Parameters
         ----------
-        N0_file
-        N0_offset
-        N0_ell_factors
 
         Returns
         -------
 
         """
-        self.covariance.setup_cmb_noise(N0_file, N0_offset, N0_ell_factors)
+        self.covariance.setup_cmb_noise(self.exp, self.qe, self.gmv, self.ps, self.L_cuts[0], self.L_cuts[1], self.L_cuts[2], self.L_cuts[3])
