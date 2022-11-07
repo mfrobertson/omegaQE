@@ -124,13 +124,13 @@ class OmegaQE:
                             F_i_fft = fac * self._get_f(i, p, r, weyl_ps, matter_weyl_ps, Chi_index) * a_i
                             G_j_fft = fac * self._get_g(j, q, s, Chi_index) * a_j
                             F_j_fft = fac * self._get_f(j, q, s, weyl_ps, matter_weyl_ps, Chi_index) * a_j
-                            G_i_fft = fac * self._get_g(i, p, r, Chi_index) * a_j
+                            G_i_fft = fac * self._get_g(i, p, r, Chi_index) * a_i
 
                             F_i = np.fft.irfft2(F_i_fft, norm="ortho")
                             F_j = np.fft.irfft2(F_j_fft, norm="ortho")
                             G_i = np.fft.irfft2(G_i_fft, norm="ortho")
                             G_j = np.fft.irfft2(G_j_fft, norm="ortho")
-                            I[:, :, Chi_index] += (F_j * G_i) + (F_i * G_j)
+                            I[:, :, Chi_index] += (F_i * G_j) - (F_j * G_i)
 
         omega_F = dChi * np.sum(I * self.windows["k"] / (Chis ** 2), axis=2)
         return np.fft.rfft2(omega_F, norm="ortho") / self.F_L_spline(self.L_map)
