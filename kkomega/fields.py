@@ -8,7 +8,7 @@ import copy
 class Fields:
 
 
-    def __init__(self, fields, N_pix=2**7, kmax=5000, kappa_map=None):
+    def __init__(self, fields, exp="SO", N_pix=2**7, kmax=5000, kappa_map=None):
         if kappa_map is None:
             self.fields = self._get_fields(fields)
             self.N_pix = N_pix
@@ -20,17 +20,18 @@ class Fields:
         self.kmax = kmax
         self.kM, self.k_values = self._get_k_values()
         self.covariance = Covariance()
+        self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000)
         self.y = self._get_y(kappa_map)
         self.maps = dict.fromkeys(self.fields)
+        self.fft_maps = dict.fromkeys(self.fields)
+        self.fft_noise_maps = dict.fromkeys(self.fields)
         for field in self.fields:
             self.maps[field] = self.get_map(field, fft=False)
-        self.fft_maps = dict.fromkeys(self.fields)
-        for field in self.fields:
             self.fft_maps[field] = self.get_map(field, fft=True)
+            self.fft_noise_maps[field] = self.get_noise_map(field)
 
     def _get_fields(self, fields):
         return np.char.array(list(fields))
-
 
     def _get_rearanged_fields(self, fields):
         fields = self._get_fields(fields)
@@ -63,17 +64,19 @@ class Fields:
         L = self._get_L(C)
         mean = 0
         var = 1 / np.sqrt(2)
+        np.random.seed(0)
         real = np.random.normal(mean, var, (np.size(self.k_values), N_fields, 1))
+        np.random.seed(0)
         imag = np.random.normal(mean, var, (np.size(self.k_values), N_fields, 1))
         v = real + (1j * imag)
         if kappa_map is not None:
             C_kappa_sqrt = L[:,0,0]
-            v[:, 0, 0] = np.fft.rfft2(kappa_map, norm="ortho").flatten() / C_kappa_sqrt
+            v[:, 0, 0] = np.fft.rfft2(kappa_map, norm="forward").flatten() / C_kappa_sqrt    # Converting a real kappa map from lensit, should check what normalisation should be
         y = np.matmul(L, v)
         return y
 
     def get_dist(self):
-        return (np.sqrt(2) * self.N_pix * np.pi) / (self.kmax)
+        return (np.sqrt(2) * self.N_pix * np.pi) / self.kmax
 
     def get_kx_ky(self, N_pix, dx):
         kx = np.fft.rfftfreq(N_pix, dx) * 2 * np.pi
@@ -121,12 +124,39 @@ class Fields:
             fft_map = self._enforce_symmetries(fft_map)
 
         if not fft:
-            return np.fft.irfft2(fft_map, norm="forward")
+            return np.fft.irfft2(fft_map, norm="ortho")
         return fft_map
 
-    def get_ps(self, fields, nBins=20):
-        fft_map1 = self.get_map(fields[0], fft=True)
-        fft_map2 = self.get_map(fields[1], fft=True)
+    def _get_N(self, field):
+        if field == "k":
+            return self.covariance.noise.get_N0("kappa", self.kmax, recalc_N0=False)
+        if field == "g":
+            return self.covariance.noise.get_gal_shot_N(ellmax=self.kmax)
+        if field == "I":
+            N_dust = self.covariance.noise.get_dust_N(353e9, ellmax=self.kmax)
+            N_cib = self.covariance.noise.get_cib_shot_N(353e9, ellmax=self.kmax)
+            N = N_dust+N_cib
+            N[:110] = 1e10
+            N[2000:] = 1e10
+            return N
+
+    def get_noise_map(self, field):
+        N = self._get_N(field)
+        Ls = np.arange(np.size(N))
+        N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
+        mean = 0
+        var = 1 / np.sqrt(2)
+        real = np.random.normal(mean, var, np.shape(self.kM))
+        imag = np.random.normal(mean, var, np.shape(self.kM))
+        gauss_matrix = real + (1j * imag)
+        return np.sqrt(N_spline(self.kM)) * gauss_matrix
+
+    def get_ps(self, fields, nBins=20, noise=False):
+        fft_map1 = copy.deepcopy(self.fft_maps[fields[0]])
+        fft_map2 = copy.deepcopy(self.fft_maps[fields[1]])
+        if noise:
+            fft_map1 += self.fft_noise_maps[fields[0]]
+            fft_map2 += self.fft_noise_maps[fields[1]]
         ps = np.real(np.conjugate(fft_map1) * fft_map2).flatten()
         means, bin_edges, binnumber = stats.binned_statistic(self.k_values, ps, 'mean', bins=nBins)
         binSeperation = bin_edges[1]
