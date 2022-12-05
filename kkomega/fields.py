@@ -78,21 +78,18 @@ class Fields:
     def get_dist(self):
         return (np.sqrt(2) * self.N_pix * np.pi) / self.kmax
 
-    def get_kx_ky(self, N_pix, dx):
-        kx = np.fft.rfftfreq(N_pix, dx) * 2 * np.pi
-        ky = np.fft.fftfreq(N_pix, dx) * 2 * np.pi
+    def get_kx_ky(self):
+        kx = np.fft.rfftfreq(self.N_pix, self.get_dist()/self.N_pix) * 2 * np.pi
+        ky = np.fft.fftfreq(self.N_pix, self.get_dist()/self.N_pix) * 2 * np.pi
         return kx, ky
 
-    def get_k_matrix(self, N_pix, dx):
-        kx, ky = self.get_kx_ky(N_pix, dx)
+    def get_k_matrix(self):
+        kx, ky = self.get_kx_ky()
         kSqr = kx[np.newaxis, ...] ** 2 + ky[..., np.newaxis] ** 2
         return np.sqrt(kSqr)
 
     def _get_k_values(self):
-        N_pix = self.N_pix
-        dist = self.get_dist()
-        dx = dist / N_pix
-        kM = self.get_k_matrix(N_pix, dx)
+        kM = self.get_k_matrix()
         k_values = kM.flatten()
         return kM, k_values
 
@@ -136,8 +133,6 @@ class Fields:
             N_dust = self.covariance.noise.get_dust_N(353e9, ellmax=self.kmax)
             N_cib = self.covariance.noise.get_cib_shot_N(353e9, ellmax=self.kmax)
             N = N_dust+N_cib
-            N[:110] = 1e10
-            N[2000:] = 1e10
             return N
 
     def get_noise_map(self, field):
