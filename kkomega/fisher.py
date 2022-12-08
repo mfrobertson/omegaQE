@@ -27,7 +27,7 @@ class Fisher:
     power : Powerspectra
     """
 
-    def __init__(self, exp="SO", qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000)):
+    def __init__(self, exp="SO", qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False):
         """
         Constructor
 
@@ -36,7 +36,7 @@ class Fisher:
 
         """
         self.covariance = Covariance()
-        self.setup_noise(exp, qe, gmv, ps, L_cuts)
+        self.setup_noise(exp, qe, gmv, ps, L_cuts, iter)
         self.bi = Bispectra()
         self.power = Powerspectra()
         self._maths = Maths()
@@ -51,12 +51,13 @@ class Fisher:
         if not path_exists(path):
             raise FileNotFoundError(f"Path {path} does not exist")
 
-    def setup_noise(self, exp, qe, gmv, ps, L_cuts):
-        self.exp = exp
-        self.qe = qe
-        self.gmv = gmv
-        self.ps = ps
-        self.L_cuts = L_cuts
+    def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None):
+        if exp is not None: self.exp = exp
+        if qe is not None: self.qe = qe
+        if gmv is not None: self.gmv = gmv
+        if ps is not None: self.ps = ps
+        if L_cuts is not None: self.L_cuts = L_cuts
+        if iter is not None: self.iter = iter
         self.reset_noise()
 
     def setup_bispectra(self, path, ellmax=4000, Nell=100):    #4100 200
@@ -224,6 +225,8 @@ class Fisher:
             self.opt_Ls = Ls
         I = np.zeros(np.size(Ls))
         Ls2 = np.arange(Lmin, Lmax + 1, dL2)
+        if any([np.isin(typ_i, self.covariance.test_types) for typ_i in typ[4:]]):
+            typ = "opt_kkkk"    # if any test types are detected, it is assumed all observables are kappa
         for iii, L3 in enumerate(Ls):
             L2 = Ls2[None, :]
             L3_vec = vector.obj(rho=L3, phi=0)
@@ -284,6 +287,8 @@ class Fisher:
         Lmax, Lmin, _, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta, typ, nu, gal_bins, typs, C_inv, gal_distro=gal_distro)
         F_L = np.zeros(np.size(Ls))
         Ls2 = np.arange(Lmin, Lmax + 1, dL2)
+        if any([np.isin(typ_i, self.covariance.test_types) for typ_i in typ[4:]]):
+            typ = "opt_kkkk"    # if any test types are detected, it is assumed all observables are kappa
         for iii, L3 in enumerate(Ls):
             L2 = Ls2[None, :]
             L3_vec = vector.obj(rho=L3, phi=0)
@@ -429,4 +434,4 @@ class Fisher:
         -------
 
         """
-        self.covariance.setup_cmb_noise(self.exp, self.qe, self.gmv, self.ps, self.L_cuts[0], self.L_cuts[1], self.L_cuts[2], self.L_cuts[3])
+        self.covariance.setup_cmb_noise(self.exp, self.qe, self.gmv, self.ps, self.L_cuts[0], self.L_cuts[1], self.L_cuts[2], self.L_cuts[3], self.iter)
