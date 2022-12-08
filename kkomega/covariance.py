@@ -21,8 +21,8 @@ class Covariance:
         samp2 = np.logspace(1, 3, Nells-np.size(samp1)) * floaty
         return np.concatenate((samp1, samp2))
 
-    def setup_cmb_noise(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
-        self.noise.setup_cmb_noise(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
+    def setup_cmb_noise(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter):
+        self.noise.setup_cmb_noise(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter)
 
     def _interpolate(self, arr):
         ells_sample = np.arange(np.size(arr))
@@ -99,11 +99,15 @@ class Covariance:
 
     def _get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
         if typ[0] != typ[1]:
+            if typ[0] in self.test_types and typ[1] in self.test_types:
+                return self._get_Cl_kappa(ellmax)
             return self._get_Cl(typ, ellmax, nu, gal_bins, use_bins, gal_distro=gal_distro)
         if typ[0] == "k":
             N = self.noise.get_N0("kappa", ellmax)
         elif typ[0] in self.test_types:
-            N = 3*self.noise.get_N0("kappa", ellmax)
+            print("test")
+            N = 2*self.noise.get_N0("kappa", ellmax)
+            typ="kk"
         elif typ[0] == "I":
             N_cib = self.noise.get_cib_shot_N(ellmax=ellmax, nu=nu)
             N_dust = self.noise.get_dust_N(ellmax=ellmax, nu=nu)
