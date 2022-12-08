@@ -51,18 +51,21 @@ class Noise:
                 N0[L] = 0.5 * (N0[L-1] + N0[L+1])
         return N0
 
-    def _get_N0(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
-        if gmv: qe += "_gmv"
+    def _get_N0(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter):
+        if iter:
+            qe+= "_iter"
+        elif gmv:
+            qe += "_gmv"
         sep = getFileSep()
         dir = f'data{sep}N0{sep}{exp}{sep}'
         N0_phi = np.array(pd.read_csv(dir+f'N0_phi_{ps}_T{T_Lmin}-{T_Lmax}_P{P_Lmin}-{P_Lmax}.csv', sep=' ')[qe])
         N0_curl = np.array(pd.read_csv(dir+f'N0_curl_{ps}_T{T_Lmin}-{T_Lmax}_P{P_Lmin}-{P_Lmax}.csv', sep=' ')[qe])
         return N0_phi, N0_curl
 
-    def setup_cmb_noise(self, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000):
-        self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
+    def setup_cmb_noise(self, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, iter=False):
+        self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter)
 
-    def get_N0(self, typ, ellmax, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, recalc_N0=False):
+    def get_N0(self, typ, ellmax, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, recalc_N0=False, iter=False):
         """
         Extracts the noise from the supplied input file.
 
@@ -83,7 +86,7 @@ class Noise:
             1D array of the noise up to desired ellmax, the indices representing ell - offset.
         """
         if recalc_N0:
-            self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
+            self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter)
         if self.N0 is None:
             raise ValueError(f"N0 has not been created, either call setup_cmb_noise or use recalc_N0 argument.")
         if typ == "phi":
@@ -199,7 +202,7 @@ class Noise:
         if deltaT is None or beam is None:
             return self._get_cached_cmb_gaussian_N(typ, ellmax, exp)
 
-        arcmin_to_radians = 0.000290888
+        arcmin_to_radians = 0.000290888   #pi/180/60
         deltaT *= arcmin_to_radians
         beam *= arcmin_to_radians
         T_cmb = 2.7255               #arXiv:0911.1955
