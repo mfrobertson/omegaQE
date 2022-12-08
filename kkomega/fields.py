@@ -20,7 +20,7 @@ class Fields:
         self.kmax = kmax
         self.kM, self.k_values = self._get_k_values()
         self.covariance = Covariance()
-        self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000)
+        self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False)
         self.y = self._get_y(kappa_map)
         self.maps = dict.fromkeys(self.fields)
         self.fft_maps = dict.fromkeys(self.fields)
@@ -64,9 +64,7 @@ class Fields:
         L = self._get_L(C)
         mean = 0
         var = 1 / np.sqrt(2)
-        np.random.seed(0)
         real = np.random.normal(mean, var, (np.size(self.k_values), N_fields, 1))
-        np.random.seed(0)
         imag = np.random.normal(mean, var, (np.size(self.k_values), N_fields, 1))
         v = real + (1j * imag)
         if kappa_map is not None:
@@ -121,7 +119,7 @@ class Fields:
             fft_map = self._enforce_symmetries(fft_map)
 
         if not fft:
-            return np.fft.irfft2(fft_map, norm="ortho")
+            return np.fft.irfft2(fft_map, norm="forward")     # Should check the normalisation
         return fft_map
 
     def _get_N(self, field):
@@ -144,7 +142,7 @@ class Fields:
         real = np.random.normal(mean, var, np.shape(self.kM))
         imag = np.random.normal(mean, var, np.shape(self.kM))
         gauss_matrix = real + (1j * imag)
-        return np.sqrt(N_spline(self.kM)) * gauss_matrix
+        return self._enforce_symmetries(np.sqrt(N_spline(self.kM)) * gauss_matrix)
 
     def get_ps(self, fields, nBins=20, noise=False):
         fft_map1 = copy.deepcopy(self.fft_maps[fields[0]])
