@@ -144,13 +144,16 @@ class Fields:
         gauss_matrix = real + (1j * imag)
         return self._enforce_symmetries(np.sqrt(N_spline(self.kM)) * gauss_matrix)
 
-    def get_ps(self, fields, nBins=20, noise=False):
-        fft_map1 = copy.deepcopy(self.fft_maps[fields[0]])
-        fft_map2 = copy.deepcopy(self.fft_maps[fields[1]])
-        if noise:
-            fft_map1 += self.fft_noise_maps[fields[0]]
-            fft_map2 += self.fft_noise_maps[fields[1]]
-        ps = np.real(np.conjugate(fft_map1) * fft_map2).flatten()
+    def get_ps(self, fft_map1, fft_map2=None, nBins=20):
+        fft_map1 = copy.deepcopy(fft_map1)
+        if fft_map2 is None:
+            fft_map2 = copy.deepcopy(fft_map1)
+        else:
+            fft_map2 = copy.deepcopy(fft_map2)
+        ps = np.real(np.conjugate(fft_map1) * fft_map2)
+        ps[1:, 0] /= 2
+        ps[1:, -1] /= 2
+        ps = ps.flatten()
         means, bin_edges, binnumber = stats.binned_statistic(self.k_values, ps, 'mean', bins=nBins)
         binSeperation = bin_edges[1]
         kBins = np.asarray([bin_edges[i] - binSeperation / 2 for i in range(1, len(bin_edges))])
