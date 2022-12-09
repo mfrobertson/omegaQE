@@ -17,20 +17,20 @@ class Powerspectra:
         Constructor.
 
         """
-        self._cosmo = Cosmology()
-        self._maths = Maths()
+        self.cosmo = Cosmology()
+        self.maths = Maths()
         self.weyl_PK = None
         self.matter_weyl_PK = None
         self.matter_PK = None
 
     def _get_PK(self, typ, ellmax=None, Nchi=None):
         if ellmax is None and Nchi is None:
-            return self._cosmo.get_matter_PK(typ=typ)
+            return self.cosmo.get_matter_PK(typ=typ)
         zbuffer = 100
-        zmax = self._cosmo.eta_to_z(self._cosmo.get_eta0() - self._cosmo.get_chi_star()) + zbuffer
+        zmax = self.cosmo.eta_to_z(self.cosmo.get_eta0() - self.cosmo.get_chi_star()) + zbuffer
         kbuffer = 10
-        kmax = ellmax * Nchi/self._cosmo.get_chi_star() + kbuffer
-        return self._cosmo.get_matter_PK(kmax, zmax, typ=typ)
+        kmax = ellmax * Nchi/self.cosmo.get_chi_star() + kbuffer
+        return self.cosmo.get_matter_PK(kmax, zmax, typ=typ)
 
     def recalculate_PK(self, typ, ellmax,  Nchi):
         """
@@ -75,15 +75,15 @@ class Powerspectra:
         if typ.lower() == "weyl":
             if self.weyl_PK is None:
                 self.weyl_PK = self._get_PK("weyl")
-            return self._cosmo.get_matter_ps(self.weyl_PK, z, k, curly, weyl_scaled)
+            return self.cosmo.get_matter_ps(self.weyl_PK, z, k, curly, weyl_scaled)
         elif typ.lower() == "matter-weyl" or typ.lower() == "weyl-matter":
             if self.matter_weyl_PK is None:
                 self.matter_weyl_PK = self._get_PK("matter-weyl")
-            return self._cosmo.get_matter_ps(self.matter_weyl_PK, z, k, curly, weyl_scaled, typ="matter-weyl")
+            return self.cosmo.get_matter_ps(self.matter_weyl_PK, z, k, curly, weyl_scaled, typ="matter-weyl")
         elif typ.lower() == "matter":
             if self.matter_PK is None:
                 self.matter_PK = self._get_PK("matter")
-            return self._cosmo.get_matter_ps(self.matter_PK, z, k, curly)
+            return self.cosmo.get_matter_ps(self.matter_PK, z, k, curly)
 
     def _get_matter_ps(self, typ, zs, ks, curly, weyl_scaled):
         return self.get_matter_ps(typ, zs, ks, curly, weyl_scaled)
@@ -99,20 +99,20 @@ class Powerspectra:
     def _vectorise_zs(self, Chis, Nells):
         ndim = Chis.ndim
         if ndim == 1:
-            zs = self._cosmo.Chi_to_z(Chis)
+            zs = self.cosmo.Chi_to_z(Chis)
             return np.repeat(zs[np.newaxis, :], Nells, 0)
         if ndim == 2:
             zs = np.ones(np.shape(Chis))
             for row in range(np.shape(Chis)[0]):
-                zs[row] = self._cosmo.Chi_to_z(Chis[row])
+                zs[row] = self.cosmo.Chi_to_z(Chis[row])
             return np.repeat(zs[np.newaxis, :, :], Nells, 0)
 
     def _integral_prep(self, ells, Nchi, zmin, zmax, kmin, kmax, extended, curly, matter_ps_typ="weyl"):
-        Chi_min = self._cosmo.z_to_Chi(zmin)
+        Chi_min = self.cosmo.z_to_Chi(zmin)
         if zmax is None:
-            Chi_max = self._cosmo.get_chi_star()
+            Chi_max = self.cosmo.get_chi_star()
         else:
-            Chi_max = self._cosmo.z_to_Chi(zmax)
+            Chi_max = self.cosmo.z_to_Chi(zmax)
         Chis = np.linspace(Chi_min, Chi_max, Nchi)[1:]
         dChi = Chis[1] - Chis[0]
         Nells = np.size(ells)
@@ -122,36 +122,36 @@ class Powerspectra:
             ks = (ells + 0.5)/Chis
         else:
             ks = ells/Chis
-        step = self._maths.rectangular_pulse_steps(ks, kmin, kmax)
+        step = self.maths.rectangular_pulse_steps(ks, kmin, kmax)
         matter_ps = self._get_matter_ps(matter_ps_typ, zs, ks, curly, weyl_scaled=False)
         return step, Chis, matter_ps, dChi
 
     def _Cl_phi(self, ells, Nchi, zmin, zmax, kmin, kmax, extended):
         step, Chis, weyl_ps, dChi = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=True)
-        window = self._cosmo.cmb_lens_window(Chis, self._cosmo.get_chi_star())
+        window = self.cosmo.cmb_lens_window(Chis, self.cosmo.get_chi_star())
         I = step * Chis * weyl_ps * dChi * window ** 2
         if extended: ells = ells + 0.5
         return I.sum(axis=1) / ells ** 3 * 8 * np.pi ** 2
 
     def _Cl_kappa(self, ells, Nchi, zmin, zmax, kmin, kmax, extended):
         step, Chis, weyl_ps, dChi = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False)
-        window = self._cosmo.cmb_lens_window(Chis, self._cosmo.get_chi_star())
+        window = self.cosmo.cmb_lens_window(Chis, self.cosmo.get_chi_star())
         I = step * weyl_ps/(Chis)**2 * dChi * window ** 2
         if extended: ells = ells + 0.5
         return I.sum(axis=1) * ells** 4
 
     def _Cl_kappa_matter(self, ells, Nchi, zmin, zmax, kmin, kmax, extended):
         step, Chis, weyl_ps, dChi = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window = self._cosmo.cmb_lens_window_matter(Chis, self._cosmo.get_chi_star())
+        window = self.cosmo.cmb_lens_window_matter(Chis, self.cosmo.get_chi_star())
         I = step * weyl_ps/(Chis ** 2) * dChi * window ** 2
         return I.sum(axis=1)
 
     def _Cl_kappa_2source(self, ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended):
-        zmax = self._cosmo.Chi_to_z(Chi_source1)
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
         step, Chis, weyl_ps, dChi= self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False)
-        window1 = self._cosmo.cmb_lens_window(Chis, Chi_source1)
+        window1 = self.cosmo.cmb_lens_window(Chis, Chi_source1)
         if Chi_source2 is not None:
-            window2 = self._cosmo.cmb_lens_window(Chis, Chi_source2)
+            window2 = self.cosmo.cmb_lens_window(Chis, Chi_source2)
         else:
             window2 = window1
         I = step * weyl_ps / Chis ** 2 * dChi * window1 * window2
@@ -161,11 +161,11 @@ class Powerspectra:
         return I.sum(axis=1) * ells ** 4
 
     def _Cl_kappa_2source_matter(self, ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended):
-        zmax = self._cosmo.Chi_to_z(Chi_source1)
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
         step, Chis, weyl_ps, dChi= self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window1 = self._cosmo.cmb_lens_window_matter(Chis, Chi_source1)
+        window1 = self.cosmo.cmb_lens_window_matter(Chis, Chi_source1)
         if Chi_source2 is not None:
-            window2 = self._cosmo.cmb_lens_window_matter(Chis, Chi_source2)
+            window2 = self.cosmo.cmb_lens_window_matter(Chis, Chi_source2)
         else:
             window2 = window1
         I = step * weyl_ps / Chis ** 2 * dChi * window1 * window2
@@ -173,23 +173,23 @@ class Powerspectra:
 
     def _Cl_gal_lens(self, ells, Nchi, zmin, zmax, kmin, kmax, extended):
         step, Chis, weyl_ps, dChi = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False)
-        window = self._cosmo.gal_lens_window(Chis, np.max(Chis))
+        window = self.cosmo.gal_lens_window(Chis, np.max(Chis))
         I = step * weyl_ps/(Chis ** 2) * dChi * window ** 2
         if extended: ells = ells + 0.5
         return I.sum(axis=1) * ells ** 4
 
     def _Cl_gal_lens_matter(self, ells, Nchi, zmin, zmax, kmin, kmax, extended):
         step, Chis, matter_ps, dChi = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window = self._cosmo.gal_lens_window_matter(Chis, np.max(Chis))
+        window = self.cosmo.gal_lens_window_matter(Chis, np.max(Chis))
         I = step * matter_ps/(Chis**2) * dChi * window ** 2
         return I.sum(axis=1)
 
     def _Cl_gal_lens_2source(self, ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended):
-        zmax = self._cosmo.Chi_to_z(Chi_source1)
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
         step, Chis, weyl_ps, dChi = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False)
-        window1 = self._cosmo.gal_lens_window(Chis, Chi_source1)
+        window1 = self.cosmo.gal_lens_window(Chis, Chi_source1)
         if Chi_source2 is not None:
-            window2 = self._cosmo.gal_lens_window(Chis, Chi_source2)
+            window2 = self.cosmo.gal_lens_window(Chis, Chi_source2)
         else:
             window2 = window1
         I = step * weyl_ps/(Chis ** 2) * dChi * window1 * window2
@@ -199,11 +199,11 @@ class Powerspectra:
         return I.sum(axis=1) * ells ** 4
 
     def _Cl_gal_lens_2source_matter(self, ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended):
-        zmax = self._cosmo.Chi_to_z(Chi_source1)
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
         step, Chis, weyl_ps, dChi = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window1 = self._cosmo.gal_lens_window_matter(Chis, Chi_source1)
+        window1 = self.cosmo.gal_lens_window_matter(Chis, Chi_source1)
         if Chi_source2 is not None:
-            window2 = self._cosmo.gal_lens_window_matter(Chis, Chi_source2)
+            window2 = self.cosmo.gal_lens_window_matter(Chis, Chi_source2)
         else:
             window2 = window1
         I = step * weyl_ps/(Chis ** 2) * dChi * window1 * window2
@@ -211,11 +211,11 @@ class Powerspectra:
 
     def _Cl_gal_kappa(self, ells, Chi_source1, Nchi, kmin, kmax, gal_win_zmin, gal_win_zmax, extended, gal_distro="LSST_gold"):
         if Chi_source1 is None:
-            Chi_source1 = self._cosmo.get_chi_star()
-        zmax = self._cosmo.Chi_to_z(Chi_source1)
+            Chi_source1 = self.cosmo.get_chi_star()
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
         step, Chis, matter_weyl_ps, dChi = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter-weyl")
-        window1 = self._cosmo.cmb_lens_window(Chis, Chi_source1)
-        window2 = self._cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin, zmax=gal_win_zmax)
+        window1 = self.cosmo.cmb_lens_window(Chis, Chi_source1)
+        window2 = self.cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin, zmax=gal_win_zmax)
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
         if np.size(Chi_source1) > 1:
             ells = self._vectorise_ells(ells, 1)
@@ -224,28 +224,28 @@ class Powerspectra:
 
     def _Cl_gal_kappa_matter(self, ells, Chi_source1, Nchi, kmin, kmax, gal_win_zmin, gal_win_zmax, extended, gal_distro="LSST_gold"):
         if Chi_source1 is None:
-            Chi_source1 = self._cosmo.get_chi_star()
-        zmax = self._cosmo.Chi_to_z(Chi_source1)
+            Chi_source1 = self.cosmo.get_chi_star()
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
         step, Chis, matter_weyl_ps, dChi = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window1 = self._cosmo.cmb_lens_window_matter(Chis, Chi_source1)
-        window2 = self._cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin, zmax=gal_win_zmax)
+        window1 = self.cosmo.cmb_lens_window_matter(Chis, Chi_source1)
+        window2 = self.cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin, zmax=gal_win_zmax)
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
         return (-1) * I.sum(axis=1)
 
     def _Cl_gal(self, ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended, gal_distro="LSST_gold"):
         step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window1 = self._cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin_a, zmax=gal_win_zmax_a)
-        window2 = self._cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin_b, zmax=gal_win_zmax_b)
+        window1 = self.cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin_a, zmax=gal_win_zmax_a)
+        window2 = self.cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin_b, zmax=gal_win_zmax_b)
         I = step * matter_ps/(Chis)**2 * dChi * window1 * window2
         return I.sum(axis=1)
 
     def _Cl_cib_kappa(self, ells, nu, Chi_source1, Nchi, kmin, kmax, extended, bias):
         if Chi_source1 is None:
-            Chi_source1 = self._cosmo.get_chi_star()
-        zmax = self._cosmo.Chi_to_z(Chi_source1)
+            Chi_source1 = self.cosmo.get_chi_star()
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
         step, Chis, matter_weyl_ps, dChi = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter-weyl")
-        window1 = self._cosmo.cmb_lens_window(Chis, Chi_source1)
-        window2 = self._cosmo.cib_window_Chi(Chis, nu, b_c=bias)
+        window1 = self.cosmo.cmb_lens_window(Chis, Chi_source1)
+        window2 = self.cosmo.cib_window_Chi(Chis, nu, b_c=bias)
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
         if np.size(Chi_source1) > 1:
             ells = self._vectorise_ells(ells, 1)
@@ -254,24 +254,24 @@ class Powerspectra:
 
     def _Cl_cib_kappa_matter(self, ells, nu, Chi_source1, Nchi, kmin, kmax, extended, bias):
         if Chi_source1 is None:
-            Chi_source1 = self._cosmo.get_chi_star()
-        zmax = self._cosmo.Chi_to_z(Chi_source1)
+            Chi_source1 = self.cosmo.get_chi_star()
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
         step, Chis, matter_weyl_ps, dChi = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window1 = self._cosmo.cmb_lens_window_matter(Chis, Chi_source1)
-        window2 = self._cosmo.cib_window_Chi(Chis, nu, b_c=bias)
+        window1 = self.cosmo.cmb_lens_window_matter(Chis, Chi_source1)
+        window2 = self.cosmo.cib_window_Chi(Chis, nu, b_c=bias)
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
         return (-1) * I.sum(axis=1)
 
     def _Cl_cib(self, ells, nu, Nchi, zmin, zmax, kmin, kmax, extended, bias):
         step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window = self._cosmo.cib_window_Chi(Chis, nu, b_c=bias)
+        window = self.cosmo.cib_window_Chi(Chis, nu, b_c=bias)
         I = step * matter_ps/(Chis)**2 * dChi * window ** 2
         return I.sum(axis=1)
 
     def _Cl_cib_gal(self, ells, nu, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin, gal_win_zmax, extended, bias, gal_distro="LSST_gold"):
         step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
-        window1 = self._cosmo.cib_window_Chi(Chis, nu, b_c=bias)
-        window2 = self._cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin, zmax=gal_win_zmax)
+        window1 = self.cosmo.cib_window_Chi(Chis, nu, b_c=bias)
+        window2 = self.cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin, zmax=gal_win_zmax)
         I = step * matter_ps/(Chis)**2 * dChi * window1 * window2
         return I.sum(axis=1)
 
@@ -607,7 +607,7 @@ class Powerspectra:
         -------
 
         """
-        return self._cosmo.get_postborn_omega_ps(2*ellmax)
+        return self.cosmo.get_postborn_omega_ps(2*ellmax)
 
     def get_ps_variance(self, ells, Cl, N0, auto=True):
         """

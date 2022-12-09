@@ -1,6 +1,4 @@
 from powerspectra import Powerspectra
-from cosmology import Cosmology
-from maths import Maths
 import numpy as np
 
 
@@ -19,9 +17,9 @@ class Modecoupling:
         Constructor
 
         """
-        self._cosmo = Cosmology()
         self._powerspectra = Powerspectra()
-        self._maths = Maths()
+        self._cosmo = self._powerspectra.cosmo
+        self._maths = self._powerspectra.maths
         self.weyl_PK = self._cosmo.get_matter_PK(typ="weyl")
         self.matter_weyl_PK = self._cosmo.get_matter_PK(typ="matter-weyl")
         self.binned_gal_types = list("abcdef")

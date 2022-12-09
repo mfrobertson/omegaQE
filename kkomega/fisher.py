@@ -1,8 +1,5 @@
 import numpy as np
 from bispectra import Bispectra
-from powerspectra import Powerspectra
-from noise import Noise
-from maths import Maths
 from covariance import Covariance
 from postborn import Postborn
 from scipy.interpolate import InterpolatedUnivariateSpline
@@ -20,8 +17,6 @@ class Fisher:
 
     Attributes
     ----------
-    noise : Noise
-        Instance of Noise, instantiated with the supplied  N0_file and offset.
     bi : Bispetrum
         Instance of Bispectrum, this instantiation will spline the supplied modecoupling matrix.
     power : Powerspectra
@@ -38,8 +33,7 @@ class Fisher:
         self.covariance = Covariance()
         self.setup_noise(exp, qe, gmv, ps, L_cuts, iter)
         self.bi = Bispectra()
-        self.power = Powerspectra()
-        self._maths = Maths()
+        self.power = self.covariance.power
         self.opt_I_cache = None
 
     def _files_match(self, ell_file, M_file):
