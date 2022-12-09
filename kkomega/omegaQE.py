@@ -2,23 +2,24 @@ import numpy as np
 from fields import Fields
 from fisher import Fisher
 from scipy.interpolate import InterpolatedUnivariateSpline
-from cosmology import Cosmology
-from powerspectra import Powerspectra
+import datetime
 
 class OmegaQE:
 
-    def __init__(self, field_labels, exp="SO", N_pix=2 ** 7, Lmax=5000, kappa_map=None):
-        self._power = Powerspectra()
-        self._cosmo = Cosmology()
+    def __init__(self, field_labels, exp="SO", N_pix=2 ** 7, Lmax=5000, kappa_map=None, F_L_spline=None, C_inv_spline=None):
         self._fish = Fisher()
+        self._power = self._fish.power
+        self._cosmo = self._power.cosmo
         self.N_pix = N_pix
         self.fields = Fields(field_labels, exp, self.N_pix, Lmax, kappa_map)
         self.L_map = self.fields.kM
         self.Lx_map, self.Ly_map = self.get_Lx_Ly_maps()
-        self.F_L_spline, self.C_inv_spline = self._get_F_L_and_C_inv_splines(Lmax)
+        self.F_L_spline, self.C_inv_spline = self._get_F_L_and_C_inv_splines(Lmax, F_L_spline, C_inv_spline)
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
 
-    def _get_F_L_and_C_inv_splines(self, Lmax=5000):
+    def _get_F_L_and_C_inv_splines(self, Lmax=5000, F_L_spline=None, C_inv_spline=None):
+        if F_L_spline != None and C_inv_spline != None:
+            return F_L_spline, C_inv_spline
         sample_Ls = self._fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=150)
         sample_Ls, F_L, C_inv = self._fish.get_F_L(self.fields.fields, Ls=sample_Ls, Ntheta=100, nu=353e9, return_C_inv=True)
         F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
@@ -96,6 +97,8 @@ class OmegaQE:
         I = np.zeros((np.shape(self.L_map)), dtype="complex128")
         r = 1
         s = 0
+        t0 = datetime.datetime.now()
+        print(f"[00:00] {0}%", end='')
         for Chi_i, Chi in enumerate(Chis):
             Cls = dict.fromkeys(self.fields.fields)
             windows = dict.fromkeys(self.fields.fields)
@@ -113,4 +116,7 @@ class OmegaQE:
                 G_i = np.fft.irfft2(g_i, norm=norm)
                 I_tmp += 2 * np.fft.rfft2((F_i * G_j) - (F_j * G_i), norm=norm)
             I += I_tmp / (Chi ** 2) * windows['k']
+            print('\r', end='')
+            print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i+1)/Nchi * 100)}%", end='')
+        print("")
         return I * dChi * dx * dy / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
