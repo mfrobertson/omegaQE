@@ -4,6 +4,7 @@ from fisher import Fisher
 from scipy.interpolate import InterpolatedUnivariateSpline
 import datetime
 
+
 class OmegaQE:
 
     def __init__(self, field_labels, exp="SO", N_pix=2 ** 7, Lmax=5000, kappa_map=None, F_L_spline=None, C_inv_spline=None):
@@ -11,16 +12,17 @@ class OmegaQE:
         self._power = self._fish.power
         self._cosmo = self._power.cosmo
         self.N_pix = N_pix
-        self.fields = Fields(field_labels, exp, self.N_pix, Lmax, kappa_map)
+        self.Lmax = Lmax
+        self.fields = Fields(field_labels, exp, self.N_pix, self.Lmax, kappa_map)
         self.L_map = self.fields.kM
         self.Lx_map, self.Ly_map = self.get_Lx_Ly_maps()
-        self.F_L_spline, self.C_inv_spline = self._get_F_L_and_C_inv_splines(Lmax, F_L_spline, C_inv_spline)
+        self.F_L_spline, self.C_inv_spline = self._get_F_L_and_C_inv_splines(self.Lmax, F_L_spline, C_inv_spline)
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
 
     def _get_F_L_and_C_inv_splines(self, Lmax=5000, F_L_spline=None, C_inv_spline=None):
         if F_L_spline != None and C_inv_spline != None:
             return F_L_spline, C_inv_spline
-        sample_Ls = self._fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=150)
+        sample_Ls = self._fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=300)
         sample_Ls, F_L, C_inv = self._fish.get_F_L(self.fields.fields, Ls=sample_Ls, Ntheta=100, nu=353e9, return_C_inv=True)
         F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
         N_fields = np.size(self.fields.fields)
@@ -33,21 +35,28 @@ class OmegaQE:
         return F_L_spline, C_inv_splines
 
     def _get_Cl_and_window(self, Chi, field, nu=353e9, gal_distro="LSST_gold"):
+        Ls_sample = np.arange(1, self.Lmax + 1)
         if field == "k":
-            Cl = self._power.get_kappa_ps_2source(self.L_map.flatten(), Chi, self._cosmo.get_chi_star(), use_weyl=False)
-            Cl = np.reshape(Cl, np.shape(self.L_map))
+            Cl_sample = self._power.get_kappa_ps_2source(Ls_sample, Chi, self._cosmo.get_chi_star(), use_weyl=False)
+            Cl_spline = InterpolatedUnivariateSpline(Ls_sample, Cl_sample)
+            Cl = Cl_spline(self.L_map)
             window = self._cosmo.cmb_lens_window_matter(Chi, self._cosmo.get_chi_star(), False)
             return Cl, window
         if field == "g":
-            Cl = self._power.get_gal_kappa_ps(self.L_map.flatten(), Chi, gal_distro=gal_distro, use_weyl=False)
-            Cl = np.reshape(Cl, np.shape(self.L_map))
+            Cl_sample = self._power.get_gal_kappa_ps(Ls_sample, Chi, gal_distro=gal_distro, use_weyl=False)
+            Cl_spline = InterpolatedUnivariateSpline(Ls_sample, Cl_sample)
+            Cl = Cl_spline(self.L_map)
             window = self._cosmo.gal_window_Chi(Chi)
             return Cl, window
         if field == "I":
-            Cl = self._power.get_cib_kappa_ps(self.L_map.flatten(), nu=nu, Chi_source1=Chi, use_weyl=False)
-            Cl = np.reshape(Cl, np.shape(self.L_map))
+            Cl_sample = self._power.get_cib_kappa_ps(Ls_sample, nu=nu, Chi_source1=Chi, use_weyl=False)
+            Cl_spline = InterpolatedUnivariateSpline(Ls_sample, Cl_sample)
+            Cl = Cl_spline(self.L_map)
             window = self._cosmo.cib_window_Chi(Chi, nu)
             return Cl, window
+
+    def get_window_k(self, Chi):
+        return self._cosmo.cmb_lens_window_matter(Chi, self._cosmo.get_chi_star(), False)
 
     def get_Lx_Ly_maps(self):
         Lx, Ly = self.fields.get_kx_ky()
@@ -90,8 +99,7 @@ class OmegaQE:
     def get_omega(self, Nchi=20, noise=True):
         norm="forward"
         Lx, Ly = self.fields.get_kx_ky()
-        dx = Lx[1] - Lx[0]
-        dy = Ly[1] - Ly[0]
+        dL = Lx[1] - Lx[0]
         Chis = np.linspace(0, self._cosmo.get_chi_star(), Nchi + 1)[1:]
         dChi = Chis[1] - Chis[0]
         I = np.zeros((np.shape(self.L_map)), dtype="complex128")
@@ -105,7 +113,7 @@ class OmegaQE:
             matter_ps = self._get_matter_ps(Chi)
             for field in self.fields.fields:
                 Cls[field], windows[field] = self._get_Cl_and_window(Chi, field)
-            I_tmp = np.zeros((np.shape(self.L_map)), dtype="complex128")
+            I_tmp = np.zeros((np.shape(self.L_map)[0], np.shape(self.L_map)[0]), dtype="complex128")
             for p in range(2):
                 q = p
                 f_i, g_j = self.get_f_g(p, r, q, s, Cls, windows, matter_ps, noise)
@@ -114,9 +122,10 @@ class OmegaQE:
                 G_j = np.fft.irfft2(g_j, norm=norm)
                 F_j = np.fft.irfft2(f_j, norm=norm)
                 G_i = np.fft.irfft2(g_i, norm=norm)
-                I_tmp += 2 * np.fft.rfft2((F_i * G_j) - (F_j * G_i), norm=norm)
-            I += I_tmp / (Chi ** 2) * windows['k']
+                I_tmp += (F_i * G_j) - (F_j * G_i)
+            window_k = self.get_window_k(Chi)
+            I += 2 * np.fft.rfft2(I_tmp, norm=norm) / (Chi ** 2) * window_k
             print('\r', end='')
             print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i+1)/Nchi * 100)}%", end='')
         print("")
-        return I * dChi * dx * dy / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
+        return I * dChi * dL / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
