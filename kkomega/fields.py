@@ -45,7 +45,7 @@ class Fields:
         for iii, field_i in enumerate(self.fields):
             for jjj, field_j in enumerate(self.fields):
                 C[:, iii, jjj] = self.covariance.get_Cl(field_i + field_j, ellmax=self.kmax)[1:]
-        return C
+        return C * (2*np.pi)**2
 
     def _get_L(self, C):
         N_fields = np.size(self.fields)
@@ -142,7 +142,7 @@ class Fields:
         real = np.random.normal(mean, var, np.shape(self.kM))
         imag = np.random.normal(mean, var, np.shape(self.kM))
         gauss_matrix = real + (1j * imag)
-        return self._enforce_symmetries(np.sqrt(N_spline(self.kM)) * gauss_matrix)
+        return self._enforce_symmetries(np.sqrt(N_spline(self.kM) * (2*np.pi)**2) * gauss_matrix)
 
     def get_ps(self, fft_map1, fft_map2=None, nBins=20):
         fft_map1 = copy.deepcopy(fft_map1)
@@ -154,10 +154,10 @@ class Fields:
         ps[1:, 0] /= 2
         ps[1:, -1] /= 2
         ps = ps.flatten()
-        means, bin_edges, binnumber = stats.binned_statistic(self.k_values, ps, 'mean', bins=nBins)
-        binSeperation = bin_edges[1]
+        means, bin_edges, binnumber = stats.binned_statistic(self.k_values[1:], ps[1:], 'mean', bins=nBins)
+        binSeperation = bin_edges[1] - bin_edges[0]
         kBins = np.asarray([bin_edges[i] - binSeperation / 2 for i in range(1, len(bin_edges))])
-        counts, *others = stats.binned_statistic(self.k_values, ps, 'count', bins=nBins)
-        stds, *others = stats.binned_statistic(self.k_values, ps, 'std', bins=nBins)
+        counts, *others = stats.binned_statistic(self.k_values[1:], ps[1:], 'count', bins=nBins)
+        stds, *others = stats.binned_statistic(self.k_values[1:], ps[1:], 'std', bins=nBins)
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
