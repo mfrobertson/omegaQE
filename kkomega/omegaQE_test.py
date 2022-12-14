@@ -23,7 +23,7 @@ def get_F_L_and_C_inv_splines(fields, Lmax=5000):
 
 def get_omega(field, Nchi, N_pix_pow, F_L_spline, C_inv_spline):
     qe = OmegaQE(field, N_pix=2 ** N_pix_pow, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline)
-    omega = qe.get_omega(Nchi, noise=True)
+    omega = qe.get_omega(Nchi)
     return qe, omega,  qe.F_L_spline
 
 

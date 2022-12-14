@@ -18,6 +18,16 @@ class OmegaQE:
         self.Lx_map, self.Ly_map = self.get_Lx_Ly_maps()
         self.F_L_spline, self.C_inv_spline = self._get_F_L_and_C_inv_splines(self.Lmax, F_L_spline, C_inv_spline)
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
+        self.a_bars = dict.fromkeys(self.fields.fields)
+        self._populate_a_bars()
+
+    def _populate_a_bars(self):
+        for iii, field_i in enumerate(self.fields.fields):
+            a_bar_i = np.zeros(np.shape(self.L_map), dtype="complex128")
+            for jjj, field_j in enumerate(self.fields.fields):
+                a_j = self.fields.fft_maps[field_j] + self.fields.fft_noise_maps[field_j]
+                a_bar_i += a_j * self.C_inv_spline[iii, jjj](self.L_map)
+            self.a_bars[field_i] = a_bar_i
 
     def _get_F_L_and_C_inv_splines(self, Lmax=5000, F_L_spline=None, C_inv_spline=None):
         if F_L_spline != None and C_inv_spline != None:
@@ -75,20 +85,14 @@ class OmegaQE:
         L_r = self.L_comp_map(r)
         return L_p * L_r / ((self.L_map + 0.5) ** 2)
 
-    def get_f_g(self, p, r, q, s, Cls, windows, matter_ps, noise):
+    def get_f_g(self, p, r, q, s, Cls, windows, matter_ps):
         L_fac_f = self.get_L_fac(p, r)
         L_fac_g = self.get_L_fac(q, s)
-        C_inv_spline = self.C_inv_spline
         h_f = 0
         h_g = 0
         for iii, field_i in enumerate(self.fields.fields):
-            for jjj, field_j in enumerate(self.fields.fields):
-                if noise:
-                    a_j = self.fields.fft_maps[field_j] + self.fields.fft_noise_maps[field_j]
-                else:
-                    a_j = self.fields.fft_maps[field_j]
-                h_f += windows[field_i] * a_j * C_inv_spline[iii, jjj](self.L_map)
-                h_g += Cls[field_i] * a_j * C_inv_spline[iii, jjj](self.L_map)
+            h_f += windows[field_i] * self.a_bars[field_i]
+            h_g += Cls[field_i] * self.a_bars[field_i]
         return L_fac_f * h_f * matter_ps, L_fac_g * h_g
 
     def _get_matter_ps(self, Chi):
@@ -96,8 +100,8 @@ class OmegaQE:
         ks = (self.L_map + 0.5) / Chi
         return self._cosmo.get_matter_ps(self.matter_PK, z, ks, weyl_scaled=False, typ="matter")
 
-    def get_omega(self, Nchi=20, noise=True):
-        norm="forward"
+    def get_omega(self, Nchi=20):
+        norm = "forward"
         Lx, Ly = self.fields.get_kx_ky()
         dL = Lx[1] - Lx[0]
         Chis = np.linspace(0, self._cosmo.get_chi_star(), Nchi + 1)[1:]
@@ -116,8 +120,8 @@ class OmegaQE:
             I_tmp = np.zeros((np.shape(self.L_map)[0], np.shape(self.L_map)[0]), dtype="complex128")
             for p in range(2):
                 q = p
-                f_i, g_j = self.get_f_g(p, r, q, s, Cls, windows, matter_ps, noise)
-                f_j, g_i = self.get_f_g(q, s, p, r, Cls, windows, matter_ps, noise)
+                f_i, g_j = self.get_f_g(p, r, q, s, Cls, windows, matter_ps)
+                f_j, g_i = self.get_f_g(q, s, p, r, Cls, windows, matter_ps)
                 F_i = np.fft.irfft2(f_i, norm=norm)
                 G_j = np.fft.irfft2(g_j, norm=norm)
                 F_j = np.fft.irfft2(f_j, norm=norm)
