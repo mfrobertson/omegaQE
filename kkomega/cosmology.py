@@ -243,7 +243,7 @@ class Cosmology:
         k_B = physical_constants["Boltzmann constant"][0]
         exponent = np.asarray((h*nu)/(k_B*T), dtype=np.double)
         exponent[exponent>700] = np.double(700)
-        small_nu = (np.exp(exponent) - 1) ** -1 * nu ** pow
+        small_nu = (np.exp(exponent) - 1) ** -1 * nu ** power
         big_nu = (np.exp(exponent) - 1)**-1 * nu_prim**power * (nu/nu_prim)**-alpha
         if np.shape(nu) != ():
             w1 = np.zeros(np.shape(nu))
