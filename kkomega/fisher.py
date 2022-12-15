@@ -22,7 +22,7 @@ class Fisher:
     power : Powerspectra
     """
 
-    def __init__(self, exp="SO", qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False):
+    def __init__(self, exp="SO", qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir="data", setup_bispectra=False):
         """
         Constructor
 
@@ -31,8 +31,10 @@ class Fisher:
 
         """
         self.covariance = Covariance()
-        self.setup_noise(exp, qe, gmv, ps, L_cuts, iter)
+        self.setup_noise(exp, qe, gmv, ps, L_cuts, iter, data_dir)
         self.bi = Bispectra()
+        if setup_bispectra:
+            self.setup_bispectra()
         self.power = self.covariance.power
         self.opt_I_cache = None
 
@@ -45,16 +47,17 @@ class Fisher:
         if not path_exists(path):
             raise FileNotFoundError(f"Path {path} does not exist")
 
-    def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None):
+    def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None):
         if exp is not None: self.exp = exp
         if qe is not None: self.qe = qe
         if gmv is not None: self.gmv = gmv
         if ps is not None: self.ps = ps
         if L_cuts is not None: self.L_cuts = L_cuts
         if iter is not None: self.iter = iter
+        if data_dir is not None: self.data_dir = data_dir
         self.reset_noise()
 
-    def setup_bispectra(self, path, ellmax=4000, Nell=100):    #4100 200
+    def setup_bispectra(self, path="cache/_M", ellmax=5000, Nell=100):
         """
 
         Parameters
@@ -277,32 +280,32 @@ class Fisher:
             self.opt_I_cache = None
         return F
 
-    def _get_F_L_element_sample(self, typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro="LSST_gold"):
-        Lmax, Lmin, _, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta, typ, nu, gal_bins, typs, C_inv, gal_distro=gal_distro)
+    def _get_F_L_element_sample(self, typs, typ, Ls, Nell2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro="LSST_gold"):
+        Lmax, Lmin, _, thetas, dTheta, weights, C1_spline, C2_spline, _ = self._integral_prep_sample(Ls, Ntheta, typ, nu, gal_bins, typs, C_inv, gal_distro=gal_distro)
         F_L = np.zeros(np.size(Ls))
-        Ls2 = np.arange(Lmin, Lmax + 1, dL2)
+        Ls2 = self.covariance.get_log_sample_Ls(Lmin, Lmax, Nell2)
         if any([np.isin(typ_i, self.covariance.test_types) for typ_i in typ[4:]]):
             typ = "opt_kkkk"    # if any test types are detected, it is assumed all observables are kappa
         for iii, L3 in enumerate(Ls):
-            L2 = Ls2[None, :]
-            L3_vec = vector.obj(rho=L3, phi=0)
-            L2_vec = vector.obj(rho=L2, phi=thetas[:,None])
-            L1_vec = L3_vec + L2_vec
-            L1 = L1_vec.rho
-            w = np.ones(np.shape(L1))
-            w[L1 > Lmax] = 0
-            w[L1 < Lmin] = 0
-            thetas12 = L1_vec.deltaphi(L2_vec)
-            bi1 = self.bi.get_bispectrum(typ[4:6] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-            bi2 = self.bi.get_bispectrum(typ[6:] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-            covs = C1_spline(L1) * C2_spline(L2)
-            I_tmp = dL2 * 2 * np.sum(L2 * w * dTheta * bi1 * bi2 * covs)
-            F_L[iii] = I_tmp / (2 * C_omega_spline(L3))
+            I_tmp = np.zeros(np.size(Ls2))
+            for jjj, L2 in enumerate(Ls2):
+                L3_vec = vector.obj(rho=L3, phi=0)
+                L2_vec = vector.obj(rho=L2, phi=thetas)
+                L1_vec = L3_vec - L2_vec
+                L1 = L1_vec.rho
+                w = np.ones(np.shape(L1))
+                w[L1 > Lmax] = 0
+                w[L1 < Lmin] = 0
+                thetas12 = L1_vec.deltaphi(L2_vec)
+                bi1 = self.bi.get_bispectrum(typ[4:6] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+                bi2 = self.bi.get_bispectrum(typ[6:] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+                covs = C1_spline(L1) * C2_spline(L2)
+                I_tmp[jjj] = 2 * np.sum(L2 * w * dTheta * bi1 * bi2 * covs)
+            F_L[iii] = InterpolatedUnivariateSpline(Ls2, I_tmp).integral(Lmin, Lmax) / (2 * C_omega_spline(L3))
         F_L *= 1 / ((2 * np.pi) ** 2)
         return F_L
 
-
-    def _get_F_L(self, typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro="LSST_gold"):
+    def _get_F_L(self, typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro="LSST_gold"):
         typs = np.char.array(typs)
         Lmax = np.int(np.max(Ls))
         C_inv = self.covariance.get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
@@ -316,7 +319,7 @@ class Fisher:
         for iii in np.arange(Ncombos):
             for jjj in np.arange(iii, Ncombos):
                 typ = "opt_" + combos[iii] + combos[jjj]
-                F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro=gal_distro)
+                F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, Nell2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro=gal_distro)
                 if combos[iii] != combos[jjj]:
                     factor = 2
                 else:
@@ -356,7 +359,7 @@ class Fisher:
             return self._get_bispectrum_Fisher_sample(typ, Ls, dL2, Ntheta, f_sky, arr, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
 
-    def get_F_L(self, typs, Ls, dL2=2, Ntheta=100, nu=353e9, gal_bins=(None,None,None,None), return_C_inv=False, gal_distro="LSST_gold"):
+    def get_F_L(self, typs, Ls, Nell2=2, Ntheta=100, nu=353e9, gal_bins=(None,None,None,None), return_C_inv=False, gal_distro="LSST_gold"):
         """
 
         Parameters
@@ -371,7 +374,7 @@ class Fisher:
 
         """
         typs = list(typs)
-        return self._get_F_L(typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro=gal_distro)
+        return self._get_F_L(typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro=gal_distro)
 
     def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1, verbose=False, nu=353e9, gal_bins=(None,None,None,None), save_array=False, only_bins=False, gal_distro="LSST_gold"):
         """
@@ -428,4 +431,4 @@ class Fisher:
         -------
 
         """
-        self.covariance.setup_cmb_noise(self.exp, self.qe, self.gmv, self.ps, self.L_cuts[0], self.L_cuts[1], self.L_cuts[2], self.L_cuts[3], self.iter)
+        self.covariance.setup_cmb_noise(self.exp, self.qe, self.gmv, self.ps, self.L_cuts[0], self.L_cuts[1], self.L_cuts[2], self.L_cuts[3], self.iter, self.data_dir)
