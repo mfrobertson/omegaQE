@@ -40,33 +40,25 @@ class Bispectra:
         s = (mag1 + mag2 + mag3)/2
         return 2 * np.sqrt(s*(s-mag1)*(s-mag2)*(s-mag3))
 
-    def _get_sign(self, typ):
-        if typ == "kk":
-            return 1
-        if typ[0] == "k" or typ[1] == "k":
-            return -1
-        return 1
-
     def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
         L12_dot = None
         if L3 is not None:
             L12_dot = self._triangle_dot_product(L1, L2, L3)
         M_typ1 = typ[:2]
         M_typ2 = M_typ1[::-1]
-        sign = self._get_sign(M_typ1)
         if M_spline:
             M1 = self._M_splines[M_typ1].spline.ev(L1, L2)
             M2 = self._M_splines[M_typ2].spline.ev(L2, L1)
-            return M1, M2, L12_dot, sign
+            return M1, M2, L12_dot
         M1 = self._mode.components(L1, L2, typ=M_typ1, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         M2 = self._mode.components(L2, L1, typ=M_typ2, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-        return M1, M2, L12_dot, sign
+        return M1, M2, L12_dot
 
     def _kappa1_kappa1_kappa2(self, L1, L2, L3, M_spline, zmin, zmax):
-        M1, M2, L12_dot, sign = self._bispectra_prep("kkk", L1, L2, L3, M_spline, zmin, zmax)
+        M1, M2, L12_dot = self._bispectra_prep("kkk", L1, L2, L3, M_spline, zmin, zmax)
         L13_dot = self._triangle_dot_product(L1, L3, L2)
         L23_dot = self._triangle_dot_product(L2, L3, L1)
-        return sign * 2*L12_dot*(L13_dot*M1 + L23_dot*M2)/(L1**2 * L2**2)
+        return 2*L12_dot*(L13_dot*M1 + L23_dot*M2)/(L1**2 * L2**2)
 
     def _kappa1_kappa2_kappa1(self, L1, L2, L3, M_spline, zmin, zmax):
         return self._kappa1_kappa1_kappa2(L3, L1, L2, M_spline, zmin, zmax)
@@ -139,14 +131,14 @@ class Bispectra:
         return True
 
     def _bispectrum(self, typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold"):
-        M1, M2, L12_dot, sign = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+        M1, M2, L12_dot = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         L13_cross = self._triangle_cross_product(L1, L3, L2)
         L23_cross = self._triangle_cross_product(L2, L3, L1)
-        return sign * 2 * L12_dot * (L13_cross * M1 - L23_cross * M2)/(L1**2 * L2**2)
+        return 2 * L12_dot * (L13_cross * M1 - L23_cross * M2)/(L1**2 * L2**2)
 
     def _bispectrum_angle(self, typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold"):
-        M1, M2, _, sign = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-        return sign * np.sin(2 * theta) * (M1 - M2)
+        M1, M2, _ = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+        return np.sin(2 * theta) * (M1 - M2)
 
     def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
         """

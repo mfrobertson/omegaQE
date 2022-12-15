@@ -230,7 +230,7 @@ class Powerspectra:
         window1 = self.cosmo.cmb_lens_window_matter(Chis, Chi_source1)
         window2 = self.cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin, zmax=gal_win_zmax)
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
-        return (-1) * I.sum(axis=1)
+        return I.sum(axis=1)
 
     def _Cl_gal(self, ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended, gal_distro="LSST_gold"):
         step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
@@ -260,7 +260,7 @@ class Powerspectra:
         window1 = self.cosmo.cmb_lens_window_matter(Chis, Chi_source1)
         window2 = self.cosmo.cib_window_Chi(Chis, nu, b_c=bias)
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
-        return (-1) * I.sum(axis=1)
+        return I.sum(axis=1)
 
     def _Cl_cib(self, ells, nu, Nchi, zmin, zmax, kmin, kmax, extended, bias):
         step, Chis, matter_ps, dChi= self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
