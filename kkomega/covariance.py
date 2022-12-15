@@ -15,9 +15,9 @@ class Covariance:
         self.binned_gal_types = list("abcdef")
         self.test_types = list("xyz")
 
-    def get_log_sample_Ls(self, Lmin, Lmax, Nells=500):
+    def get_log_sample_Ls(self, Lmin, Lmax, Nells=500, dL_small=1):
         floaty = Lmax / 1000
-        samp1 = np.arange(Lmin, floaty * 10, 1)
+        samp1 = np.arange(Lmin, floaty * 10, dL_small)
         samp2 = np.logspace(1, 3, Nells-np.size(samp1)) * floaty
         return np.concatenate((samp1, samp2))
 

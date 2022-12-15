@@ -314,7 +314,8 @@ class Fisher:
         Ncombos = np.size(combos)
         F_L = np.zeros(np.size(Ls))
         perms = 0
-        omega_ells, C_omega = self.power.get_camb_postborn_omega_ps(Lmax * 2)
+        omega_ells = self.covariance.get_log_sample_Ls(2, Lmax, 100, dL_small=2)
+        C_omega = omega_ps(Lmax)
         C_omega_spline = InterpolatedUnivariateSpline(omega_ells, C_omega)
         for iii in np.arange(Ncombos):
             for jjj in np.arange(iii, Ncombos):
