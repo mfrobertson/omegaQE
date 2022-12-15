@@ -44,28 +44,28 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
             pass
 
     _output("-------------------------------------", my_rank, _id)
-    _output("Setting up parallisation of workload.", my_rank, _id)
-
-    _output("Initialising Fisher object.", my_rank, _id)
+    _output("Initialising Fisher object...", my_rank, _id)
 
     fish = Fisher()
     fish.setup_noise(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir="data")
     fish.setup_bispectra(Nell=200)
+
+    _output("Setting up parallisation of workload...", my_rank, _id)
 
     Ls = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=N_Ls, dL_small=2)
 
     workloads = _get_workloads(N_Ls, world_size)
     my_start, my_end = _get_start_end(my_rank, workloads)
 
-    _output("Initialisation finished.", my_rank, _id)
-
     nu = 353e9
+
+    _output("Starting F_L calculation...", my_rank, _id)
 
     start_time = MPI.Wtime()
     Ls, F_L = fish.get_F_L(typ, Ls[my_start: my_end], Nell2=NL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold")
     end_time = MPI.Wtime()
 
-    _output("Bias calculation finished.", my_rank, _id)
+    _output("Broadcasting results...", my_rank, _id)
 
     if my_rank == 0:
         print("F_L time: " + str(end_time - start_time))
