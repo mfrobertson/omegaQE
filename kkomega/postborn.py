@@ -34,7 +34,7 @@ def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb)
     return 4 * I / ((2 * np.pi) ** 2)
 
 
-def omega_ps(ells, M_path=None, Nell_prim=1000, Ntheta=500, cmb=True):
+def omega_ps(ells, M_path="cache/_M", Nell_prim=1000, Ntheta=500, cmb=True):
     """
 
     Parameters
