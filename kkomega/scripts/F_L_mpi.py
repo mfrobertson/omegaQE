@@ -52,7 +52,7 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
     fish.setup_noise(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir="data")
     fish.setup_bispectra(Nell=200)
 
-    Ls = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=N_Ls)
+    Ls = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=N_Ls, dL_small=2)
 
     workloads = _get_workloads(N_Ls, world_size)
     my_start, my_end = _get_start_end(my_rank, workloads)
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     Lmax = int(args[4])
     NL2 = int(args[5])
     Ntheta = int(args[6])
-    N_Ls = int(args[6])
-    out_dir = args[7]
-    _id = args[8]
+    N_Ls = int(args[7])
+    out_dir = args[8]
+    _id = args[9]
     _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id)
