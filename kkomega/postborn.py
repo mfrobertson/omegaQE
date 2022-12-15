@@ -19,7 +19,10 @@ def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb)
     samp1 = np.arange(Lmin, floaty * 10, 1)
     samp2 = np.logspace(1, 3, Nell_prim - np.size(samp1)) * floaty
     Lprims = np.concatenate((samp1, samp2))
-    I = np.zeros(np.size(Ls))
+    N_Ls = np.size(Ls)
+    I = np.zeros(N_Ls)
+    if N_Ls == 1:
+        Ls = np.array([Ls])
     for iii, L in enumerate(Ls):
         L_vec = vector.obj(rho=L, phi=0)
         I_tmp = np.zeros(np.size(Lprims))
