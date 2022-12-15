@@ -64,8 +64,8 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
     fish.C_inv = C_inv
 
     _output("    Storing C_omega_spline...", my_rank, _id)
-    C_omega = np.load("cache/C_omega/C_omega.npy")
-    omega_Ls = np.load("cache/C_omega/Ls.npy")
+    C_omega = np.load("cache/_C_omega/C_omega.npy")
+    omega_Ls = np.load("cache/_C_omega/Ls.npy")
     fish.C_omega_spline = InterpolatedUnivariateSpline(omega_Ls, C_omega)
 
     _output("Setting up parallelisation of workload...", my_rank, _id)
