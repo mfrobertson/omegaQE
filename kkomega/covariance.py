@@ -21,8 +21,8 @@ class Covariance:
         samp2 = np.logspace(1, 3, Nells-np.size(samp1)) * floaty
         return np.concatenate((samp1, samp2))
 
-    def setup_cmb_noise(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter):
-        self.noise.setup_cmb_noise(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter)
+    def setup_cmb_noise(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, data_dir):
+        self.noise.setup_cmb_noise(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, data_dir)
 
     def _interpolate(self, arr):
         ells_sample = np.arange(np.size(arr))
