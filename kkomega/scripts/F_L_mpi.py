@@ -5,6 +5,7 @@ from cache.tools import parse_boolean
 import os
 import sys
 import datetime
+from scipy.interpolate import InterpolatedUnivariateSpline
 
 
 def _get_workloads(N, world_size):
@@ -46,23 +47,38 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
     _output("-------------------------------------", my_rank, _id)
     _output("Initialising Fisher object...", my_rank, _id)
 
+    nu = 353e9
     fish = Fisher()
     fish.setup_noise(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir="data")
     fish.setup_bispectra(Nell=200)
 
-    _output("Setting up parallisation of workload...", my_rank, _id)
+    _output("    Preparing C_inv...", my_rank, _id)
+    if my_rank == 0:
+        C_inv = fish.covariance.get_C_inv(typ, Lmax, nu)
+    else:
+        N_typs = np.size(list(typ))
+        C_inv = np.empty((N_typs, N_typs, Lmax + 1), dtype='d')
+
+    _output("    Broadcasting and storing C_inv...", my_rank, _id)
+    world_comm.Bcast([C_inv, MPI.DOUBLE], root=0)
+    fish.C_inv = C_inv
+
+    _output("    Storing C_omega_spline...", my_rank, _id)
+    C_omega = np.load("cache/C_omega/C_omega.npy")
+    omega_Ls = np.load("cache/C_omega/Ls.npy")
+    fish.C_omega_spline = InterpolatedUnivariateSpline(omega_Ls, C_omega)
+
+    _output("Setting up parallelisation of workload...", my_rank, _id)
 
     Ls = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=N_Ls, dL_small=2)
 
     workloads = _get_workloads(N_Ls, world_size)
     my_start, my_end = _get_start_end(my_rank, workloads)
 
-    nu = 353e9
-
     _output("Starting F_L calculation...", my_rank, _id)
 
     start_time = MPI.Wtime()
-    Ls, F_L = fish.get_F_L(typ, Ls[my_start: my_end], Nell2=NL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold")
+    Ls, F_L = fish.get_F_L(typ, Ls[my_start: my_end], Nell2=NL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True)
     end_time = MPI.Wtime()
 
     _output("Broadcasting results...", my_rank, _id)

@@ -37,6 +37,8 @@ class Fisher:
             self.setup_bispectra()
         self.power = self.covariance.power
         self.opt_I_cache = None
+        self.C_inv = None
+        self.C_omega_spline = None
 
     def _files_match(self, ell_file, M_file):
         if ell_file[:-8] == M_file[:-5]:
@@ -305,18 +307,22 @@ class Fisher:
         F_L *= 1 / ((2 * np.pi) ** 2)
         return F_L
 
-    def _get_F_L(self, typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro="LSST_gold"):
+    def _get_F_L(self, typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache):
         typs = np.char.array(typs)
         Lmax = np.int(np.max(Ls))
-        C_inv = self.covariance.get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
+        if use_cache:
+            C_inv = self.C_inv
+            C_omega_spline = self.C_omega_spline
+        else:
+            C_inv = self.covariance.get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
+            omega_ells = self.covariance.get_log_sample_Ls(2, Lmax, 100, dL_small=2)
+            C_omega = omega_ps(Lmax)
+            C_omega_spline = InterpolatedUnivariateSpline(omega_ells, C_omega)
         all_combos = typs[:, None] + typs[None, :]
         combos = all_combos.flatten()
         Ncombos = np.size(combos)
         F_L = np.zeros(np.size(Ls))
         perms = 0
-        omega_ells = self.covariance.get_log_sample_Ls(2, Lmax, 100, dL_small=2)
-        C_omega = omega_ps(Lmax)
-        C_omega_spline = InterpolatedUnivariateSpline(omega_ells, C_omega)
         for iii in np.arange(Ncombos):
             for jjj in np.arange(iii, Ncombos):
                 typ = "opt_" + combos[iii] + combos[jjj]
@@ -360,7 +366,7 @@ class Fisher:
             return self._get_bispectrum_Fisher_sample(typ, Ls, dL2, Ntheta, f_sky, arr, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
 
-    def get_F_L(self, typs, Ls, Nell2=2, Ntheta=100, nu=353e9, gal_bins=(None,None,None,None), return_C_inv=False, gal_distro="LSST_gold"):
+    def get_F_L(self, typs, Ls, Nell2=2, Ntheta=100, nu=353e9, gal_bins=(None,None,None,None), return_C_inv=False, gal_distro="LSST_gold", use_cache=False):
         """
 
         Parameters
@@ -375,7 +381,7 @@ class Fisher:
 
         """
         typs = list(typs)
-        return self._get_F_L(typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro=gal_distro)
+        return self._get_F_L(typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache)
 
     def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1, verbose=False, nu=353e9, gal_bins=(None,None,None,None), save_array=False, only_bins=False, gal_distro="LSST_gold"):
         """
