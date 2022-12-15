@@ -221,7 +221,7 @@ class Modecoupling:
         M = self._matrix(ells_sample, ells_sample, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro=gal_distro)
         return RectBivariateSpline(ells_sample, ells_sample, M)
 
-    def generate_sample_ells(self, ellmax=10000, Nells=100):
+    def generate_sample_ells(self, ellmax=5000, Nells=100):
         """
         Produces optimised sample of multipole moments for input into spline build.
 
