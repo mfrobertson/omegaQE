@@ -1,7 +1,7 @@
 import numpy as np
 from bispectra import Bispectra
 from covariance import Covariance
-from postborn import Postborn
+from postborn import omega_ps
 from scipy.interpolate import InterpolatedUnivariateSpline
 from cache.tools import getFileSep, path_exists
 import copy
@@ -411,7 +411,7 @@ class Fisher:
         else:
             # ells = np.arange(2, Lmax + 3, 50)
             ells = np.concatenate((np.arange(2,40,10), np.logspace(1, 3, 50)*4))
-            Cl = Postborn().get_postborn_omega_ps(ells, M_path, cmb=cmb)
+            Cl = omega_ps(ells, M_path, cmb=cmb)
         Cl_spline = InterpolatedUnivariateSpline(ells, Cl)
         ells = np.arange(Lmin, Lmax + 1)
         if cmb:

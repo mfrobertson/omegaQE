@@ -505,7 +505,7 @@ class Cosmology:
             return ps * k ** 3 / (2 * np.pi ** 2)
         return ps
 
-    def get_postborn_omega_ps(self, ellmax=20000):
+    def get_postborn_omega_ps(self, ellmax=20000, acc=1):
         """
 
         Parameters
@@ -516,7 +516,7 @@ class Cosmology:
         -------
 
         """
-        return postborn.get_field_rotation_power(self._pars, lmax=ellmax)
+        return postborn.get_field_rotation_power(self._pars, lmax=ellmax, acc=acc)
 
     def get_cmb_ps(self, ellmax=4000):
         """
