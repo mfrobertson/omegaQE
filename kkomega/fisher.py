@@ -120,10 +120,7 @@ class Fisher:
             return C1_spline, C2_spline, C3_spline
         return C1, C2, C3_spline
 
-    def _get_optimal_Ns_sympy(self, Lmax, typ, typs, C_inv, all_spline=False):
-        N0_omega_spline = self._interpolate(self.covariance.noise.get_N0("omega", Lmax))
-        cov3_spline = N0_omega_spline
-
+    def _get_optimal_Ns_sympy(self, Lmax, typ, typs, C_inv, all_spline=False, return_cov3=True):
         combo1_idx1 = np.where(typs == typ[0])[0][0]
         combo1_idx2 = np.where(typs == typ[2])[0][0]
         combo2_idx1 = np.where(typs == typ[1])[0][0]
@@ -132,10 +129,13 @@ class Fisher:
         cov_inv1 = C_inv[combo1_idx1][combo1_idx2]
         cov_inv2 = C_inv[combo2_idx1][combo2_idx2]
         if all_spline:
-            cov_inv1_spline = self._interpolate(cov_inv1)
-            cov_inv2_spline = self._interpolate(cov_inv2)
-            return cov_inv1_spline, cov_inv2_spline, cov3_spline
-        return cov_inv1, cov_inv2, cov3_spline
+            cov_inv1 = self._interpolate(cov_inv1)
+            cov_inv2 = self._interpolate(cov_inv2)
+        if not return_cov3:
+            return cov_inv1, cov_inv2
+        N0_omega_spline = self._interpolate(self.covariance.noise.get_N0("omega", Lmax))
+        cov3 = N0_omega_spline
+        return cov_inv1, cov_inv2, cov3
 
     def _get_thetas(self, Ntheta):
         dTheta = np.pi / Ntheta
@@ -180,6 +180,14 @@ class Fisher:
         dLs[:-1] = Ls[1:] - Ls[0:-1]
         dLs[-1] = dLs[-2]
         return Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline
+
+    def _integral_prep_F_L(self, Ls, Ntheta, typ, typs=None, C_inv=None):
+        Lmax = int(np.max(Ls))
+        Lmin = int(np.min(Ls))
+        C1_spline, C2_spline = self._get_optimal_Ns_sympy(Lmax, typ[4:], typs, C_inv, all_spline=True, return_cov3=False)
+        thetas, dTheta = self._get_thetas(Ntheta)
+        weights = np.ones(np.size(thetas))
+        return Lmax, Lmin, thetas, dTheta, weights, C1_spline, C2_spline
 
     def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins, gal_distro="LSST_gold"):
         Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta,typ, nu, gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
@@ -283,7 +291,7 @@ class Fisher:
         return F
 
     def _get_F_L_element_sample(self, typs, typ, Ls, Nell2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro="LSST_gold"):
-        Lmax, Lmin, _, thetas, dTheta, weights, C1_spline, C2_spline, _ = self._integral_prep_sample(Ls, Ntheta, typ, nu, gal_bins, typs, C_inv, gal_distro=gal_distro)
+        Lmax, Lmin, thetas, dTheta, weights, C1_spline, C2_spline = self._integral_prep_F_L(Ls, Ntheta, typ, typs, C_inv)
         F_L = np.zeros(np.size(Ls))
         Ls2 = self.covariance.get_log_sample_Ls(Lmin, Lmax, Nell2)
         if any([np.isin(typ_i, self.covariance.test_types) for typ_i in typ[4:]]):
@@ -316,7 +324,7 @@ class Fisher:
         else:
             C_inv = self.covariance.get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
             omega_ells = self.covariance.get_log_sample_Ls(2, Lmax, 100, dL_small=2)
-            C_omega = omega_ps(Lmax)
+            C_omega = omega_ps(omega_ells)
             C_omega_spline = InterpolatedUnivariateSpline(omega_ells, C_omega)
         all_combos = typs[:, None] + typs[None, :]
         combos = all_combos.flatten()
@@ -366,7 +374,7 @@ class Fisher:
             return self._get_bispectrum_Fisher_sample(typ, Ls, dL2, Ntheta, f_sky, arr, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
 
-    def get_F_L(self, typs, Ls, Nell2=2, Ntheta=100, nu=353e9, gal_bins=(None,None,None,None), return_C_inv=False, gal_distro="LSST_gold", use_cache=False):
+    def get_F_L(self, typs, Ls, Nell2=1000, Ntheta=1000, nu=353e9, gal_bins=(None,None,None,None), return_C_inv=False, gal_distro="LSST_gold", use_cache=False):
         """
 
         Parameters
