@@ -45,11 +45,16 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
             pass
 
     _output("-------------------------------------", my_rank, _id)
-    _output("Initialising Fisher object...", my_rank, _id)
-
+    _output(f"typ:{typ}, exp:{exp}, fields:{fields}, gmv:{gmv}, Lmax:{Lmax}, NL2:{NL2}, Ntheta:{Ntheta}, N_Ls:{N_Ls}", my_rank, _id)
     nu = 353e9
+
+    _output("Initialising Fisher object...", my_rank, _id)
     fish = Fisher()
+
+    _output("Setting up noise...", my_rank, _id)
     fish.setup_noise(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir="data")
+
+    _output("Setting up bispectra splines...", my_rank, _id)
     fish.setup_bispectra(Nell=200)
 
     _output("    Preparing C_inv...", my_rank, _id)
@@ -78,7 +83,7 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
     _output("Starting F_L calculation...", my_rank, _id)
 
     start_time = MPI.Wtime()
-    Ls, F_L = fish.get_F_L(typ, Ls[my_start: my_end], Nell2=NL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True)
+    Ls, F_L = fish.get_F_L(typ, Ls[my_start: my_end], Nell2=NL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True, Lmin=30, Lmax=5000)
     end_time = MPI.Wtime()
 
     _output("Broadcasting results...", my_rank, _id)
