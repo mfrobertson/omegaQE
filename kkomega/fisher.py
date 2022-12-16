@@ -181,13 +181,11 @@ class Fisher:
         dLs[-1] = dLs[-2]
         return Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline
 
-    def _integral_prep_F_L(self, Ls, Ntheta, typ, typs=None, C_inv=None):
-        Lmax = int(np.max(Ls))
-        Lmin = int(np.min(Ls))
+    def _integral_prep_F_L(self, Lmax, Ntheta, typ, typs, C_inv):
         C1_spline, C2_spline = self._get_optimal_Ns_sympy(Lmax, typ[4:], typs, C_inv, all_spline=True, return_cov3=False)
         thetas, dTheta = self._get_thetas(Ntheta)
         weights = np.ones(np.size(thetas))
-        return Lmax, Lmin, thetas, dTheta, weights, C1_spline, C2_spline
+        return thetas, dTheta, weights, C1_spline, C2_spline
 
     def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins, gal_distro="LSST_gold"):
         Lmax, Lmin, dLs, thetas, dTheta, weights, C1_spline, C2_spline, C3_spline = self._integral_prep_sample(Ls, Ntheta,typ, nu, gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
@@ -290,12 +288,14 @@ class Fisher:
             self.opt_I_cache = None
         return F
 
-    def _get_F_L_element_sample(self, typs, typ, Ls, Nell2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro="LSST_gold"):
-        Lmax, Lmin, thetas, dTheta, weights, C1_spline, C2_spline = self._integral_prep_F_L(Ls, Ntheta, typ, typs, C_inv)
+    def _get_F_L_element_sample(self, typs, typ, Ls, Nell2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax):
+        thetas, dTheta, weights, C1_spline, C2_spline = self._integral_prep_F_L(Lmax, Ntheta, typ, typs, C_inv)
         F_L = np.zeros(np.size(Ls))
         Ls2 = self.covariance.get_log_sample_Ls(Lmin, Lmax, Nell2)
         if any([np.isin(typ_i, self.covariance.test_types) for typ_i in typ[4:]]):
             typ = "opt_kkkk"    # if any test types are detected, it is assumed all observables are kappa
+        if np.size(Ls) == 1:
+            Ls = np.array([Ls])
         for iii, L3 in enumerate(Ls):
             I_tmp = np.zeros(np.size(Ls2))
             for jjj, L2 in enumerate(Ls2):
@@ -315,9 +315,10 @@ class Fisher:
         F_L *= 1 / ((2 * np.pi) ** 2)
         return F_L
 
-    def _get_F_L(self, typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache):
+    def _get_F_L(self, typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax):
+        if Lmax is None: Lmax = int(np.ceil(np.max(Ls)))
+        if Lmin is None: Lmin = int(np.floor(np.min(Ls)))
         typs = np.char.array(typs)
-        Lmax = np.int(np.max(Ls))
         if use_cache:
             C_inv = self.C_inv
             C_omega_spline = self.C_omega_spline
@@ -334,7 +335,7 @@ class Fisher:
         for iii in np.arange(Ncombos):
             for jjj in np.arange(iii, Ncombos):
                 typ = "opt_" + combos[iii] + combos[jjj]
-                F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, Nell2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro=gal_distro)
+                F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, Nell2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax)
                 if combos[iii] != combos[jjj]:
                     factor = 2
                 else:
@@ -374,7 +375,7 @@ class Fisher:
             return self._get_bispectrum_Fisher_sample(typ, Ls, dL2, Ntheta, f_sky, arr, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins, include_N0_kappa=include_N0_kappa, gal_distro=gal_distro)
 
-    def get_F_L(self, typs, Ls, Nell2=1000, Ntheta=1000, nu=353e9, gal_bins=(None,None,None,None), return_C_inv=False, gal_distro="LSST_gold", use_cache=False):
+    def get_F_L(self, typs, Ls, Nell2=1000, Ntheta=1000, nu=353e9, gal_bins=(None,None,None,None), return_C_inv=False, gal_distro="LSST_gold", use_cache=False, Lmin=None, Lmax=None):
         """
 
         Parameters
@@ -389,7 +390,7 @@ class Fisher:
 
         """
         typs = list(typs)
-        return self._get_F_L(typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache)
+        return self._get_F_L(typs, Ls, Nell2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax)
 
     def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1, verbose=False, nu=353e9, gal_bins=(None,None,None,None), save_array=False, only_bins=False, gal_distro="LSST_gold"):
         """
