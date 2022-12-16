@@ -86,7 +86,7 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
     if my_rank == 0:
         print("F_L time: " + str(end_time - start_time))
         _output("F_L time: " + str(end_time - start_time), my_rank, _id)
-        F_L_arr = np.ones(Ls)
+        F_L_arr = np.ones(N_Ls)
         F_L_arr[my_start: my_end] = F_L
         for rank in range(1, world_size):
             start, end = _get_start_end(rank, workloads)
