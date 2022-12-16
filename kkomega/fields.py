@@ -8,7 +8,7 @@ import copy
 class Fields:
 
 
-    def __init__(self, fields, exp="SO", N_pix=2**7, kmax=5000, kappa_map=None):
+    def __init__(self, fields, exp="SO", N_pix=2**7, kmax=3000, kappa_map=None):
         if kappa_map is None:
             self.fields = self._get_fields(fields)
             self.N_pix = N_pix
@@ -18,9 +18,10 @@ class Fields:
             self.N_pix = np.shape(kappa_map)[0]
             self.enforce_real = False
         self.kmax = kmax
+        self.kmax_map = int(np.sqrt(2) * kmax) + 1
         self.kM, self.k_values = self._get_k_values()
         self.covariance = Covariance()
-        self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False)
+        self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, data_dir="data")
         self.y = self._get_y(kappa_map)
         self.maps = dict.fromkeys(self.fields)
         self.fft_maps = dict.fromkeys(self.fields)
@@ -41,15 +42,15 @@ class Fields:
 
     def _get_cov(self):
         N_fields = np.size(self.fields)
-        C = np.empty((self.kmax, N_fields, N_fields))
+        C = np.empty((self.kmax_map, N_fields, N_fields))
         for iii, field_i in enumerate(self.fields):
             for jjj, field_j in enumerate(self.fields):
-                C[:, iii, jjj] = self.covariance.get_Cl(field_i + field_j, ellmax=self.kmax)[1:]
+                C[:, iii, jjj] = self.covariance.get_Cl(field_i + field_j, ellmax=self.kmax_map)[1:]
         return C * (2*np.pi)**2
 
     def _get_L(self, C):
         N_fields = np.size(self.fields)
-        ks_sample = np.arange(1, self.kmax + 1)
+        ks_sample = np.arange(1, self.kmax_map + 1)
         L = np.linalg.cholesky(C)
         L_new = np.empty((np.size(self.k_values), N_fields, N_fields))
         for iii in range(N_fields):
@@ -74,7 +75,7 @@ class Fields:
         return y
 
     def get_dist(self):
-        return (np.sqrt(2) * self.N_pix * np.pi) / self.kmax
+        return self.N_pix * np.pi / self.kmax
 
     def get_kx_ky(self):
         kx = np.fft.rfftfreq(self.N_pix, self.get_dist()/self.N_pix) * 2 * np.pi
@@ -124,12 +125,12 @@ class Fields:
 
     def _get_N(self, field):
         if field == "k":
-            return self.covariance.noise.get_N0("kappa", self.kmax, recalc_N0=False)
+            return self.covariance.noise.get_N0("kappa", self.kmax_map, recalc_N0=False)
         if field == "g":
-            return self.covariance.noise.get_gal_shot_N(ellmax=self.kmax)
+            return self.covariance.noise.get_gal_shot_N(ellmax=self.kmax_map)
         if field == "I":
-            N_dust = self.covariance.noise.get_dust_N(353e9, ellmax=self.kmax)
-            N_cib = self.covariance.noise.get_cib_shot_N(353e9, ellmax=self.kmax)
+            N_dust = self.covariance.noise.get_dust_N(353e9, ellmax=self.kmax_map)
+            N_cib = self.covariance.noise.get_cib_shot_N(353e9, ellmax=self.kmax_map)
             N = N_dust+N_cib
             return N
 
@@ -144,7 +145,7 @@ class Fields:
         gauss_matrix = real + (1j * imag)
         return self._enforce_symmetries(np.sqrt(N_spline(self.kM) * (2*np.pi)**2) * gauss_matrix)
 
-    def get_ps(self, fft_map1, fft_map2=None, nBins=20):
+    def get_ps(self, fft_map1, fft_map2=None, nBins=20, kmin=1, kmax=None):
         fft_map1 = copy.deepcopy(fft_map1)
         if fft_map2 is None:
             fft_map2 = copy.deepcopy(fft_map1)
@@ -154,10 +155,15 @@ class Fields:
         ps[1:, 0] /= 2
         ps[1:, -1] /= 2
         ps = ps.flatten()
-        means, bin_edges, binnumber = stats.binned_statistic(self.k_values[1:], ps[1:], 'mean', bins=nBins)
+        if kmax is None:
+            kmax = self.kmax
+        ks = self.k_values[self.k_values <= kmax]
+        ks = ks[ks >= kmin]
+        ps = ps[np.logical_and(self.k_values <= kmax, self.k_values >= kmin)]
+        means, bin_edges, binnumber = stats.binned_statistic(ks, ps, 'mean', bins=nBins)
         binSeperation = bin_edges[1] - bin_edges[0]
         kBins = np.asarray([bin_edges[i] - binSeperation / 2 for i in range(1, len(bin_edges))])
-        counts, *others = stats.binned_statistic(self.k_values[1:], ps[1:], 'count', bins=nBins)
-        stds, *others = stats.binned_statistic(self.k_values[1:], ps[1:], 'std', bins=nBins)
+        counts, *others = stats.binned_statistic(ks, ps, 'count', bins=nBins)
+        stds, *others = stats.binned_statistic(ks, ps, 'std', bins=nBins)
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
