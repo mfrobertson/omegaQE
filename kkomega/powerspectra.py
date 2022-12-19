@@ -275,7 +275,7 @@ class Powerspectra:
         I = step * matter_ps/(Chis)**2 * dChi * window1 * window2
         return I.sum(axis=1)
 
-    def get_phi_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_PK=False):
+    def get_phi_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=False, recalc_PK=False):
         """
         Return the Limber approximated lensing potential power spectrum.
 
@@ -307,7 +307,7 @@ class Powerspectra:
             self.weyl_PK = self._get_PK("weyl", np.max(ells), Nchi)
         return self._Cl_phi(ells, Nchi, zmin, zmax, kmin, kmax, extended)
 
-    def get_kappa_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_PK=False, use_weyl=True):
+    def get_kappa_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=False, recalc_PK=False, use_weyl=True):
         """
         Return the Limber approximated lensing convergence power spectrum.
 
@@ -343,7 +343,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_kappa_matter(ells, Nchi, zmin, zmax, kmin, kmax, extended)
 
-    def get_kappa_ps_2source(self, ells, Chi_source1, Chi_source2=None, Nchi=100, kmin=0, kmax=100, extended=True, recalc_PK=False, use_weyl=True):
+    def get_kappa_ps_2source(self, ells, Chi_source1, Chi_source2=None, Nchi=100, kmin=0, kmax=100, extended=False, recalc_PK=False, use_weyl=True):
         """
         Returns the Limber approximated lensing convergence power spectrum for two source planes.
 
@@ -378,7 +378,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_kappa_2source_matter(ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended)
 
-    def get_gal_lens_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, recalc_PK=False, use_weyl=True):
+    def get_gal_lens_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=False, recalc_PK=False, use_weyl=True):
         """
         Return the Limber approximated galaxy lensing convergence power spectrum.
 
@@ -414,7 +414,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_gal_lens_matter(ells, Nchi, zmin, zmax, kmin, kmax, extended)
 
-    def get_gal_lens_ps_2source(self, ells, Chi_source1, Chi_source2=None, Nchi=100, kmin=0, kmax=100, extended=True, recalc_PK=False, use_weyl=True):
+    def get_gal_lens_ps_2source(self, ells, Chi_source1, Chi_source2=None, Nchi=100, kmin=0, kmax=100, extended=False, recalc_PK=False, use_weyl=True):
         """
         Returns the Limber approximated galaxy lensing convergence power spectrum for two source planes.
 
@@ -449,7 +449,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_gal_lens_2source_matter(ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended)
 
-    def get_gal_kappa_ps(self, ells, Chi_source1=None, Nchi=100, kmin=0, kmax=100, gal_win_zmin=None, gal_win_zmax=None, extended=True, recalc_PK=False, gal_distro="LSST_gold", use_weyl=True):
+    def get_gal_kappa_ps(self, ells, Chi_source1=None, Nchi=100, kmin=0, kmax=100, gal_win_zmin=None, gal_win_zmax=None, extended=False, recalc_PK=False, gal_distro="LSST_gold", use_weyl=True):
         """
 
         Parameters
@@ -474,7 +474,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_gal_kappa_matter(ells, Chi_source1, Nchi, kmin, kmax, gal_win_zmin, gal_win_zmax, extended, gal_distro=gal_distro)
 
-    def get_gal_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, extended=True, recalc_PK=False, gal_distro="LSST_gold"):
+    def get_gal_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, extended=False, recalc_PK=False, gal_distro="LSST_gold"):
         """
         Return the Limber approximated lensing convergence power spectrum.
 
@@ -506,7 +506,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_gal(ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended, gal_distro=gal_distro)
 
-    def get_cib_kappa_ps(self, ells, nu=353e9, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=True, bias=None, recalc_PK=False, use_weyl=True):
+    def get_cib_kappa_ps(self, ells, nu=353e9, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=False, bias=None, recalc_PK=False, use_weyl=True):
         """
 
         Parameters
@@ -531,7 +531,7 @@ class Powerspectra:
             self.matter_weyl_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_cib_kappa_matter(ells, nu, Chi_source1, Nchi, kmin, kmax, extended, bias)
 
-    def get_cib_ps(self, ells, nu=353e9, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=True, bias=None, recalc_PK=False):
+    def get_cib_ps(self, ells, nu=353e9, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=False, bias=None, recalc_PK=False):
         """
 
 
@@ -563,7 +563,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_cib(ells, nu, Nchi, zmin, zmax, kmin, kmax, extended, bias)
 
-    def get_cib_gal_ps(self, ells, nu=353e9, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, gal_win_zmin=None, gal_win_zmax=None, extended=True, bias=None, recalc_PK=False, gal_distro="LSST_gold"):
+    def get_cib_gal_ps(self, ells, nu=353e9, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, gal_win_zmin=None, gal_win_zmax=None, extended=False, bias=None, recalc_PK=False, gal_distro="LSST_gold"):
         """
         Return the Limber approximated lensing convergence power spectrum.
 

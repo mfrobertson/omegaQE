@@ -143,7 +143,7 @@ class Modecoupling:
         return (observables[:, None] + observables[None, :]).flatten()
 
 
-    def components(self, ells1, ells2, typ="kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=True, recalc_PK=False, gal_distro="LSST_gold"):
+    def components(self, ells1, ells2, typ="kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=False, recalc_PK=False, gal_distro="LSST_gold"):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
 
@@ -182,7 +182,7 @@ class Modecoupling:
             star = False
         return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro=gal_distro)
 
-    def spline(self, ells_sample=None, M_matrix=None, typ = "kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=True, recalc_PK=False, gal_distro="LSST_gold"):
+    def spline(self, ells_sample=None, M_matrix=None, typ = "kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=False, recalc_PK=False, gal_distro="LSST_gold"):
         """
         Produces 2D spline of the mode coupling matrix.
 

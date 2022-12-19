@@ -103,7 +103,7 @@ class OmegaQE:
 
     def _get_matter_ps(self, Chi):
         z = self._cosmo.Chi_to_z(Chi)
-        ks = (self.L_map + 0.5) / Chi
+        ks = self.L_map / Chi
         return self._cosmo.get_matter_ps(self.matter_PK, z, ks, weyl_scaled=False, typ="matter")
 
     def get_omega(self, Nchi=200):
