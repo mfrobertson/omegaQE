@@ -30,7 +30,7 @@ def _output(message, my_rank, _id):
         f.close()
 
 
-def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
+def _main(typ, exp, fields, gmv, Lmax, dL2, Ntheta, N_Ls, out_dir, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -45,7 +45,7 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
             pass
 
     _output("-------------------------------------", my_rank, _id)
-    _output(f"typ:{typ}, exp:{exp}, fields:{fields}, gmv:{gmv}, Lmax:{Lmax}, NL2:{NL2}, Ntheta:{Ntheta}, N_Ls:{N_Ls}", my_rank, _id)
+    _output(f"typ:{typ}, exp:{exp}, fields:{fields}, gmv:{gmv}, Lmax:{Lmax}, dL2:{dL2}, Ntheta:{Ntheta}, N_Ls:{N_Ls}", my_rank, _id)
     nu = 353e9
 
     _output("Initialising Fisher object...", my_rank, _id)
@@ -75,7 +75,7 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
 
     _output("Setting up parallelisation of workload...", my_rank, _id)
 
-    Ls = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=N_Ls, dL_small=2)
+    Ls = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=N_Ls, dL_small=1)
 
     workloads = _get_workloads(N_Ls, world_size)
     my_start, my_end = _get_start_end(my_rank, workloads)
@@ -83,7 +83,7 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
     _output("Starting F_L calculation...", my_rank, _id)
 
     start_time = MPI.Wtime()
-    Ls, F_L = fish.get_F_L(typ, Ls[my_start: my_end], Nell2=NL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True, Lmin=30, Lmax=5000)
+    Ls, F_L = fish.get_F_L(typ, Ls[my_start: my_end], dL2=dL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True, Lmin=30, Lmax=5000)
     end_time = MPI.Wtime()
 
     _output("Broadcasting results...", my_rank, _id)
@@ -99,7 +99,7 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
             world_comm.Recv([F_L, MPI.DOUBLE], source=rank, tag=77)
             F_L_arr[start: end] = F_L
         gmv_str = "gmv" if gmv else "single"
-        out_dir += f"/{typ}/{exp}/{gmv_str}/{fields}/{Lmax}/{NL2}_{Ntheta}/"
+        out_dir += f"/{typ}/{exp}/{gmv_str}/{fields}/{Lmax}/{dL2}_{Ntheta}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
         np.save(out_dir+"/Ls", Ls)
@@ -114,15 +114,15 @@ def _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id):
 if __name__ == '__main__':
     args = sys.argv[1:]
     if len(args) != 10:
-        raise ValueError("Arguments should be typ exp fields gmv Lmax NL2 Ntheta N_Ls out_dir _id")
+        raise ValueError("Arguments should be typ exp fields gmv Lmax dL2 Ntheta N_Ls out_dir _id")
     typ = str(args[0])
     exp = str(args[1])
     fields = str(args[2])
     gmv = parse_boolean(args[3])
     Lmax = int(args[4])
-    NL2 = int(args[5])
+    dL2 = int(args[5])
     Ntheta = int(args[6])
     N_Ls = int(args[7])
     out_dir = args[8]
     _id = args[9]
-    _main(typ, exp, fields, gmv, Lmax, NL2, Ntheta, N_Ls, out_dir, _id)
+    _main(typ, exp, fields, gmv, Lmax, dL2, Ntheta, N_Ls, out_dir, _id)
