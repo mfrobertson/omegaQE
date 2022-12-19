@@ -323,7 +323,7 @@ class Fisher:
             C_inv = self.C_inv
             C_omega_spline = self.C_omega_spline
         else:
-            C_inv = self.covariance.get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
+            C_inv = self.covariance.get_C_inv(typs, int(np.ceil(np.max(Ls))), nu, gal_bins, gal_distro=gal_distro)
             omega_ells = self.covariance.get_log_sample_Ls(2, Lmax, 100, dL_small=2)
             C_omega = omega_ps(omega_ells)
             C_omega_spline = InterpolatedUnivariateSpline(omega_ells, C_omega)

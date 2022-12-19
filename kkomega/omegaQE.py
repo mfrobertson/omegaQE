@@ -7,16 +7,18 @@ import datetime
 
 class OmegaQE:
 
-    def __init__(self, field_labels, exp="SO", N_pix=2 ** 7, Lmax=5000, kappa_map=None, F_L_spline=None, C_inv_spline=None):
+    def __init__(self, field_labels, exp="SO", N_pix=2 ** 7, Lmin=30, Lmax=3000, Lmax_map=None, kappa_map=None, F_L_spline=None, C_inv_spline=None):
         self._fish = Fisher()
         self._power = self._fish.power
         self._cosmo = self._power.cosmo
         self.N_pix = N_pix
+        self.Lmin = Lmin
         self.Lmax = Lmax
-        self.fields = Fields(field_labels, exp, self.N_pix, self.Lmax, kappa_map)
+        self.Lmax_map = int(np.ceil(np.sqrt(2) * Lmax)) if Lmax_map is None else Lmax_map
+        self.fields = Fields(field_labels, exp, self.N_pix, self.Lmax_map, kappa_map)
         self.L_map = self.fields.kM
         self.Lx_map, self.Ly_map = self.get_Lx_Ly_maps()
-        self.F_L_spline, self.C_inv_spline = self._get_F_L_and_C_inv_splines(self.Lmax, F_L_spline, C_inv_spline)
+        self.F_L_spline, self.C_inv_spline = self._get_F_L_and_C_inv_splines(F_L_spline, C_inv_spline)
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
         self.a_bars = dict.fromkeys(self.fields.fields)
         self._populate_a_bars()
@@ -29,23 +31,25 @@ class OmegaQE:
                 a_bar_i += a_j * self.C_inv_spline[iii, jjj](self.L_map)
             self.a_bars[field_i] = a_bar_i
 
-    def _get_F_L_and_C_inv_splines(self, Lmax=5000, F_L_spline=None, C_inv_spline=None):
+    def _get_F_L_and_C_inv_splines(self, F_L_spline=None, C_inv_spline=None):
         if F_L_spline != None and C_inv_spline != None:
             return F_L_spline, C_inv_spline
-        sample_Ls = self._fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=300)
-        sample_Ls, F_L, C_inv = self._fish.get_F_L(self.fields.fields, Ls=sample_Ls, Ntheta=100, nu=353e9, return_C_inv=True)
+        sample_Ls = self._fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=self.Lmax_map, Nells=300)
+        sample_Ls, F_L, C_inv = self._fish.get_F_L(self.fields.fields, Ls=sample_Ls, Ntheta=1000, nu=353e9, return_C_inv=True, Lmin=self.Lmin, Lmax=self.Lmax)
         F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
         N_fields = np.size(self.fields.fields)
         C_inv_splines = np.empty((N_fields, N_fields), dtype=InterpolatedUnivariateSpline)
-        Ls = np.arange(Lmax + 1)
+        Ls = np.arange(self.Lmax_map + 1)
         for iii in range(N_fields):
             for jjj in range(N_fields):
                 C_inv_ij = C_inv[iii, jjj]
-                C_inv_splines[iii, jjj] = InterpolatedUnivariateSpline(Ls[2:], C_inv_ij[2:])
+                C_inv_ij[self.Lmax + 1:] = 0
+                C_inv_ij[:self.Lmin] = 0
+                C_inv_splines[iii, jjj] = InterpolatedUnivariateSpline(Ls, C_inv_ij)
         return F_L_spline, C_inv_splines
 
     def _get_Cl_and_window(self, Chi, field, nu=353e9, gal_distro="LSST_gold"):
-        Ls_sample = np.arange(1, self.Lmax + 1)
+        Ls_sample = np.arange(1, self.Lmax_map)
         if field == "k":
             Cl_sample = self._power.get_kappa_ps_2source(Ls_sample, Chi, self._cosmo.get_chi_star(), use_weyl=False)
             Cl_spline = InterpolatedUnivariateSpline(Ls_sample, Cl_sample)
@@ -83,7 +87,9 @@ class OmegaQE:
     def get_L_fac(self, p, r):
         L_p = self.L_comp_map(p)
         L_r = self.L_comp_map(r)
-        return L_p * L_r / ((self.L_map + 0.5) ** 2)
+        L_map_inv = 1 / self.L_map
+        L_map_inv[L_map_inv == np.inf] = 0
+        return L_p * L_r * L_map_inv ** 2
 
     def get_f_g(self, p, r, q, s, Cls, windows, matter_ps):
         L_fac_f = self.get_L_fac(p, r)
@@ -100,7 +106,7 @@ class OmegaQE:
         ks = (self.L_map + 0.5) / Chi
         return self._cosmo.get_matter_ps(self.matter_PK, z, ks, weyl_scaled=False, typ="matter")
 
-    def get_omega(self, Nchi=20):
+    def get_omega(self, Nchi=200):
         norm = "forward"
         Lx, Ly = self.fields.get_kx_ky()
         dL = Lx[1] - Lx[0]

@@ -8,7 +8,7 @@ import copy
 class Fields:
 
 
-    def __init__(self, fields, exp="SO", N_pix=2**7, kmax=3000, kappa_map=None):
+    def __init__(self, fields, exp="SO", N_pix=2**7, kmax=5000, kappa_map=None):
         if kappa_map is None:
             self.fields = self._get_fields(fields)
             self.N_pix = N_pix
@@ -17,8 +17,7 @@ class Fields:
             self.fields = self._get_rearanged_fields(fields)
             self.N_pix = np.shape(kappa_map)[0]
             self.enforce_real = False
-        self.kmax = kmax
-        self.kmax_map = int(np.sqrt(2) * kmax) + 1
+        self.kmax_map = kmax
         self.kM, self.k_values = self._get_k_values()
         self.covariance = Covariance()
         self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, data_dir="data")
@@ -75,7 +74,7 @@ class Fields:
         return y
 
     def get_dist(self):
-        return self.N_pix * np.pi / self.kmax
+        return np.sqrt(2) * self.N_pix * np.pi / self.kmax_map
 
     def get_kx_ky(self):
         kx = np.fft.rfftfreq(self.N_pix, self.get_dist()/self.N_pix) * 2 * np.pi
@@ -145,7 +144,7 @@ class Fields:
         gauss_matrix = real + (1j * imag)
         return self._enforce_symmetries(np.sqrt(N_spline(self.kM) * (2*np.pi)**2) * gauss_matrix)
 
-    def get_ps(self, fft_map1, fft_map2=None, nBins=20, kmin=1, kmax=None):
+    def get_ps(self, fft_map1, fft_map2=None, nBins=20, kmin=1, kmax=None, kM=None):
         fft_map1 = copy.deepcopy(fft_map1)
         if fft_map2 is None:
             fft_map2 = copy.deepcopy(fft_map1)
@@ -156,10 +155,11 @@ class Fields:
         ps[1:, -1] /= 2
         ps = ps.flatten()
         if kmax is None:
-            kmax = self.kmax
-        ks = self.k_values[self.k_values <= kmax]
+            kmax = self.kmax_map/np.sqrt(2)
+        k_values = self.k_values if kM is None else kM.flatten()
+        ks = k_values[k_values <= kmax]
         ks = ks[ks >= kmin]
-        ps = ps[np.logical_and(self.k_values <= kmax, self.k_values >= kmin)]
+        ps = ps[np.logical_and(k_values <= kmax, k_values >= kmin)]
         means, bin_edges, binnumber = stats.binned_statistic(ks, ps, 'mean', bins=nBins)
         binSeperation = bin_edges[1] - bin_edges[0]
         kBins = np.asarray([bin_edges[i] - binSeperation / 2 for i in range(1, len(bin_edges))])
