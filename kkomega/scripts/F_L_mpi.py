@@ -45,7 +45,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, ou
             pass
 
     _output("-------------------------------------", my_rank, _id)
-    _output(f"typ:{typ}, exp:{exp}, fields:{fields}, gmv:{gmv}, Lmax:{Lmax}, dL2:{dL2}, Ntheta:{Ntheta}, N_Ls:{N_Ls}", my_rank, _id)
+    _output(f"typ:{typ}, exp:{exp}, fields:{fields}, gmv:{gmv}, Lmax:{Lmax}, Lcut_min:{Lcut_min}, Lcut_max:{Lcut_max}, dL2:{dL2}, Ntheta:{Ntheta}, N_Ls:{N_Ls}", my_rank, _id)
     nu = 353e9
 
     _output("Initialising Fisher object...", my_rank, _id)
@@ -75,7 +75,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, ou
 
     _output("Setting up parallelisation of workload...", my_rank, _id)
 
-    Ls = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=N_Ls, dL_small=1)
+    Ls_samp = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=N_Ls, dL_small=1)
 
     workloads = _get_workloads(N_Ls, world_size)
     my_start, my_end = _get_start_end(my_rank, workloads)
@@ -83,7 +83,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, ou
     _output("Starting F_L calculation...", my_rank, _id)
 
     start_time = MPI.Wtime()
-    Ls, F_L = fish.get_F_L(typ, Ls[my_start: my_end], dL2=dL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True, Lmin=Lcut_min, Lmax=Lcut_max)
+    _, F_L = fish.get_F_L(typ, Ls_samp[my_start: my_end], dL2=dL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True, Lmin=Lcut_min, Lmax=Lcut_max)
     end_time = MPI.Wtime()
 
     _output("Broadcasting results...", my_rank, _id)
@@ -102,7 +102,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, ou
         out_dir += f"/{typ}/{exp}/{gmv_str}/{fields}/{Lcut_min}_{Lcut_max}/{dL2}_{Ntheta}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
-        np.save(out_dir+"/Ls", Ls)
+        np.save(out_dir+"/Ls", Ls_samp)
         np.save(out_dir+"/F_L", F_L_arr)
         end_time_tot = MPI.Wtime()
         print("Total time: " + str(end_time_tot - start_time_tot))
