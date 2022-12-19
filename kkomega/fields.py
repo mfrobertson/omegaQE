@@ -144,22 +144,33 @@ class Fields:
         gauss_matrix = real + (1j * imag)
         return self._enforce_symmetries(np.sqrt(N_spline(self.kM) * (2*np.pi)**2) * gauss_matrix)
 
-    def get_ps(self, fft_map1, fft_map2=None, nBins=20, kmin=1, kmax=None, kM=None):
-        fft_map1 = copy.deepcopy(fft_map1)
-        if fft_map2 is None:
-            fft_map2 = copy.deepcopy(fft_map1)
-        else:
-            fft_map2 = copy.deepcopy(fft_map2)
-        ps = np.real(np.conjugate(fft_map1) * fft_map2)
-        ps[1:, 0] /= 2
-        ps[1:, -1] /= 2
-        ps = ps.flatten()
+    def get_ps(self, rfft_map1, rfft_map2=None, kmin=1, kmax=None, kM=None):
+        kM = self.kM if kM is None else kM
         if kmax is None:
             kmax = self.kmax_map/np.sqrt(2)
-        k_values = self.k_values if kM is None else kM.flatten()
-        ks = k_values[k_values <= kmax]
-        ks = ks[ks >= kmin]
-        ps = ps[np.logical_and(k_values <= kmax, k_values >= kmin)]
+        N_pix = np.shape(kM)[0]
+        fft_map1 = copy.deepcopy(rfft_map1)
+        if rfft_map2 is None:
+            fft_map2 = copy.deepcopy(fft_map1)
+        else:
+            fft_map2 = copy.deepcopy(rfft_map2)
+
+        ps_raw = np.real(np.conjugate(fft_map1) * fft_map2)
+        k_counts = np.bincount(kM[:, 1:-1].flatten().astype(int))
+        k_counts += np.bincount(kM[1:N_pix // 2, [0, -1]].flatten().astype(int))
+        ps = np.bincount(kM[:, 1:-1].flatten().astype(int), weights=ps_raw[:, 1:-1].flatten())
+        ps += np.bincount(kM[1:N_pix // 2, [0, -1]].flatten().astype(int), weights=ps_raw[1:N_pix // 2, [0, -1]].flatten())
+
+        ps = ps / k_counts
+        ps[k_counts == 0] = 0
+        ps = ps[:kmax + 1]
+        ps = ps[kmin:]
+        ks = np.arange(kmin, kmax+1)
+
+        return ks, ps
+
+    def get_ps_binned(self, rfft_map1, rfft_map2=None, nBins=20, kmin=1, kmax=None, kM=None):
+        ks, ps = self.get_ps(rfft_map1, rfft_map2, kmin, kmax, kM)
         means, bin_edges, binnumber = stats.binned_statistic(ks, ps, 'mean', bins=nBins)
         binSeperation = bin_edges[1] - bin_edges[0]
         kBins = np.asarray([bin_edges[i] - binSeperation / 2 for i in range(1, len(bin_edges))])
