@@ -75,7 +75,7 @@ class Powerspectra:
         if typ.lower() == "weyl":
             if self.weyl_PK is None:
                 self.weyl_PK = self._get_PK("weyl")
-            return self.cosmo.get_matter_ps(self.weyl_PK, z, k, curly, weyl_scaled)
+            return self.cosmo.get_matter_ps(self.weyl_PK, z, k, curly, weyl_scaled, typ="weyl")
         elif typ.lower() == "matter-weyl" or typ.lower() == "weyl-matter":
             if self.matter_weyl_PK is None:
                 self.matter_weyl_PK = self._get_PK("matter-weyl")
@@ -83,7 +83,7 @@ class Powerspectra:
         elif typ.lower() == "matter":
             if self.matter_PK is None:
                 self.matter_PK = self._get_PK("matter")
-            return self.cosmo.get_matter_ps(self.matter_PK, z, k, curly)
+            return self.cosmo.get_matter_ps(self.matter_PK, z, k, curly, typ="matter")
 
     def _get_matter_ps(self, typ, zs, ks, curly, weyl_scaled):
         return self.get_matter_ps(typ, zs, ks, curly, weyl_scaled)

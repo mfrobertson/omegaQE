@@ -35,7 +35,7 @@ class OmegaQE:
         if F_L_spline != None and C_inv_spline != None:
             return F_L_spline, C_inv_spline
         sample_Ls = self._fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=self.Lmax_map, Nells=300)
-        sample_Ls, F_L, C_inv = self._fish.get_F_L(self.fields.fields, Ls=sample_Ls, Ntheta=1000, nu=353e9, return_C_inv=True, Lmin=self.Lmin, Lmax=self.Lmax)
+        sample_Ls, F_L, C_inv = self._fish.get_F_L(self.fields.fields, Ls=sample_Ls, dL2=2, Ntheta=2000, nu=353e9, return_C_inv=True, Lmin=self.Lmin, Lmax=self.Lmax)
         F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
         N_fields = np.size(self.fields.fields)
         C_inv_splines = np.empty((N_fields, N_fields), dtype=InterpolatedUnivariateSpline)

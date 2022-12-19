@@ -112,7 +112,7 @@ class Covariance:
             N_cib = self.noise.get_cib_shot_N(ellmax=ellmax, nu=nu)
             N_dust = self.noise.get_dust_N(ellmax=ellmax, nu=nu)
             N = N_cib + N_dust
-            N[:111] = 1e10
+            N[:110] = 1e10
             N[2001:] = 1e10
         elif typ[0] == "g":
             N = self.noise.get_gal_shot_N(ellmax=ellmax)

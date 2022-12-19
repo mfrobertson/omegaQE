@@ -9,7 +9,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 def get_F_L_and_C_inv_splines(fields, L_max_map=5000, L_min_cut=30, L_max_cut=3000):
     fish = Fisher()
     sample_Ls = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=L_max_map, Nells=200)
-    sample_Ls, F_L, C_inv = fish.get_F_L(fields, Ls=sample_Ls, Nell2=1000, Ntheta=1000, nu=353e9, return_C_inv=True, Lmin=L_min_cut, Lmax=L_max_cut)
+    sample_Ls, F_L, C_inv = fish.get_F_L(fields, Ls=sample_Ls, dL2=2, Ntheta=1000, nu=353e9, return_C_inv=True, Lmin=L_min_cut, Lmax=L_max_cut)
     F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
     N_fields = np.size(fields)
     C_inv_splines = np.empty((N_fields, N_fields), dtype=InterpolatedUnivariateSpline)
@@ -17,7 +17,7 @@ def get_F_L_and_C_inv_splines(fields, L_max_map=5000, L_min_cut=30, L_max_cut=30
     for iii in range(N_fields):
         for jjj in range(N_fields):
             C_inv_ij = C_inv[iii, jjj]
-            C_inv_ij[L_max_map+1:] = 0
+            C_inv_ij[L_max_cut+1:] = 0
             C_inv_ij[:L_min_cut] = 0
             C_inv_splines[iii, jjj] = InterpolatedUnivariateSpline(Ls, C_inv_ij)
     return F_L_spline, C_inv_splines
