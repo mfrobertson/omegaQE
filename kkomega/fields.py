@@ -7,7 +7,7 @@ import copy
 
 class Fields:
 
-    def __init__(self, fields, exp="SO", N_pix=2**7, kmax=5000, kappa_map=None):
+    def __init__(self, fields, exp="SO", N_pix=2**7, kmax=5000, kappa_map=None, HDres=None):
         if kappa_map is None:
             self.fields = self._get_fields(fields)
             self.N_pix = N_pix
@@ -16,7 +16,8 @@ class Fields:
             self.fields = self._get_rearanged_fields(fields)
             self.N_pix = np.shape(kappa_map)[0]
             self.enforce_real = False
-        self.kmax_map = kmax
+        self.HDres = HDres
+        self.kmax_map = self._get_kmax(kmax)
         self.kM, self.k_values = self._get_k_values()
         self.fish = Fisher()
         self.covariance = self.fish.covariance
@@ -29,6 +30,11 @@ class Fields:
             self.maps[field] = self.get_map(field, fft=False)
             self.fft_maps[field] = self.get_map(field, fft=True)
             self.fft_noise_maps[field] = self.get_noise_map(field)
+
+    def _get_kmax(self, kmax):
+        if self.HDres is None:
+            return kmax
+        return np.sqrt(2) * self.N_pix * 180 * 60 / 0.74 / (2**self.HDres)
 
     def _get_fields(self, fields):
         return np.char.array(list(fields))
@@ -76,13 +82,18 @@ class Fields:
     def get_dist(self):
         return np.sqrt(2) * self.N_pix * np.pi / self.kmax_map
 
-    def get_kx_ky(self):
-        kx = np.fft.rfftfreq(self.N_pix, self.get_dist()/self.N_pix) * 2 * np.pi
-        ky = np.fft.fftfreq(self.N_pix, self.get_dist()/self.N_pix) * 2 * np.pi
+    def get_kx_ky(self, N_pix=None, dist=None):
+        if N_pix is None:
+            N_pix = self.N_pix
+        if dist is None:
+            dist = self.get_dist()
+        sep = dist/N_pix
+        kx = np.fft.rfftfreq(N_pix, sep) * 2 * np.pi
+        ky = np.fft.fftfreq(N_pix, sep) * 2 * np.pi
         return kx, ky
 
-    def get_k_matrix(self):
-        kx, ky = self.get_kx_ky()
+    def get_k_matrix(self, Npix=None, dist=None):
+        kx, ky = self.get_kx_ky(Npix, dist)
         kSqr = kx[np.newaxis, ...] ** 2 + ky[..., np.newaxis] ** 2
         return np.sqrt(kSqr)
 
@@ -178,3 +189,8 @@ class Fields:
         stds, *others = stats.binned_statistic(ks, ps, 'std', bins=nBins)
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
+
+    def get_lensit_kM(self, LDres=14, HDres=14):
+        N_pix = 2**LDres
+        dist = 0.74 * 2**HDres * np.pi / 180 / 60
+        return self.get_k_matrix(N_pix, dist)
