@@ -1,12 +1,11 @@
 import numpy as np
-from covariance import Covariance
+from fisher import Fisher
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy import stats
 import copy
 
 
 class Fields:
-
 
     def __init__(self, fields, exp="SO", N_pix=2**7, kmax=5000, kappa_map=None):
         if kappa_map is None:
@@ -19,7 +18,8 @@ class Fields:
             self.enforce_real = False
         self.kmax_map = kmax
         self.kM, self.k_values = self._get_k_values()
-        self.covariance = Covariance()
+        self.fish = Fisher()
+        self.covariance = self.fish.covariance
         self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, data_dir="data")
         self.y = self._get_y(kappa_map)
         self.maps = dict.fromkeys(self.fields)
