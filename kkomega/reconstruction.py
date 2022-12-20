@@ -5,7 +5,7 @@ import os
 
 class Reconstruction:
 
-    def __init__(self, exp, LDres=14, HDres=14):
+    def __init__(self, exp="SO", LDres=12, HDres=12):
         if not 'LENSIT' in os.environ.keys():
             os.environ['LENSIT'] = '_tmp'
         self.exp = exp
@@ -13,6 +13,8 @@ class Reconstruction:
         self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=1, num_threads=4)
         self.isocov = li.get_isocov(exp_conf, LDres, HD_res=HDres, pyFFTWthreads=4)
         self.P_alm = self.isocov.lib_skyalm.udgrade(self.maps.lencmbs.lib_skyalm, self.maps.lencmbs.get_sim_plm(0))
+        self.curl = None
+        self.phi = None
 
     def _get_exp_noise(self, exp):
         if exp == "SO":
@@ -40,15 +42,10 @@ class Reconstruction:
             return self.maps.get_sim_tmap(0)
         return self.maps.get_sim_tmap(0) - self.maps.get_noise_sim_tmap(0)
 
-    def Qmap(self, include_noise=True):
+    def QUmap(self, include_noise=True):
         if include_noise:
-            return self.maps.get_sim_qmap(0)
-        return self.maps.get_sim_qmap(0) - self.maps.get_noise_sim_qmap(0)
-
-    def Umap(self, include_noise=True):
-        if include_noise:
-            return self.maps.get_sim_umap(0)
-        return self.maps.get_sim_umap(0) - self.maps.get_noise_sim_umap(0)
+            return self.maps.get_sim_qumap(0)
+        return self.maps.get_sim_qumap(0)[0] - self.maps.get_noise_sim_qmap(0), self.maps.get_sim_qumap(0)[1] - self.maps.get_noise_sim_umap(0)
 
     def _get_iblm(self, fields, include_noise):
         if fields == "T":
@@ -58,15 +55,17 @@ class Reconstruction:
             return estimator, iblm
         if fields == "EB":
             estimator = "QU"
-            Q_alm = self.isocov.lib_datalm.map2alm(self.Qmap(include_noise))
-            U_alm = self.isocov.lib_datalm.map2alm(self.Umap(include_noise))
+            Qmap, Umap = self.QUmap(include_noise)
+            Q_alm = self.isocov.lib_datalm.map2alm(Qmap)
+            U_alm = self.isocov.lib_datalm.map2alm(Umap)
             iblm = self.isocov.get_iblms(estimator, np.array([Q_alm, U_alm]), use_cls_len=True)[0]
             return estimator, iblm
         if fields == "TEB":
             estimator = "TQU"
             T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise))
-            Q_alm = self.isocov.lib_datalm.map2alm(self.Qmap(include_noise))
-            U_alm = self.isocov.lib_datalm.map2alm(self.Umap(include_noise))
+            Qmap, Umap = self.QUmap(include_noise)
+            Q_alm = self.isocov.lib_datalm.map2alm(Qmap)
+            U_alm = self.isocov.lib_datalm.map2alm(Umap)
             iblm = self.isocov.get_iblms(estimator, np.array([T_alm, Q_alm, U_alm]), use_cls_len=True)[0]
             return estimator, iblm
         raise ValueError(f"Supplied fields {fields} not one of T, EB, or TEB")
@@ -81,16 +80,16 @@ class Reconstruction:
         return phi, N0
 
     def get_phi_rec(self, fields, return_map=False, include_noise=True):
-        phi, N0 = self._QE(fields, 0, include_noise)
+        self.phi, N0 = self._QE(fields, 0, include_noise)
         if return_map:
-            self.isocov.lib_skyalm.alm2map(phi), N0
-        return phi, N0
+            return self.isocov.lib_skyalm.alm2map(self.phi), N0
+        return self.phi, N0
 
     def get_curl_rec(self, fields, return_map=False, include_noise=True):
-        curl, N0 = self._QE(fields, 1, include_noise)
+        self.curl, N0 = self._QE(fields, 1, include_noise)
         if return_map:
-            self.isocov.lib_skyalm.alm2map(curl), N0
-        return curl, N0
+            return self.isocov.lib_skyalm.alm2map(self.curl), N0
+        return self.curl, N0
 
     def get_phi_input(self, return_map=False):
         if return_map:
