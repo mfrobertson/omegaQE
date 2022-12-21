@@ -13,9 +13,11 @@ EXP="SO"
 FIELDS="TEB"
 GMV="True"
 Lmax=5000
+Lcutmin=30
+Lcutmax=3000
 dL2=1000
 Ntheta=1000
 NLS=32
 OUTDIR="$SCRATCH/bias/results/$EXP"
 ID="TEST"
-srun -N 1 -n 32 -c 2 python _F_L_mpi.py "$TYP" "$EXP" "$FIELDS" "$GMV" "$Lmax" "$dL2" "$Ntheta" "$NLS" "$OUTDIR" "$ID"
+srun -N 1 -n 32 -c 2 python _F_L_mpi.py "$TYP" "$EXP" "$FIELDS" "$GMV" "$Lmax" "$Lcutmin" "$Lcutmax" "$dL2" "$Ntheta" "$NLS" "$OUTDIR" "$ID"
