@@ -31,10 +31,14 @@ class Fields:
             self.fft_maps[field] = self.get_map(field, fft=True)
             self.fft_noise_maps[field] = self.get_noise_map(field)
 
+    def _get_lensit_dist(self, HDres):
+        return np.sqrt(4*np.pi)/(2**14) * (2**(HDres-np.log2(self.N_pix))) * self.N_pix
+
     def _get_kmax(self, kmax):
         if self.HDres is None:
             return kmax
-        return np.sqrt(2) * self.N_pix * 180 * 60 / 0.74 / (2**self.HDres)
+        kmax = np.sqrt(2) * self.N_pix * np.pi / self._get_lensit_dist(self.HDres)
+        return int(np.around(kmax - 0.5))     #Lensit do this ell = |k|-1/2, don't know why???
 
     def _get_fields(self, fields):
         return np.char.array(list(fields))
@@ -134,13 +138,14 @@ class Fields:
         return fft_map
 
     def _get_N(self, field):
+        kmax = 5000
         if field == "k":
-            return self.covariance.noise.get_N0("kappa", self.kmax_map, recalc_N0=False)
+            return self.covariance.noise.get_N0("kappa", kmax=kmax, recalc_N0=False)
         if field == "g":
-            return self.covariance.noise.get_gal_shot_N(ellmax=self.kmax_map)
+            return self.covariance.noise.get_gal_shot_N(ellmax=kmax)
         if field == "I":
-            N_dust = self.covariance.noise.get_dust_N(353e9, ellmax=self.kmax_map)
-            N_cib = self.covariance.noise.get_cib_shot_N(353e9, ellmax=self.kmax_map)
+            N_dust = self.covariance.noise.get_dust_N(353e9, ellmax=kmax)
+            N_cib = self.covariance.noise.get_cib_shot_N(353e9, ellmax=kmax)
             N = N_dust+N_cib
             return N
 
