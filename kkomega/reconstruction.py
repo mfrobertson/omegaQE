@@ -82,19 +82,25 @@ class Reconstruction:
     def get_phi_rec(self, fields, return_map=False, include_noise=True):
         self.phi, N0 = self._QE(fields, 0, include_noise)
         if return_map:
-            return self.isocov.lib_skyalm.alm2map(self.phi), N0
+            return self._get_rfft_map(self.phi), N0
         return self.phi, N0
 
     def get_curl_rec(self, fields, return_map=False, include_noise=True):
         self.curl, N0 = self._QE(fields, 1, include_noise)
         if return_map:
-            return self.isocov.lib_skyalm.alm2map(self.curl), N0
+            return self._get_rfft_map(self.curl), N0
         return self.curl, N0
 
     def get_phi_input(self, return_map=False):
         if return_map:
-            return self.isocov.lib_skyalm.alm2map(self.P_alm)
+            return self._get_rfft_map(self.P_alm)
         return self.P_alm
+
+    def _get_rfft_map(self, alm):
+        map = self.isocov.lib_skyalm.alm2map(alm)
+        rfft = np.fft.rfft2(map, norm="forward")
+        physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
+        return rfft * physical_length
 
 
 if __name__ == '__main__':

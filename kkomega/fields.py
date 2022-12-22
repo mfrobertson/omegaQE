@@ -1,5 +1,6 @@
 import numpy as np
 from fisher import Fisher
+from reconstruction import Reconstruction
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy import stats
 import copy
@@ -7,21 +8,27 @@ import copy
 
 class Fields:
 
-    def __init__(self, fields, exp="SO", N_pix=2**7, kmax=5000, kappa_map=None, HDres=None):
-        if kappa_map is None:
-            self.fields = self._get_fields(fields)
-            self.N_pix = N_pix
-            self.enforce_real = True
-        else:
-            self.fields = self._get_rearanged_fields(fields)
-            self.N_pix = np.shape(kappa_map)[0]
-            self.enforce_real = False
+    def __init__(self, fields, exp="SO", N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None):
+        self.N_pix = 2**N_pix_pow
         self.HDres = HDres
-        self.kmax_map = self._get_kmax(kmax)
+        self.kmax_map = self._get_kmax(kmax)                 # If HDres is not None then HDres determines kmax_map
+        self.kmax_map_round = int(np.floor(self.kmax_map))
         self.kM, self.k_values = self._get_k_values()
         self.fish = Fisher()
         self.covariance = self.fish.covariance
         self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, data_dir="data")
+        self.rec = None
+        if setup_cmb_lens_rec:   # HDres must not be None if kappa_rec is True
+            self.rec = Reconstruction(exp, LDres=N_pix_pow, HDres=HDres)
+        if "k" in fields and setup_cmb_lens_rec:
+            phi_map = 2 * np.pi * self.rec.get_phi_input(return_map=True)
+            kappa_map = phi_map * self.kM **2 / 2
+            self.fields = self._get_rearanged_fields(fields)
+            self.enforce_real = False
+        else:
+            kappa_map = None
+            self.fields = self._get_fields(fields)
+            self.enforce_real = True
         self.y = self._get_y(kappa_map)
         self.maps = dict.fromkeys(self.fields)
         self.fft_maps = dict.fromkeys(self.fields)
@@ -32,13 +39,13 @@ class Fields:
             self.fft_noise_maps[field] = self.get_noise_map(field)
 
     def _get_lensit_dist(self, HDres):
-        return np.sqrt(4*np.pi)/(2**14) * (2**(HDres-np.log2(self.N_pix))) * self.N_pix
+        return np.sqrt(4.*np.pi)/(2**14) * (2**(int(HDres-np.log2(self.N_pix)))) * self.N_pix
 
     def _get_kmax(self, kmax):
         if self.HDres is None:
             return kmax
         kmax = np.sqrt(2) * self.N_pix * np.pi / self._get_lensit_dist(self.HDres)
-        return int(np.around(kmax - 0.5))     #Lensit do this ell = |k|-1/2, don't know why???
+        return kmax     # Lensit do this ell = |k|-1/2, don't know why???
 
     def _get_fields(self, fields):
         return np.char.array(list(fields))
@@ -51,15 +58,15 @@ class Fields:
 
     def _get_cov(self):
         N_fields = np.size(self.fields)
-        C = np.empty((self.kmax_map, N_fields, N_fields))
+        C = np.empty((self.kmax_map_round, N_fields, N_fields))
         for iii, field_i in enumerate(self.fields):
             for jjj, field_j in enumerate(self.fields):
-                C[:, iii, jjj] = self.covariance.get_Cl(field_i + field_j, ellmax=self.kmax_map)[1:]
+                C[:, iii, jjj] = self.covariance.get_Cl(field_i + field_j, ellmax=self.kmax_map_round)[1:]
         return C * (2*np.pi)**2
 
     def _get_L(self, C):
         N_fields = np.size(self.fields)
-        ks_sample = np.arange(1, self.kmax_map + 1)
+        ks_sample = np.arange(1, self.kmax_map_round + 1)
         L = np.linalg.cholesky(C)
         L_new = np.empty((np.size(self.k_values), N_fields, N_fields))
         for iii in range(N_fields):
@@ -79,7 +86,7 @@ class Fields:
         v = real + (1j * imag)
         if kappa_map is not None:
             C_kappa_sqrt = L[:,0,0]
-            v[:, 0, 0] = np.fft.rfft2(kappa_map, norm="forward").flatten() / C_kappa_sqrt    # Converting a real kappa map from lensit, should check what normalisation should be
+            v[:, 0, 0] = kappa_map.flatten() / C_kappa_sqrt    # Converting a real kappa map from lensit, should check what normalisation should be
         y = np.matmul(L, v)
         return y
 
@@ -140,7 +147,7 @@ class Fields:
     def _get_N(self, field):
         kmax = 5000
         if field == "k":
-            return self.covariance.noise.get_N0("kappa", kmax=kmax, recalc_N0=False)
+            return self.covariance.noise.get_N0("kappa", ellmax=kmax, recalc_N0=False)
         if field == "g":
             return self.covariance.noise.get_gal_shot_N(ellmax=kmax)
         if field == "I":
@@ -195,7 +202,8 @@ class Fields:
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
 
-    def get_lensit_kM(self, LDres=14, HDres=14):
-        N_pix = 2**LDres
-        dist = 0.74 * 2**HDres * np.pi / 180 / 60
-        return self.get_k_matrix(N_pix, dist)
+    def get_omega_rec(self, cmb_fields="T", include_noise="True"):
+        if self.rec is None:
+            raise ValueError(f"CMB lensing reconstruction not setup for this fields instance.")
+        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise)
+        return curl_map * self.kM **2 / 2
