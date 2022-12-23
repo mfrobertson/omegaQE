@@ -1,5 +1,6 @@
 import numpy as np
 from fisher import Fisher
+import postborn
 from reconstruction import Reconstruction
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy import stats
@@ -8,10 +9,11 @@ import copy
 
 class Fields:
 
-    def __init__(self, fields, exp="SO", N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None):
+    def __init__(self, fields, exp="SO", N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None, N_lensit_sims=1):
+        # TODO: Lensit has ellM = int(np.around(kM - 1/2))?? So my maps disagree with lensit of small scales...
         self.N_pix = 2**N_pix_pow
         self.HDres = HDres
-        self.kmax_map = self._get_kmax(kmax)                 # If HDres is not None then HDres determines kmax_map
+        self.kmax_map = self._get_kmax(kmax)                # If HDres is not None then HDres determines kmax_map
         self.kmax_map_round = int(np.floor(self.kmax_map))
         self.kM, self.k_values = self._get_k_values()
         self.fish = Fisher()
@@ -19,7 +21,7 @@ class Fields:
         self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, data_dir="data")
         self.rec = None
         if setup_cmb_lens_rec:   # HDres must not be None if kappa_rec is True
-            self.rec = Reconstruction(exp, LDres=N_pix_pow, HDres=HDres)
+            self.rec = Reconstruction(exp, LDres=N_pix_pow, HDres=HDres, nsims=N_lensit_sims)
         if "k" in fields and setup_cmb_lens_rec:
             phi_map = 2 * np.pi * self.rec.get_phi_input(return_map=True)
             kappa_map = phi_map * self.kM **2 / 2
@@ -75,18 +77,21 @@ class Fields:
                 L_new[:, iii, jjj] = InterpolatedUnivariateSpline(ks_sample, L_ij)(self.k_values)
         return L_new
 
+    def _get_gauss_matrix(self, shape):
+        mean = 0
+        var = 1 / np.sqrt(2)
+        real = np.random.normal(mean, var, shape)
+        imag = np.random.normal(mean, var, shape)
+        return real + (1j * imag)
+
     def _get_y(self, kappa_map=None):
         C = self._get_cov()
         N_fields = np.size(self.fields)
         L = self._get_L(C)
-        mean = 0
-        var = 1 / np.sqrt(2)
-        real = np.random.normal(mean, var, (np.size(self.k_values), N_fields, 1))
-        imag = np.random.normal(mean, var, (np.size(self.k_values), N_fields, 1))
-        v = real + (1j * imag)
+        v = self._get_gauss_matrix((np.size(self.k_values), N_fields, 1))
         if kappa_map is not None:
             C_kappa_sqrt = L[:,0,0]
-            v[:, 0, 0] = kappa_map.flatten() / C_kappa_sqrt    # Converting a real kappa map from lensit, should check what normalisation should be
+            v[:, 0, 0] = kappa_map.flatten() / C_kappa_sqrt
         y = np.matmul(L, v)
         return y
 
@@ -160,11 +165,7 @@ class Fields:
         N = self._get_N(field)
         Ls = np.arange(np.size(N))
         N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
-        mean = 0
-        var = 1 / np.sqrt(2)
-        real = np.random.normal(mean, var, np.shape(self.kM))
-        imag = np.random.normal(mean, var, np.shape(self.kM))
-        gauss_matrix = real + (1j * imag)
+        gauss_matrix = self._get_gauss_matrix(np.shape(self.kM))
         return self._enforce_symmetries(np.sqrt(N_spline(self.kM) * (2*np.pi)**2) * gauss_matrix)
 
     def get_ps(self, rfft_map1, rfft_map2=None, kmin=1, kmax=None, kM=None):
@@ -202,8 +203,15 @@ class Fields:
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
 
-    def get_omega_rec(self, cmb_fields="T", include_noise="True"):
+    def get_omega_rec(self, cmb_fields="T", include_noise="True", sim=0):
         if self.rec is None:
-            raise ValueError(f"CMB lensing reconstruction not setup for this fields instance.")
-        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise)
+            raise ValueError(f"CMB lensing reconstruction not setup for this Fields instance.")
+        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=sim)
         return curl_map * self.kM **2 / 2
+
+    def get_omega_fiducial(self):
+        omega_Ls = self.fish.covariance.get_log_sample_Ls(2, self.kmax_map_round, 100, dL_small=2)
+        C_omega = postborn.omega_ps(omega_Ls)
+        C_omega_spline = InterpolatedUnivariateSpline(omega_Ls, C_omega)
+        gauss_matrix = self._get_gauss_matrix(np.shape(self.kM))
+        return self._enforce_symmetries(np.sqrt(C_omega_spline(self.kM) * (2 * np.pi) ** 2) * gauss_matrix)
