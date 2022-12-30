@@ -15,4 +15,4 @@ DL2=1
 NTHETA=1000
 OUTDIR="$SCRATCH/perfect_a/results/$EXP"
 ID="TEST"
-srun -N 1 -n 3 -c 8 python _F_L_mpi.py "$EXP" "$NBINS" "$NELL" "$DL2" "$NTHETA" "$OUTDIR" "$ID"
+srun -N 1 -n 3 -c 8 python perfect_a_mpi.py "$EXP" "$NBINS" "$NELL" "$DL2" "$NTHETA" "$OUTDIR" "$ID"

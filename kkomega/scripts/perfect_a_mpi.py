@@ -23,7 +23,7 @@ def _get_start_end(my_rank, workloads):
 
 def _output(message, my_rank, _id):
     if my_rank == 0:
-        f = open(f"_outlogs/_F_L_run_{_id}.out", "a")
+        f = open(f"_outlogs/perf_a_run_{_id}.out", "a")
         f.write("[" + str(datetime.datetime.now()) + "] " + message + "\n")
         f.close()
 
@@ -52,11 +52,11 @@ def _main(exp, Nbins, Nell, dL2, Ntheta, out_dir, _id):
 
     _output("Setting up parallelisation of workload...", my_rank, _id)
 
-    N_steps = (Nbins+1) * Nbins/2
+    N_steps = int((Nbins+1) * Nbins/2)
     workloads = _get_workloads(N_steps, world_size)
     my_start, my_end = _get_start_end(my_rank, workloads)
 
-    indices = np.empty(int(N_steps), dtype=tuple)
+    indices = np.empty(N_steps, dtype=tuple)
     idx = 0
     for iii in range(Nbins):
         for jjj in range(iii, Nbins):
