@@ -90,11 +90,9 @@ class Cosmology:
         """
         chis = np.linspace(Chi1, Chi2, 1000)
         dChi = chis[1] - chis[0]
-        zs = self.Chi_to_z(chis)
 
-        # cancelling bias from gal_window as want n(chi) not b*n(chi)
-        bias = 1 + (0.84 * zs)
-        gal_distro = self.gal_window_z(zs) / bias * self.get_hubble(zs)
+        # Setting bias to 1 in gal window
+        gal_distro = self.gal_window_Chi(chis, bias_unity=True)
 
         I = gal_distro * self.cmb_lens_window(Chi1, chis, heaviside)
         q = np.sum(dChi * I, axis=0)
@@ -139,7 +137,7 @@ class Cosmology:
         return Chi_distro/self.get_hubble(z)
 
     def _check_z_distr_typ(self, typ):
-        typs = ["LSST_gold", "CMB", "flat"]
+        typs = ["LSST_gold", "LSST_gold_bias_unity", "CMB", "flat", "flat_bias_unity", "perfect"]
         if typ not in typs:
             raise ValueError(f"Redshift distribution type {typ} not from accepted types: {typs}")
 
@@ -151,6 +149,19 @@ class Cosmology:
             return self._gal_z_CMB_distribution
         if typ == "flat":
             return self._gal_z_flat_distribution
+        if typ == "flat_bias_unity":
+            return self._get_z_distr_func("flat")
+        if typ == "perfect":
+            return self._get_z_distr_func("flat")
+        else:
+            raise ValueError(f"No galaxy distribution of type {typ}.")
+
+    def _get_bias(self, z, typ, bias_unity):
+        if bias_unity:
+            return 1
+        if typ == "flat_bias_unity" or typ == "LSST_gold_bias_unity" or "perfect":
+            return 1
+        return 1 + 0.84*z
 
     def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         """
@@ -165,19 +176,18 @@ class Cosmology:
         """
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
-        b = 1 if bias_unity else 1 + 0.84*z
-        # b=1
+        b = self._get_bias(z, typ, bias_unity)
         zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)
         dz = zs[1] - zs[0]
         if zmin is not None and zmax is not None:
-            norm = np.sum(dz * self._maths.rectangular_pulse_steps(zs, zmin, zmax) * z_distr_func(zs))
+            norm = 1 if typ == "perfect" else np.sum(dz * self._maths.rectangular_pulse_steps(zs, zmin, zmax) * z_distr_func(zs))
             window = (dn_dz * b) / norm
             return self._maths.rectangular_pulse_steps(z, zmin, zmax) * window
-        norm = np.sum(dz * z_distr_func(zs))
+        norm = 1 if typ == "perfect" else np.sum(dz * z_distr_func(zs))
         window = (dn_dz * b) / norm
         return window
 
-    def gal_window_Chi(self, Chi, typ="LSST_gold", zmin=None, zmax=None):
+    def gal_window_Chi(self, Chi, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         """
         1906.08760 eq 2.7
         Parameters
@@ -192,7 +202,7 @@ class Cosmology:
 
         """
         z = self.Chi_to_z(Chi)
-        window_z = self.gal_window_z(z, typ, zmin, zmax)
+        window_z = self.gal_window_z(z, typ, zmin, zmax, bias_unity)
         window = window_z * self.get_hubble(z)
         return window
 
@@ -200,7 +210,6 @@ class Cosmology:
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
         b = 1 if bias_unity else 1 + 0.84 * z
-        # b=1
         zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)
         dz = zs[1] - zs[0]
         norm = np.sum(dz * z_distr_func(zs))
