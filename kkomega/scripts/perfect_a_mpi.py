@@ -105,7 +105,7 @@ def _main(exp, Nbins, Nell, dL2, Ntheta, out_dir, _id):
         print("Total time: " + str(end_time_tot - start_time_tot))
         _output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
     else:
-        world_comm.Send([F_tot, MPI.DOUBLE], dest=0, tag=77)
+        world_comm.Send([np.array([F_tot]), MPI.DOUBLE], dest=0, tag=77)
 
 
 if __name__ == '__main__':
