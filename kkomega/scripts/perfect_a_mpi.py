@@ -100,7 +100,7 @@ def _main(exp, Nbins, Nell, dL2, Ntheta, out_dir, _id):
         out_dir += f"/{exp}/{Nell}_{dL2}_{Ntheta}/{Nbins}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
-        np.savetxt(out_dir+"/F", np.sqrt(np.sum(F_tot)))
+        np.savetxt(out_dir+"/F", np.array([np.sqrt(np.sum(F_tot))]))
         end_time_tot = MPI.Wtime()
         print("Total time: " + str(end_time_tot - start_time_tot))
         _output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
