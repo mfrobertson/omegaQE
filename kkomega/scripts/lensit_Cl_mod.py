@@ -17,8 +17,9 @@ def main():
     ells = cols[0]
     Cl_pp = _get_Cl_pp(ells)
     cols[5] = Cl_pp
-    #np.savetxt(f'my_fiducial_flatsky_lenspotentialCls.dat', cols.transpose(), fmt='%.5e')    #File to be added to /lensit/data/cls/fiducial_flatsky_lenspotentialCls.dat
+    # np.savetxt(f'my_fiducial_flatsky_lenspotentialCls.dat', cols.transpose(), fmt='%.5e')    #File to be added to /lensit/data/cls/fiducial_flatsky_lenspotentialCls.dat
 
 
 if __name__ == '__main__':
-    main()    #This changing the lensit input phi Cl to be zeroth order limber
+    # NOTE: must delete all cached data to implement the change
+    main()    # This changing the lensit input phi Cl to be zeroth order limber
