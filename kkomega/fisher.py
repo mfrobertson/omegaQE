@@ -59,7 +59,7 @@ class Fisher:
         if data_dir is not None: self.data_dir = data_dir
         self.reset_noise()
 
-    def setup_bispectra(self, path="cache/_M", ellmax=5000, Nell=100):
+    def setup_bispectra(self, path="cache/_M", ellmax=5000, Nell=200):
         """
 
         Parameters
@@ -410,7 +410,7 @@ class Fisher:
         typs = list(typs)
         return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ls, dL2, Ntheta, f_sky, verbose, nu, gal_bins, save_array, only_bins, gal_distro=gal_distro)
 
-    def get_rotation_ps_Fisher(self, Lmax, M_path, f_sky=1, auto=True, camb=False, cmb=True, Lmin=30):
+    def get_rotation_ps_Fisher(self, Lmax, M_path, f_sky=1, auto=True, camb=False, cmb=True, Lmin=30, n=40):
         """
         TODO: Check equation !!!!!!!!!!!
         Parameters
@@ -426,15 +426,14 @@ class Fisher:
         if camb:
             ells, Cl = self.power.get_camb_postborn_omega_ps(Lmax)
         else:
-            # ells = np.arange(2, Lmax + 3, 50)
-            ells = np.concatenate((np.arange(2,40,10), np.logspace(1, 3, 50)*4))
+            ells = self.covariance.get_log_sample_Ls(2, Lmax, 100, dL_small=2)
             Cl = omega_ps(ells, M_path, cmb=cmb)
         Cl_spline = InterpolatedUnivariateSpline(ells, Cl)
         ells = np.arange(Lmin, Lmax + 1)
         if cmb:
             N0 = self.covariance.noise.get_N0("omega", Lmax)
         else:
-            N0 = self.covariance.noise.get_shape_N()
+            N0 = self.covariance.noise.get_shape_N(n=n)
         var = self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto)
         return f_sky * np.sum(Cl_spline(ells) ** 2 / var)
 
