@@ -1,17 +1,16 @@
 import numpy as np
-from fields import Fields
 from scipy.interpolate import InterpolatedUnivariateSpline
 import datetime
 
 
 class Template:
 
-    def __init__(self, field_labels, exp="SO", N_pix=2 ** 7, Lmin=30, Lmax=3000, Lmax_map=None, kappa_map=None, F_L_spline=None, C_inv_spline=None):
-        self.N_pix = N_pix
+    def __init__(self, fields, Lmin=30, Lmax=3000, F_L_spline=None, C_inv_spline=None, sim=None, tracer_noise=False):
         self.Lmin = Lmin
         self.Lmax = Lmax
-        self.Lmax_map = int(np.ceil(np.sqrt(2) * Lmax)) if Lmax_map is None else Lmax_map
-        self.fields = Fields(field_labels, exp, self.N_pix, self.Lmax_map, kappa_map)
+        self.fields = fields
+        self.Lmax_map = fields.kmax_map
+        self.N_pix = fields.N_pix
         self._fish = self.fields.fish
         self._power = self._fish.power
         self._cosmo = self._power.cosmo
@@ -20,13 +19,16 @@ class Template:
         self.F_L_spline, self.C_inv_spline = self._get_F_L_and_C_inv_splines(F_L_spline, C_inv_spline)
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
         self.a_bars = dict.fromkeys(self.fields.fields)
-        self._populate_a_bars()
+        self._populate_a_bars(sim, tracer_noise)
 
-    def _populate_a_bars(self):
+    def _populate_a_bars(self, sim, tracer_noise):
         for iii, field_i in enumerate(self.fields.fields):
             a_bar_i = np.zeros(np.shape(self.L_map), dtype="complex128")
             for jjj, field_j in enumerate(self.fields.fields):
-                a_j = self.fields.fft_maps[field_j] + self.fields.fft_noise_maps[field_j]
+                if tracer_noise:
+                    a_j = self.fields.get_map(field_j, fft=True, sim=sim) + self.fields.get_noise_map(field_j) #need to make sure cov obj setup correctly for noise
+                else:
+                    a_j = self.fields.get_map(field_j, fft=True, sim=sim)
                 a_bar_i += a_j * self.C_inv_spline[iii, jjj](self.L_map)
             self.a_bars[field_i] = a_bar_i
 
