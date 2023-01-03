@@ -1,5 +1,6 @@
 import numpy as np
 from fisher import Fisher
+from template import Template
 import postborn
 from reconstruction import Reconstruction
 from scipy.interpolate import InterpolatedUnivariateSpline
@@ -22,23 +23,14 @@ class Fields:
         self.rec = None
         if setup_cmb_lens_rec:   # HDres must not be None if kappa_rec is True
             self.rec = Reconstruction(exp, LDres=N_pix_pow, HDres=HDres, nsims=N_lensit_sims)
-        if "k" in fields and setup_cmb_lens_rec:
-            phi_map = 2 * np.pi * self.rec.get_phi_input(return_map=True)
-            kappa_map = phi_map * self.kM **2 / 2
-            self.fields = self._get_rearanged_fields(fields)
-            self.enforce_real = False
-        else:
-            kappa_map = None
-            self.fields = self._get_fields(fields)
-            self.enforce_real = True
-        self.y = self._get_y(kappa_map)
-        self.maps = dict.fromkeys(self.fields)
-        self.fft_maps = dict.fromkeys(self.fields)
-        self.fft_noise_maps = dict.fromkeys(self.fields)
-        for field in self.fields:
-            self.maps[field] = self.get_map(field, fft=False)
-            self.fft_maps[field] = self.get_map(field, fft=True)
-            self.fft_noise_maps[field] = self.get_noise_map(field)
+        self.fields = self._get_rearanged_fields(fields) if ("k" in fields and setup_cmb_lens_rec) else self._get_fields(fields)
+        self.template = None
+
+    def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None):
+        return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, data_dir)
+    def _get_lensit_kappa_map(self, sim=0):
+        phi_map = 2 * np.pi * self.rec.get_phi_input(return_map=True, sim=sim)
+        return phi_map * self.kM ** 2 / 2
 
     def _get_lensit_dist(self, HDres):
         return np.sqrt(4.*np.pi)/(2**14) * (2**(int(HDres-np.log2(self.N_pix)))) * self.N_pix
@@ -111,6 +103,7 @@ class Fields:
     def get_k_matrix(self, Npix=None, dist=None):
         kx, ky = self.get_kx_ky(Npix, dist)
         kSqr = kx[np.newaxis, ...] ** 2 + ky[..., np.newaxis] ** 2
+        # return np.rint(np.sqrt(kSqr) - 0.5)     # This is what lensit does
         return np.sqrt(kSqr)
 
     def _get_k_values(self):
@@ -137,12 +130,19 @@ class Fields:
         fft_map[self.N_pix // 2 + 1:, -1] = np.conjugate(fft_map[1:self.N_pix // 2, -1][::-1])
         return fft_map
 
-    def get_map(self, field, fft=False):
+    def get_map(self, field, fft=False, sim=None):
         index = self._get_index(field)
-        fft_map = copy.deepcopy(self.y[:, index, 0])
+        if sim is not None:
+             kappa_map = self._get_lensit_kappa_map(sim)
+             enforce_real = False
+        else:
+            kappa_map = None
+            enforce_real = True
+        y = self._get_y(kappa_map=kappa_map)
+        fft_map = copy.deepcopy(y[:, index, 0])
         fft_map = np.reshape(fft_map, (np.shape(self.kM)))
 
-        if self.enforce_real:
+        if enforce_real:
             fft_map = self._enforce_symmetries(fft_map)
 
         if not fft:
@@ -215,3 +215,9 @@ class Fields:
         C_omega_spline = InterpolatedUnivariateSpline(omega_Ls, C_omega)
         gauss_matrix = self._get_gauss_matrix(np.shape(self.kM))
         return self._enforce_symmetries(np.sqrt(C_omega_spline(self.kM) * (2 * np.pi) ** 2) * gauss_matrix)
+
+    def get_omega_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, sim=None):
+        if self.template is None or sim is not None:
+            self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, sim=sim)
+        return self.template.get_omega(Nchi)
+
