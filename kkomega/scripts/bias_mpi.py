@@ -1,6 +1,6 @@
 from mpi4py import MPI
 import numpy as np
-from bias import Bias
+from bias import bias
 from cache.tools import parse_boolean
 import os
 import sys
@@ -23,9 +23,10 @@ def _get_start_end(my_rank, workloads):
     return my_start, my_end
 
 
-def _get_Ls(N_Ls):
-    samp1 = np.arange(30, 40, 5)
-    samp2 = np.logspace(1, 3, N_Ls - 2) * 4
+def _get_log_sample_Ls(Lmin, Lmax, Nells=500, dL_small=1):
+    floaty = Lmax / 1000
+    samp1 = np.arange(Lmin, floaty * 10, dL_small)
+    samp2 = np.logspace(1, 3, Nells - np.size(samp1)) * floaty
     return np.concatenate((samp1, samp2))
 
 
@@ -53,93 +54,15 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     _output("-------------------------------------", my_rank, _id)
     _output("Setting up parallisation of workload.", my_rank, _id)
 
-    Ls = _get_Ls(N_Ls)
+    Ls = _get_log_sample_Ls(30, 3000, N_Ls)
 
     workloads = _get_workloads(N_Ls, world_size)
     my_start, my_end = _get_start_end(my_rank, workloads)
 
-    _output("Initialising Bias object.", my_rank, _id)
-
-    N0_path = "cache/_N0"
-    bias = Bias(N0_path, M_path="cache/_M", init_qe=False, exp=exp)
-
-    _output("Setting up cached Cls for bias initialisation.", my_rank, _id)
-
-    parsed_fields_all = bias.qe.parse_fields(includeBB=True)
-    Cls = np.load(f"cache/_Cls/{exp}/Cls_cmb_6000.npy")
-    for iii, field in enumerate(parsed_fields_all):
-        lenCl = Cls[iii, 0, :]
-        gradCl = Cls[iii, 1, :]
-        N = Cls[iii, 2, :]
-        bias.qe.initialise_manual(field, lenCl, gradCl, N)
-    bias.qe.initialise()
-
     _output("Initialisation finished.", my_rank, _id)
 
-    nu = 353e9
-
-    if bi_typ != "theory":
-        _output("Building F_L on root thread...", my_rank, _id)
-        if my_rank == 0:
-            bias.build_F_L(bi_typ, fields, gmv, nu)
-            Cl_kk = bias.cache.Cl_kk
-            Cov_kk = bias.cache.Cov_kk
-            Cl_gk = bias.cache.Cl_gk
-            Cl_Ik = bias.cache.Cl_Ik
-            sample_F_L_Ls = bias.cache.sample_F_L_Ls
-            F_L = bias.cache.F_L
-            C_inv = bias.cache.C_inv
-            L_cuts = bias.cache.L_cuts
-        else:
-            Cl_kk = np.empty(5001, dtype='d')
-            Cov_kk = np.empty(5001, dtype='d')
-            Cl_gk = np.empty(5001, dtype='d')
-            Cl_Ik = np.empty(5001, dtype='d')
-            sample_F_L_Ls = np.empty(300, dtype='d')
-            F_L = np.empty(300, dtype='d')
-            C_inv = np.empty((len(bi_typ), len(bi_typ), 5001), dtype='d')
-            L_cuts = None
-
-        _output("F_L build finished. Broadcasting...", my_rank, _id)
-
-        world_comm.Bcast([Cl_kk, MPI.DOUBLE], root=0)
-        _output("  Cl_kk done.", my_rank, _id)
-        world_comm.Bcast([Cov_kk, MPI.DOUBLE], root=0)
-        _output("  Cov_kk done.", my_rank, _id)
-        world_comm.Bcast([Cl_gk, MPI.DOUBLE], root=0)
-        _output("  Cl_gk done.", my_rank, _id)
-        world_comm.Bcast([Cl_Ik, MPI.DOUBLE], root=0)
-        _output("  Cl_Ik done.", my_rank, _id)
-        world_comm.Bcast([sample_F_L_Ls, MPI.DOUBLE], root=0)
-        _output("  sample_F_L_Ls done.", my_rank, _id)
-        world_comm.Bcast([F_L, MPI.DOUBLE], root=0)
-        _output("  F_L done.", my_rank, _id)
-        world_comm.Bcast([C_inv, MPI.DOUBLE], root=0)
-        _output("  C_inv done.", my_rank, _id)
-        L_cuts = world_comm.bcast(L_cuts, root=0)
-        _output("  L_cuts done.", my_rank, _id)
-
-        _output("Broadcasting finished. Setting up broadcasted F_Ls...", my_rank, _id)
-
-        if my_rank != 0:
-            bias.cache.Cl_kk = Cl_kk
-            bias.cache.Cov_kk = Cov_kk
-            bias.cache.Cl_gk = Cl_gk
-            bias.cache.Cl_Ik = Cl_Ik
-            bias.cache.sample_F_L_Ls = sample_F_L_Ls
-            bias.cache.F_L = F_L
-            bias.cache.F_L_spline = InterpolatedUnivariateSpline(sample_F_L_Ls, F_L)
-            bias.cache.C_inv = C_inv
-            bias.cache.typs = bi_typ
-            bias.cache.fields = fields
-            bias.cache.gmv = gmv
-            bias.cache.nu = nu
-            bias.cache.L_cuts = L_cuts
-
-    _output("Setup complete. Calculating bias...", my_rank, _id)
-
     start_time = MPI.Wtime()
-    N_A1_curl_TT, N_C1_curl_TT = bias.bias(bi_typ, fields, Ls[my_start: my_end], gmv=gmv, curl=True, N_L1=100, N_L3=200,Ntheta12=100, Ntheta13=100)
+    N_A1, N_C1 = bias(Ls[my_start: my_end], bi_typ, curl=True, exp=exp, qe_fields=fields, gmv=gmv, N_L1=100, N_L3=200, Ntheta12=100, Ntheta13=100, F_L_path="_results/F_L_results", qe_setup_path=f"cache/_Cls/{exp}/Cls_cmb_6000.npy")
     end_time = MPI.Wtime()
 
     _output("Bias calculation finished.", my_rank, _id)
@@ -148,14 +71,14 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
         print("Bias time: " + str(end_time - start_time))
         _output("Bias time: " + str(end_time - start_time), my_rank, _id)
         N_arr = np.ones(N_Ls)
-        N_arr[my_start: my_end] = N_A1_curl_TT + N_C1_curl_TT
+        N_arr[my_start: my_end] = N_A1 + N_C1
         for rank in range(1, world_size):
             start, end = _get_start_end(rank, workloads)
             N = np.empty(end - start)
             world_comm.Recv([N, MPI.DOUBLE], source=rank, tag=77)
             N_arr[start: end] = N
         gmv_str = "gmv" if gmv else "single"
-        dir += f"/{fields}_{gmv_str}/{bi_typ}"
+        dir += f"{exp}/{fields}_{gmv_str}/{bi_typ}"
         if not os.path.isdir(dir):
             os.makedirs(dir)
         np.save(dir+"/Ls", Ls)
@@ -164,7 +87,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
         print("Total time: " + str(end_time_tot - start_time_tot))
         _output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
     else:
-        N = N_A1_curl_TT + N_C1_curl_TT
+        N = N_A1 + N_C1
         world_comm.Send([N, MPI.DOUBLE], dest=0, tag=77)
 
 

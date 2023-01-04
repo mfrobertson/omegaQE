@@ -214,7 +214,7 @@ def mixed_bispectrum(typs, L1, L2, theta12, nu=353e9):
     return _mixed_bispectrum(list(typs), L1, L2, theta12, nu)
 
 
-def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None,L_cuts=None, iter=None, data_dir=None, F_L_path="_results/F_L_results",N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60):
+def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path="_results/F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60):
     """
 
     Parameters
@@ -239,7 +239,18 @@ def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None,L_cuts=No
     global_fish = Fisher()
     global_fish.setup_noise(exp, qe_fields, gmv, ps, L_cuts, iter, data_dir)
     global_fish.setup_bispectra()
-    global_qe = QE(exp=global_fish.exp, init=True, L_cuts=global_fish.L_cuts)  # QE noise only used for exp noise curves
+    if qe_setup_path is None:
+        global_qe = QE(exp=global_fish.exp, init=True, L_cuts=global_fish.L_cuts)
+    else:
+        global_qe = QE(exp=global_fish.exp, init=False, L_cuts=global_fish.L_cuts)
+        parsed_fields_all = global_qe.parse_fields(includeBB=True)
+        Cls = np.load(qe_setup_path)
+        for iii, field in enumerate(parsed_fields_all):
+            lenCl = Cls[iii, 0, :]
+            gradCl = Cls[iii, 1, :]
+            N = Cls[iii, 2, :]
+            global_qe.initialise_manual(field, lenCl, gradCl, N)
+        global_qe.initialise()
 
 
     if bi_typ != "theory":
