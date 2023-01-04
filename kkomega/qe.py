@@ -17,16 +17,21 @@ class QE:
             self.gradCl_spline = None
             self.N_spline = None
 
-    def __init__(self, exp="SO", deltaT=None, beam=None, init=True, fields="TEB", N0_path=None):
+    def __init__(self, exp, deltaT=None, beam=None, init=True, fields="TEB", L_cuts=(None,None,None,None)):
         self._cosmo = Cosmology()
         self._noise = Noise()
-        self.N0_path = N0_path
         self.cmb = dict.fromkeys(self._cmb_types(), self.CMBsplines())
         if init:
             self.initialise(exp, deltaT, beam, fields=fields)
         else:
             self._cov_inv_fields = "uninitialised"
-            self.L_cuts = (None, None, None, None)
+        self._setup_qe_L_cuts(L_cuts)
+
+    def _setup_qe_L_cuts(self, L_cuts):
+        self.T_Lmin = L_cuts[0]
+        self.T_Lmax = L_cuts[1]
+        self.P_Lmin = L_cuts[2]
+        self.P_Lmax = L_cuts[3]
 
 
     def _cmb_types(self):
@@ -183,11 +188,11 @@ class QE:
             fac = 1 if i == j else 2
             C_inv_ip = self._get_cmb_Cov_inv_spline(i + p, fields)(ell)
             C_inv_jq = self._get_cmb_Cov_inv_spline(j + q, fields)(L3)
+            weight_tmp = self._response(i + j, L_vec, ell_vec, curl, resp_ps) * C_inv_ip * C_inv_jq
             if apply_Lcuts:
-                w1, w2 = self._get_L_cut_weights(ij, ell, L3)
-                weight += w1 * w2 * fac * self._response(i + j, L_vec, ell_vec, curl, resp_ps) * C_inv_ip * C_inv_jq
-            else:
-                weight += fac * self._response(i + j, L_vec, ell_vec, curl, resp_ps) * C_inv_ip * C_inv_jq
+                w1, w2 = self._get_L_cut_weights(typ, ell, L3)
+                weight_tmp *= w1 * w2
+            weight += fac * weight_tmp
         return weight / 2
 
 
@@ -203,6 +208,7 @@ class QE:
         Returns
         -------
         """
+        # TODO: all weight funcs (except TT) are possibly wrong
         if gmv:
             return self.gmv_weight_function(typ, L_vec, ell_vec, curl, fields, resp_ps)
         self._initialisation_check()
