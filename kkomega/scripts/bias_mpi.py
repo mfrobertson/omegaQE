@@ -32,7 +32,7 @@ def _get_log_sample_Ls(Lmin, Lmax, Nells=500, dL_small=1):
 
 def _output(message, my_rank, _id):
     if my_rank == 0:
-        f = open(f"_output/_bias_run_{_id}.out", "a")
+        f = open(f"_outlogs/_bias_run_{_id}.out", "a")
         f.write("[" + str(datetime.datetime.now()) + "] " + message + "\n")
         f.close()
 
@@ -52,6 +52,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
             pass
 
     _output("-------------------------------------", my_rank, _id)
+    _output(f"exp: {exp}, N_Ls: {N_Ls}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
     _output("Setting up parallisation of workload.", my_rank, _id)
 
     Ls = _get_log_sample_Ls(30, 3000, N_Ls)
