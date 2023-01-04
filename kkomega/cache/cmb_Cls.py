@@ -17,8 +17,7 @@ def save(C, exp, Lmax):
     tools.save_array(folder, filename, C)
 
 def main(exp):
-    N0_path = "_N0"
-    qe = QE(exp=exp, N0_path=N0_path)
+    qe = QE(exp=exp)
     parsed_fields_all = qe.parse_fields(includeBB=True)
     N_fields = np.size(parsed_fields_all)
     Lmax = 6000
