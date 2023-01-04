@@ -13,6 +13,6 @@ NBINS=2
 NELL=500
 DL2=1
 NTHETA=1000
-OUTDIR="$SCRATCH/perfect_a/results/$EXP"
+OUTDIR="$SCRATCH/perfect_a/results"
 ID="TEST"
 srun -N 1 -n 3 -c 8 python perfect_a_mpi.py "$EXP" "$NBINS" "$NELL" "$DL2" "$NTHETA" "$OUTDIR" "$ID"
