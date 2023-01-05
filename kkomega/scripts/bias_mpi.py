@@ -5,7 +5,6 @@ from cache.tools import parse_boolean
 import os
 import sys
 import datetime
-from scipy.interpolate import InterpolatedUnivariateSpline
 
 
 def _get_workloads(N, world_size):
@@ -44,12 +43,6 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     my_rank = world_comm.Get_rank()
 
     start_time_tot = MPI.Wtime()
-
-    if my_rank == 0:
-        try:
-            os.remove("_bias_run.out")
-        except:
-            pass
 
     _output("-------------------------------------", my_rank, _id)
     _output(f"exp: {exp}, N_Ls: {N_Ls}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)

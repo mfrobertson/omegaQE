@@ -134,14 +134,13 @@ def _bias(bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl):
     N_C1 = np.zeros(np.shape(Ls))
     XYs = global_qe.parse_fields(fields, unique=False) if gmv else [fields]
     for iii, L in enumerate(Ls):
-        print(L)
         for XY in XYs:
             if gmv:
                 N_A1_tmp, N_C1_tmp = _bias_calc(XY, L, True, fields, *_bias_prep(bi_typ, fields, True, N_L1, N_L3, Ntheta12, Ntheta13, curl))
             else:
                 N_A1_tmp, N_C1_tmp = _bias_calc(XY, L, False, XY, *_bias_prep(bi_typ, XY, False, N_L1, N_L3, Ntheta12, Ntheta13, curl))
-            N_A1[iii] = A[iii] * N_A1_tmp
-            N_C1[iii] = A[iii] * N_C1_tmp
+            N_A1[iii] += A[iii] * N_A1_tmp
+            N_C1[iii] += A[iii] * N_C1_tmp
     return N_A1, N_C1
 
 
