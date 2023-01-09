@@ -159,9 +159,9 @@ class Cosmology:
     def _get_bias(self, z, typ, bias_unity):
         if bias_unity:
             return 1
-        if typ == "flat_bias_unity" or typ == "LSST_gold_bias_unity" or "perfect":
+        if typ == "flat_bias_unity" or typ == "LSST_gold_bias_unity" or typ == "perfect":
             return 1
-        return 1 + 0.84*z
+        return 1 + (0.84*z)
 
     def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         """
@@ -177,7 +177,7 @@ class Cosmology:
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
         b = self._get_bias(z, typ, bias_unity)
-        zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)
+        zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)    #TODO: optimize step size here
         dz = zs[1] - zs[0]
         if zmin is not None and zmax is not None:
             norm = 1 if typ == "perfect" else np.sum(dz * self._maths.rectangular_pulse_steps(zs, zmin, zmax) * z_distr_func(zs))
