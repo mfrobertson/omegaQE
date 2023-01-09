@@ -10,7 +10,7 @@ import copy
 
 class Fields:
 
-    def __init__(self, fields, exp="SO", N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None, N_lensit_sims=1):
+    def __init__(self, fields, exp="SO", N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None):
         # TODO: Lensit has ellM = int(np.around(kM - 1/2))?? So my maps disagree with lensit of small scales...
         self.N_pix = 2**N_pix_pow
         self.HDres = HDres
@@ -21,13 +21,24 @@ class Fields:
         self.covariance = self.fish.covariance
         self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, data_dir="data")
         self.rec = None
-        if setup_cmb_lens_rec:   # HDres must not be None if kappa_rec is True
-            self.rec = Reconstruction(exp, LDres=N_pix_pow, HDres=HDres, nsims=N_lensit_sims)
+        input_kappa_map = None
+        enforce_sym = True
+        if setup_cmb_lens_rec:
+            self.rec = Reconstruction(exp, LDres=N_pix_pow, HDres=HDres)
+            input_kappa_map = self._get_lensit_kappa_map()
+            enforce_sym = False
         self.fields = self._get_rearanged_fields(fields) if ("k" in fields and setup_cmb_lens_rec) else self._get_fields(fields)
         self.template = None
+        self.y = self._get_y(input_kappa_map)
+        self.fft_maps = dict.fromkeys(self.fields)
+        self.fft_noise_maps = dict.fromkeys(self.fields)
+        for field in self.fields:
+            self.fft_maps[field] = self.get_map(field, fft=True, enforce_sym=enforce_sym)
+            self.fft_noise_maps[field] = self.get_noise_map(field)
 
     def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None):
         return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, data_dir)
+
     def _get_lensit_kappa_map(self, sim=0):
         phi_map = 2 * np.pi * self.rec.get_phi_input(return_map=True, sim=sim)
         return phi_map * self.kM ** 2 / 2
@@ -82,7 +93,7 @@ class Fields:
         L = self._get_L(C)
         v = self._get_gauss_matrix((np.size(self.k_values), N_fields, 1))
         if kappa_map is not None:
-            C_kappa_sqrt = L[:,0,0]
+            C_kappa_sqrt = L[:, 0, 0]
             v[:, 0, 0] = kappa_map.flatten() / C_kappa_sqrt
         y = np.matmul(L, v)
         return y
@@ -130,19 +141,13 @@ class Fields:
         fft_map[self.N_pix // 2 + 1:, -1] = np.conjugate(fft_map[1:self.N_pix // 2, -1][::-1])
         return fft_map
 
-    def get_map(self, field, fft=False, sim=None):
+    def get_map(self, field, fft=True, enforce_sym=True):
         index = self._get_index(field)
-        if sim is not None:
-             kappa_map = self._get_lensit_kappa_map(sim)
-             enforce_real = False
-        else:
-            kappa_map = None
-            enforce_real = True
-        y = self._get_y(kappa_map=kappa_map)
+        y = self.y
         fft_map = copy.deepcopy(y[:, index, 0])
         fft_map = np.reshape(fft_map, (np.shape(self.kM)))
 
-        if enforce_real:
+        if enforce_sym:
             fft_map = self._enforce_symmetries(fft_map)
 
         if not fft:
@@ -171,7 +176,7 @@ class Fields:
     def get_ps(self, rfft_map1, rfft_map2=None, kmin=1, kmax=None, kM=None):
         kM = self.kM if kM is None else kM
         if kmax is None:
-            kmax = self.kmax_map/np.sqrt(2)
+            kmax = int(np.floor(self.kmax_map/np.sqrt(2)))
         N_pix = np.shape(kM)[0]
         fft_map1 = copy.deepcopy(rfft_map1)
         if rfft_map2 is None:
@@ -216,8 +221,8 @@ class Fields:
         gauss_matrix = self._get_gauss_matrix(np.shape(self.kM))
         return self._enforce_symmetries(np.sqrt(C_omega_spline(self.kM) * (2 * np.pi) ** 2) * gauss_matrix)
 
-    def get_omega_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, sim=None):
-        if self.template is None or sim is not None:
-            self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, sim=sim)
+    def get_omega_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, tracer_noise=False):
+        if self.template is None:
+            self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, tracer_noise=tracer_noise)
         return self.template.get_omega(Nchi)
 
