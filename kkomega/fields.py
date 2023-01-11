@@ -10,7 +10,7 @@ import copy
 
 class Fields:
 
-    def __init__(self, fields, exp="SO", N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None):
+    def __init__(self, fields, exp="SO", N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None, Nsims=1, sim=0):
         # TODO: Lensit has ellM = int(np.around(kM - 1/2))?? So my maps disagree with lensit of small scales...
         self.N_pix = 2**N_pix_pow
         self.HDres = HDres
@@ -24,8 +24,9 @@ class Fields:
         input_kappa_map = None
         enforce_sym = True
         if setup_cmb_lens_rec:
-            self.rec = Reconstruction(exp, LDres=N_pix_pow, HDres=HDres)
-            input_kappa_map = self._get_lensit_kappa_map()
+            self.rec = Reconstruction(exp, LDres=N_pix_pow, HDres=HDres, nsims=Nsims)
+            self._sim = sim
+            input_kappa_map = self._get_lensit_kappa_map(sim=self._sim)
             enforce_sym = False
         self.fields = self._get_rearanged_fields(fields) if ("k" in fields and setup_cmb_lens_rec) else self._get_fields(fields)
         self.template = None
@@ -208,10 +209,10 @@ class Fields:
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
 
-    def get_omega_rec(self, cmb_fields="T", include_noise="True", sim=0):
+    def get_omega_rec(self, cmb_fields="T", include_noise="True"):
         if self.rec is None:
             raise ValueError(f"CMB lensing reconstruction not setup for this Fields instance.")
-        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=sim)
+        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim)
         return curl_map * self.kM **2 / 2
 
     def get_omega_fiducial(self):
