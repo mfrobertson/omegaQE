@@ -183,7 +183,9 @@ class Noise:
             return np.zeros(ellmax + 1)
         sep = getFileSep()
         dir = f'data{sep}N0{sep}{exp}{sep}'
-        return np.array(pd.read_csv(dir+f'N.csv', sep=' ')[typ[0]])[:ellmax+1]
+        N = np.array(pd.read_csv(dir + f'N.csv', sep=' ')[typ[0]])[:ellmax + 1]
+        N = np.concatenate((np.zeros(self.cmb_offset), N))
+        return N
 
     def get_cmb_gaussian_N(self, typ, deltaT=3, beam=3, ellmax=4000, exp="SO"):
         """
