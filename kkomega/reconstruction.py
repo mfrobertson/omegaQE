@@ -33,8 +33,13 @@ class Reconstruction:
         return InterpolatedUnivariateSpline(Ls_sample, n)(Ls)
 
     def _get_exp_noise(self, exp):
+        lensit_ellmax_sky = 6000
         if exp == "SO":
-            return 3, None, 3
+            nT = 3
+            nT = np.ones(lensit_ellmax_sky + 1) * nT
+            nP = np.sqrt(2) * nT
+            beam = 3
+            return nT, nP, beam
         if exp == "SO_base":
             beam = 0
             nT = self._deconstruct_noise_curve("TT", exp, beam)
@@ -46,18 +51,25 @@ class Reconstruction:
             nP = self._deconstruct_noise_curve("EE", exp, beam)
             return nT, nP, beam
         if exp == "S4":
-            return 1, None, 3
+            nT = 1
+            nT = np.ones(lensit_ellmax_sky + 1) * nT
+            nP = np.sqrt(2) * nT
+            beam = 3
+            return nT, nP, beam
         if exp == "S4_base":
             beam = 0
             nT = self._deconstruct_noise_curve("TT", exp, beam)
             nP = self._deconstruct_noise_curve("EE", exp, beam)
             return nT, nP, beam
         if exp == "HD":
-            return 0.5, None, 0.25
+            nT = 0.5
+            nT = np.ones(lensit_ellmax_sky + 1) * nT
+            nP = np.sqrt(2) * nT
+            beam = 0.25
+            return nT, nP, beam
         raise ValueError(f"Experiment {exp} unexpected.")
 
     def _get_Lcuts(self, T_Lmin, T_Lmax, P_Lmin, P_Lmax, strict):
-
         if strict:
             return np.max((T_Lmin, P_Lmin)), np.min((T_Lmax, P_Lmax))
         return np.min((T_Lmin, P_Lmin)), np.max((T_Lmax, P_Lmax))
