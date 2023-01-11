@@ -1,35 +1,87 @@
 import numpy as np
 import lensit as li
+from noise import Noise
+from scipy.interpolate import InterpolatedUnivariateSpline
 import os
 
 
 class Reconstruction:
 
-    def __init__(self, exp="SO", LDres=12, HDres=12, nsims=1):
+    def __init__(self, exp="SO", LDres=12, HDres=12, nsims=1, Lcuts=(30,3000,30,5000)):
         if not 'LENSIT' in os.environ.keys():
             os.environ['LENSIT'] = '_tmp'
+        self.noise = Noise()
         self.exp = exp
-        exp_conf = tuple(self._get_lensit_config(exp))
+        exp_conf = tuple(self._get_lensit_config(exp, Lcuts))
         self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=nsims, num_threads=4)
         self.isocov = li.get_isocov(exp_conf, LDres, HD_res=HDres, pyFFTWthreads=4)
         self.curl = None
         self.phi = None
 
+    def _deconstruct_noise_curve(self, typ, exp, beam):
+        Lmax_data = 5000
+        N = self.noise.get_cmb_gaussian_N(typ, None, None, Lmax_data, exp)
+        T_cmb = 2.7255
+        arcmin_to_rad = np.pi / 180 / 60
+        Ls = np.arange(np.size(N))
+        beam *= arcmin_to_rad
+        deconvolve_beam = np.exp(Ls*(Ls+1)*beam**2/(8*np.log(2)))
+        n = np.sqrt(N/deconvolve_beam) * T_cmb / 1e-6 / arcmin_to_rad
+        lensit_ellmax_sky = 6000
+        Ls_sample = np.arange(np.size(N))
+        Ls = np.arange(lensit_ellmax_sky + 1)
+        return InterpolatedUnivariateSpline(Ls_sample, n)(Ls)
+
     def _get_exp_noise(self, exp):
         if exp == "SO":
-            return 3, 3
-        elif exp == "S4":
-            return 1, 3
-        elif exp == "HD":
-            return 0.5, 0.25
-        else:
-            raise ValueError(f"Experiment {exp} unexpected.")
+            return 3, None, 3
+        if exp == "SO_base":
+            beam = 0
+            nT = self._deconstruct_noise_curve("TT", exp, beam)
+            nP = self._deconstruct_noise_curve("EE", exp, beam)
+            return nT, nP, beam
+        if exp == "SO_goal":
+            beam = 0
+            nT = self._deconstruct_noise_curve("TT", exp, beam)
+            nP = self._deconstruct_noise_curve("EE", exp, beam)
+            return nT, nP, beam
+        if exp == "S4":
+            return 1, None, 3
+        if exp == "S4_base":
+            beam = 0
+            nT = self._deconstruct_noise_curve("TT", exp, beam)
+            nP = self._deconstruct_noise_curve("EE", exp, beam)
+            return nT, nP, beam
+        if exp == "HD":
+            return 0.5, None, 0.25
+        raise ValueError(f"Experiment {exp} unexpected.")
 
-    def _get_lensit_config(self, exp):
-        delta_T, beam = self._get_exp_noise(exp)
-        Lmin = 30
-        Lmax = 3000
-        return "custom", delta_T, beam, Lmin, Lmax
+    def _get_Lcuts(self, T_Lmin, T_Lmax, P_Lmin, P_Lmax, strict):
+
+        if strict:
+            return np.max((T_Lmin, P_Lmin)), np.min((T_Lmax, P_Lmax))
+        return np.min((T_Lmin, P_Lmin)), np.max((T_Lmax, P_Lmax))
+
+    def _apply_Lcuts(self, Lcuts, delta_T, delta_P):
+        T_Lmin = Lcuts[0]
+        T_Lmax = Lcuts[1]
+        P_Lmin = Lcuts[2]
+        P_Lmax = Lcuts[3]
+        if np.size(delta_T) == 1:
+            Lmin, Lmax = self._get_Lcuts(T_Lmin, T_Lmax, P_Lmin, P_Lmax, strict=True)
+            return Lmin, Lmax, delta_T, delta_P
+        delta_T[:T_Lmin] = 1e10
+        delta_T[T_Lmax + 1:] = 1e10
+        delta_P[:P_Lmin] = 1e10
+        delta_P[P_Lmax + 1:] = 1e10
+        Lmin, Lmax = self._get_Lcuts(T_Lmin, T_Lmax, P_Lmin, P_Lmax, strict=False)
+        return Lmin, Lmax, delta_T, delta_P
+
+
+    def _get_lensit_config(self, exp, Lcuts):
+        delta_T, delta_P, beam = self._get_exp_noise(exp)
+        Lmin, Lmax, delta_T, delta_P = self._apply_Lcuts(Lcuts, delta_T, delta_P)
+        return "custom", delta_T, beam, Lmin, Lmax, delta_P, exp
 
     def _inverse_nonzero(self, array):
         ret = np.zeros_like(array)
