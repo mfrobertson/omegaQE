@@ -197,7 +197,7 @@ class Fisher:
             L2 = Ls2[None, :]
             L3_vec = vector.obj(rho=L3, phi=0)
             L2_vec = vector.obj(rho=L2, phi=thetas[:, None])
-            L1_vec = -L3_vec - L2_vec
+            L1_vec = L3_vec - L2_vec
             L1 = L1_vec.rho
             w = np.ones(np.shape(L1))
             w[L1 > Lmax] = 0
@@ -236,7 +236,7 @@ class Fisher:
             L2 = Ls2[None, :]
             L3_vec = vector.obj(rho=L3, phi=0)
             L2_vec = vector.obj(rho=L2, phi=thetas[:, None])
-            L1_vec = -L3_vec - L2_vec
+            L1_vec = L3_vec - L2_vec
             L1 = L1_vec.rho
             w = np.ones(np.shape(L1))
             w[L1 > Lmax] = 0
@@ -434,7 +434,10 @@ class Fisher:
             N0 = self.covariance.noise.get_N0("omega", Lmax)
         else:
             N0 = self.covariance.noise.get_shape_N(n=n)
-        var = self.power.get_ps_variance(ells, Cl_spline(ells), N0[ells], auto)
+        if auto:
+            var = 2 / (2 * ells + 1) * (Cl_spline(ells) + N0[ells]) ** 2
+        else:
+            var = 2 / (2 * ells + 1) * (Cl_spline(ells)**2 + 0.5*(N0[ells] * Cl_spline(ells)))
         return f_sky * np.sum(Cl_spline(ells) ** 2 / var)
 
     def reset_noise(self):
