@@ -209,7 +209,7 @@ class Cosmology:
     def _gal_window_z_no_norm(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
-        b = 1 if bias_unity else 1 + 0.84 * z
+        b = 1 if bias_unity else 1 + (0.84 * z)
         zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)
         dz = zs[1] - zs[0]
         norm = np.sum(dz * z_distr_func(zs))
