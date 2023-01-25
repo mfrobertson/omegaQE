@@ -50,8 +50,12 @@ class Modecoupling:
         cmb_lens_window = self._cosmo.cmb_lens_window_matter(Chis, self._cosmo.get_chi_star())
         if typ[0] == "k":
             win1 = win2 = cmb_lens_window
-        elif typ[0] == "s":
+        elif typ[0] == "r":
             win1 = win2 = self._cosmo.gal_lens_window(Chis, Chi_max)     # Should set reasonable upper limit for cosmic shear
+        elif typ[0] == "s":
+            shear_window = self._cosmo.gal_lens_window_matter(Chis, Chi_max)
+            win1 = cmb_lens_window
+            win2 = shear_window
         elif typ[0] == "g":
             gal_window = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
             win1 = cmb_lens_window
@@ -70,8 +74,10 @@ class Modecoupling:
     def _get_ps(self, ells, Chis, Chi_source2, typ, nu, gal_bins, recalc_PK, gal_distro="LSST_gold"):
         if typ[1] == "k":
             return self._powerspectra.get_kappa_ps_2source(ells, Chis, Chi_source2, recalc_PK=recalc_PK, use_weyl=False)
-        if typ[1] == "s":
+        if typ[1] == "r":
             return self._powerspectra.get_gal_lens_ps_2source(ells, Chis, Chi_source2, recalc_PK=recalc_PK, use_weyl=False)
+        if typ[1] == "s":
+            return self._powerspectra.get_gal_lens_kappa_ps(ells, Chis, recalc_PK=recalc_PK, use_weyl=False)
         if typ[1] == "g":
             return self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK, gal_distro=gal_distro, use_weyl=False)
         if typ[1] in self.binned_gal_types:
@@ -169,7 +175,6 @@ class Modecoupling:
             typ = "kk"
             star = False
         elif typ == "rr":
-            typ = "ss"
             star = False
         return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro=gal_distro)
 

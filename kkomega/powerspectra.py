@@ -211,6 +211,29 @@ class Powerspectra:
         I = step * weyl_ps / (Chis ** 2) * dChi * window1 * window2
         return I.sum(axis=1)
 
+    def _Cl_gal_lens_kappa(self, ells, Chi_source1, Nchi, kmin, kmax, extended):
+        if Chi_source1 is None:
+            Chi_source1 = self.cosmo.get_chi_star()
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
+        step, Chis, matter_weyl_ps, dChi = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter-weyl")
+        window1 = self.cosmo.cmb_lens_window(Chis, Chi_source1)
+        window2 = self.cosmo.gal_lens_window(Chis, self.cosmo.z_to_Chi(20))
+        I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
+        if np.size(Chi_source1) > 1:
+            ells = self._vectorise_ells(ells, 1)
+        if extended: ells = ells + 0.5
+        return (-1) * I.sum(axis=1) * ells ** 2
+
+    def _Cl_gal_lens_kappa_matter(self, ells, Chi_source1, Nchi, kmin, kmax, extended):
+        if Chi_source1 is None:
+            Chi_source1 = self.cosmo.get_chi_star()
+        zmax = self.cosmo.Chi_to_z(Chi_source1)
+        step, Chis, matter_weyl_ps, dChi = self._integral_prep(ells, Nchi, 0, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
+        window1 = self.cosmo.cmb_lens_window_matter(Chis, Chi_source1)
+        window2 = self.cosmo.gal_lens_window_matter(Chis, self.cosmo.z_to_Chi(20))
+        I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
+        return I.sum(axis=1)
+
     def _Cl_gal_kappa(self, ells, Chi_source1, Nchi, kmin, kmax, gal_win_zmin, gal_win_zmax, extended, gal_distro="LSST_gold"):
         if Chi_source1 is None:
             Chi_source1 = self.cosmo.get_chi_star()
@@ -277,22 +300,21 @@ class Powerspectra:
         I = step * matter_ps / (Chis) ** 2 * dChi * window1 * window2
         return I.sum(axis=1)
 
-    def get_window(self, typ, Chis, Chi_source):
+    def get_window(self, typ, Chis, Chi_source, nu=353e9):
         if typ[0] == "k":
             if Chi_source is None:
                 Chi_source = self.cosmo.get_chi_star()
             return self.cosmo.cmb_lens_window_matter(Chis, Chi_source)
         if typ[0] == "s":
-            return self.cosmo.gal_lens_window_matter(Chis, self.cosmo.z_to_Chi(
-                20))  # Should set reasonable upper limit for cosmic shear
+            return self.cosmo.gal_lens_window_matter(Chis, self.cosmo.z_to_Chi(20))  # Should set reasonable upper limit for cosmic shear
         if typ[0] == "g":
             return self.cosmo.gal_window_Chi(Chis)
         if typ[0] == "I":
-            return self.cosmo.cib_window_Chi(Chis)
+            return self.cosmo.cib_window_Chi(Chis, nu=nu)
 
-    def _get_ps(self, Ls, typ, Chi_source1, Chi_source2, Nchi, zmin, kmin, kmax):
+    def _get_ps(self, Ls, typ, Chi_source1, Chi_source2, Nchi, zmin, kmin, kmax, nu):
         Chi_min = self.cosmo.z_to_Chi(zmin)
-        zmax = self.cosmo.Chi_to_z(Chi_source1)
+        zmax = None if Chi_source1 is None else self.cosmo.Chi_to_z(Chi_source1)
         if zmax is None:
             if "k" in typ:
                 Chi_max = self.cosmo.get_chi_star()
@@ -304,8 +326,8 @@ class Powerspectra:
         zs = self.cosmo.Chi_to_z(Chis)
         if Chi_source2 is None:
             Chi_source2 = Chi_source1
-        win1 = self.get_window(typ[0], Chis, Chi_source1)
-        win2 = self.get_window(typ[1], Chis, Chi_source2)
+        win1 = self.get_window(typ[0], Chis, Chi_source1, nu=nu)
+        win2 = self.get_window(typ[1], Chis, Chi_source2, nu=nu)
         I = np.zeros(np.size(Ls))
         for jjj, Chi in enumerate(Chis):
             ks = Ls / Chi
@@ -489,6 +511,31 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_gal_lens_2source_matter(ells, Chi_source1, Chi_source2, Nchi, kmin, kmax, extended)
 
+    def get_gal_lens_kappa_ps(self, ells, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=False, recalc_PK=False, use_weyl=True):
+        """
+
+        Parameters
+        ----------
+        ells
+        Chi_source1
+        Nchi
+        kmin
+        kmax
+        extended
+        recalc_PK
+
+        Returns
+        -------
+
+        """
+        if use_weyl:
+            if recalc_PK or self.matter_weyl_PK is None:
+                self.matter_weyl_PK = self._get_PK("matter-weyl", np.max(ells), Nchi)
+            return self._Cl_gal_lens_kappa(ells, Chi_source1, Nchi, kmin, kmax, extended)
+        if recalc_PK or self.matter_PK is None:
+            self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
+        return self._Cl_gal_lens_kappa_matter(ells, Chi_source1, Nchi, kmin, kmax, extended)
+
     def get_gal_kappa_ps(self, ells, Chi_source1=None, Nchi=100, kmin=0, kmax=100, gal_win_zmin=None, gal_win_zmax=None, extended=False, recalc_PK=False, gal_distro="LSST_gold", use_weyl=True):
         """
 
@@ -635,7 +682,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_cib_gal(ells, nu, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin, gal_win_zmax, extended, bias, gal_distro=gal_distro)
 
-    def get_ps(self, typ, Ls, Chi_source1=None, Chi_souce2=None, Nchi=100, zmin=0, kmin=0, kmax=100):
+    def get_ps(self, typ, Ls, Chi_source1=None, Chi_souce2=None, Nchi=100, zmin=0, kmin=0, kmax=100, nu=353e9):
         """
 
         Parameters
@@ -651,7 +698,7 @@ class Powerspectra:
         -------
 
         """
-        return self._get_ps(Ls, typ, Chi_source1, Chi_souce2, Nchi, zmin, kmin, kmax)
+        return self._get_ps(Ls, typ, Chi_source1, Chi_souce2, Nchi, zmin, kmin, kmax, nu)
 
 
 if __name__ == "__main__":

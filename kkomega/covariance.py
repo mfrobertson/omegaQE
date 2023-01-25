@@ -59,6 +59,8 @@ class Covariance:
         return self.power.get_cib_gal_ps(ells, nu=nu, gal_distro=gal_distro)
 
     def _get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
+        if "g" not in typ:
+            return self.power.get_ps(typ, np.arange(ellmax + 1), nu=nu)
         if typ == "kk":
             return self._get_Cl_kappa(ellmax)
         elif typ == "gk" or typ == "kg":
@@ -114,6 +116,8 @@ class Covariance:
             N = N_cib + N_dust
             N[:110] = 1e10
             N[2001:] = 1e10
+        elif typ[0] == "s":
+            N = self.noise.get_shape_N(ellmax=ellmax)
         elif typ[0] == "g":
             N = self.noise.get_gal_shot_N(ellmax=ellmax)
         elif typ[0] in self.binned_gal_types:
