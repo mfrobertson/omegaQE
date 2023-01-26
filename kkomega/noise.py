@@ -3,6 +3,7 @@ from cosmology import Cosmology
 from cache.tools import getFileSep
 import pandas as pd
 
+
 class Noise:
     """
     Handles CMB experimental noise.
@@ -51,9 +52,11 @@ class Noise:
                 N0[L] = 0.5 * (N0[L-1] + N0[L+1])
         return N0
 
-    def _get_N0(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, data_dir):
-        if iter:
-            qe+= "_iter"
+    def _get_N0(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, iter_ext, data_dir):
+        if iter_ext:
+            qe += "_iter_ext"
+        elif iter:
+            qe += "_iter"
         elif gmv:
             qe += "_gmv"
         sep = getFileSep()
@@ -62,10 +65,10 @@ class Noise:
         N0_curl = np.array(pd.read_csv(dir+f'N0_curl_{ps}_T{T_Lmin}-{T_Lmax}_P{P_Lmin}-{P_Lmax}.csv', sep=' ')[qe])
         return N0_phi, N0_curl
 
-    def setup_cmb_noise(self, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, iter=False, data_dir="data"):
-        self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, data_dir)
+    def setup_cmb_noise(self, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, iter=False, iter_ext=False, data_dir="data"):
+        self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, iter_ext, data_dir)
 
-    def get_N0(self, typ, ellmax, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, recalc_N0=False, iter=False, data_dir="data"):
+    def get_N0(self, typ, ellmax, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, recalc_N0=False, iter=False, iter_ext=False, data_dir="data"):
         """
         Extracts the noise from the supplied input file.
 
@@ -86,7 +89,7 @@ class Noise:
             1D array of the noise up to desired ellmax, the indices representing ell - offset.
         """
         if recalc_N0:
-            self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, data_dir)
+            self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, iter_ext, data_dir)
         if self.N0 is None:
             raise ValueError(f"N0 has not been created, either call setup_cmb_noise or use recalc_N0 argument.")
         if typ == "phi":

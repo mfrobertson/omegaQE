@@ -21,8 +21,8 @@ class Covariance:
         samp2 = np.logspace(1, 3, Nells-np.size(samp1)) * floaty
         return np.concatenate((samp1, samp2))
 
-    def setup_cmb_noise(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, data_dir):
-        self.noise.setup_cmb_noise(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, data_dir)
+    def setup_cmb_noise(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, iter_ext, data_dir):
+        self.noise.setup_cmb_noise(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, iter_ext, data_dir)
 
     def _interpolate(self, arr):
         ells_sample = np.arange(np.size(arr))
@@ -59,7 +59,7 @@ class Covariance:
         return self.power.get_cib_gal_ps(ells, nu=nu, gal_distro=gal_distro)
 
     def _get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
-        if "g" not in typ:
+        if "s" in typ:
             return self.power.get_ps(typ, np.arange(ellmax + 1), nu=nu)
         if typ == "kk":
             return self._get_Cl_kappa(ellmax)
@@ -149,6 +149,51 @@ class Covariance:
         Covs = [self._get_Cov(arg, Lmax, nu, gal_bins, gal_distro=gal_distro) for arg in args]
         return C_inv_func(*Covs)
 
+    def _get_rho(self, typ, Lmax, nu, gal_bins, use_bins, gal_distro, include_kappa_noise=True):
+        a_1 = typ[0]
+        a_2 = typ[1]
+        typ1 = a_1 + a_1
+        typ2 = a_2 + a_2
+        if typ1 == "kk" and not include_kappa_noise:
+            cov_a1 = self._get_Cl(typ1, Lmax, nu, gal_bins, use_bins, gal_distro)
+        else:
+            cov_a1 = self._get_Cov(typ1, Lmax, nu, gal_bins, use_bins, gal_distro)
+        if typ2 == "kk" and not include_kappa_noise:
+            cov_a2 = self._get_Cl(typ2, Lmax, nu, gal_bins, use_bins, gal_distro)
+        else:
+            cov_a2 = self._get_Cov(typ2, Lmax, nu, gal_bins, use_bins, gal_distro)
+        Cl_cross = self._get_Cl(a_1 + a_2, Lmax, nu, gal_bins, use_bins, gal_distro)
+        corr = Cl_cross / (np.sqrt(cov_a1 * cov_a2))
+        return corr
+
+    def _get_corr_inv(self, typs, Lmax, nu, gal_bins, use_bins, gal_distro):
+        Ntyps = np.size(typs)
+        typs_no_fI = copy.deepcopy(typs)
+        typs_no_fI[typs_no_fI == "f"] = "z"  # Replacing 'f' with 'z' for sympy operations as 'ff' is sympy function
+        typs_no_fI[typs_no_fI == "I"] = "y"
+        rho = typs[:, None] + typs[None, :]
+        rho_no_fI = typs_no_fI[:, None] + typs_no_fI[None, :]
+        args = rho.flatten()
+        args_no_fI = rho_no_fI.flatten()
+        rho_sym = Matrix(rho_no_fI)
+        if Ntyps > 3:
+            rho_inv = rho_sym.inv('LU')
+        else:
+            rho_inv = rho_sym.inv()
+        rho_inv_func = lambdify(args_no_fI, rho_inv)
+        rhos = [self._get_rho(arg, Lmax, nu, gal_bins, use_bins, gal_distro) for arg in args]
+        return rho_inv_func(*rhos)
+
+    def _get_total_tracer_corr(self, tracers, Lmax, nu, gal_bins, use_bins, gal_distro):
+        rho_inv = self._get_corr_inv(tracers, Lmax, nu, gal_bins, use_bins, gal_distro)
+        rho = np.zeros(Lmax + 1)
+        for iii, a_i in enumerate(tracers):
+            rho_ik = self._get_rho(a_i + "k", Lmax, nu, gal_bins, use_bins, gal_distro, include_kappa_noise=False)
+            for jjj, a_j in enumerate(tracers):
+                rho_jk = self._get_rho(a_j + "k", Lmax, nu, gal_bins, use_bins, gal_distro, include_kappa_noise=False)
+                rho += rho_ik * rho_inv[iii][jjj] * rho_jk
+        return rho
+
     def get_C_inv(self, typs, Lmax, nu, gal_bins=(None, None, None, None), gal_distro="LSST_gold"):
         """
 
@@ -164,6 +209,58 @@ class Covariance:
 
         """
         return self._get_C_inv(np.char.array(list(typs)), Lmax, nu, gal_bins, gal_distro)
+
+    def get_corr_inv(self, typs, Lmax, nu=353e9, gal_bins=(None, None, None, None), use_bins=False, gal_distro="LSST_gold"):
+        """
+
+        Parameters
+        ----------
+        typs
+        Lmax
+        nu
+        gal_bins
+
+        Returns
+        -------
+
+        """
+        return self._get_corr_inv(np.char.array(list(typs)), Lmax, nu, gal_bins, use_bins, gal_distro)
+
+    def get_total_tracer_corr(self, tracers, Lmax, nu=353e9, gal_bins=(None, None, None, None), use_bins=False, gal_distro="LSST_gold"):
+        """
+
+        Parameters
+        ----------
+        tracers
+        Lmax
+        nu
+        gal_bins
+        use_bins
+        gal_distro
+
+        Returns
+        -------
+
+        """
+        return self._get_total_tracer_corr(np.char.array(list(tracers)), Lmax, nu, gal_bins, use_bins, gal_distro)
+
+    def get_corr(self, typ, Lmax, nu=353e9, gal_bins=(None, None, None, None), use_bins=False, gal_distro="LSST_gold", include_kappa_noise=True):
+        """
+
+        Parameters
+        ----------
+        typ
+        Lmax
+        nu
+        gal_bins
+        use_bins
+        gal_distro
+
+        Returns
+        -------
+
+        """
+        return self._get_rho(typ, Lmax, nu, gal_bins, use_bins, gal_distro, include_kappa_noise)
 
     def get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None, None, None, None), use_bins=False, gal_distro="LSST_gold"):
         """

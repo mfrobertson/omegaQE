@@ -22,7 +22,7 @@ class Fisher:
     power : Powerspectra
     """
 
-    def __init__(self, exp="SO", qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir="data", setup_bispectra=False):
+    def __init__(self, exp="SO", qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, iter_ext=False, data_dir="data", setup_bispectra=False):
         """
         Constructor
 
@@ -31,7 +31,7 @@ class Fisher:
 
         """
         self.covariance = Covariance()
-        self.setup_noise(exp, qe, gmv, ps, L_cuts, iter, data_dir)
+        self.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)
         self.bi = Bispectra()
         if setup_bispectra:
             self.setup_bispectra()
@@ -49,13 +49,14 @@ class Fisher:
         if not path_exists(path):
             raise FileNotFoundError(f"Path {path} does not exist")
 
-    def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None):
+    def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, iter_ext=None, data_dir=None):
         if exp is not None: self.exp = exp
         if qe is not None: self.qe = qe
         if gmv is not None: self.gmv = gmv
         if ps is not None: self.ps = ps
         if L_cuts is not None: self.L_cuts = L_cuts
         if iter is not None: self.iter = iter
+        if iter_ext is not None: self.iter_ext = iter_ext
         if data_dir is not None: self.data_dir = data_dir
         self.reset_noise()
 
@@ -450,4 +451,4 @@ class Fisher:
         -------
 
         """
-        self.covariance.setup_cmb_noise(self.exp, self.qe, self.gmv, self.ps, self.L_cuts[0], self.L_cuts[1], self.L_cuts[2], self.L_cuts[3], self.iter, self.data_dir)
+        self.covariance.setup_cmb_noise(self.exp, self.qe, self.gmv, self.ps, self.L_cuts[0], self.L_cuts[1], self.L_cuts[2], self.L_cuts[3], self.iter, self.iter_ext, self.data_dir)
