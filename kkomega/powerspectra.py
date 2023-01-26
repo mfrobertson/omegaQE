@@ -1,7 +1,6 @@
 import numpy as np
 from cosmology import Cosmology
 from maths import Maths
-from scipy.interpolate import InterpolatedUnivariateSpline
 
 
 class Powerspectra:
@@ -334,8 +333,7 @@ class Powerspectra:
             step = self.maths.rectangular_pulse_steps(ks, kmin, kmax)
             matter_ps = self._get_matter_ps("matter", zs[jjj], ks, curly=False, weyl_scaled=False)
             I += step * matter_ps / (Chi ** 2) * win1[jjj] * win2[jjj]
-        Cl = InterpolatedUnivariateSpline(Ls, I).integral(Chi_min, Chi_max)
-        return Cl
+        return I * (Chis[1]-Chis[0])
 
     def get_phi_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, extended=False, recalc_PK=False):
         """
