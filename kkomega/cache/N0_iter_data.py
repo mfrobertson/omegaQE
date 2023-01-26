@@ -4,7 +4,6 @@ import os
 
 def save_N0(exps, powerspectra, fields, convert=False):
     columns = np.array(fields)
-    Ls = np.arange(0, 5001)
     for exp in exps:
         for ps in powerspectra:
             df_phi = pd.read_csv(f'../data/N0/{exp}/N0_phi_{ps}_T30-3000_P30-5000.csv', sep=' ')
@@ -12,9 +11,10 @@ def save_N0(exps, powerspectra, fields, convert=False):
             for iii, col in enumerate(columns):
                 typ = "iter"
                 fields = col
-                N0_phi, N0_curl = np.load(f"_N0/{exp}/{typ}/N0_{fields}_{ps}_T30-3000_P30-5000.npy")
+                N0_phi, N0_curl = np.load(f"_N0/{exp}/{typ}/N0_{fields}_T30-3000_P30-5000.npy")
                 col += "_iter"
                 if convert:
+                    Ls = np.arange(2, 5001)
                     df_phi[col] = N0_phi[2:5001]*4/(Ls**4)
                     df_curl[col] = N0_curl[2:5001]*4/(Ls**4)
                 else:
@@ -29,9 +29,10 @@ def save_N0(exps, powerspectra, fields, convert=False):
             df_curl.to_csv(f"{dir}/N0_curl_{ps}_T30-3000_P30-5000.csv", sep=" ", float_format='{:,.6e}'.format)
 
 def main():
-    fields = ["TT", "EB", "TEB"]
-    exps = np.array(["S4_base"])
-    powerspectra = ["lensed"]
+    # fields = ["TT", "EB", "TEB"]
+    fields = ["TEB"]
+    exps = np.array(["SO_base", "SO_goal", "S4_base"])
+    powerspectra = ["gradient"]
     save_N0(exps, powerspectra, fields)
 
 
