@@ -9,17 +9,17 @@ def save_N0(exps, powerspectra, fields, convert=False):
             df_phi = pd.read_csv(f'../data/N0/{exp}/N0_phi_{ps}_T30-3000_P30-5000.csv', sep=' ')
             df_curl = pd.read_csv(f'../data/N0/{exp}/N0_curl_{ps}_T30-3000_P30-5000.csv', sep=' ')
             for iii, col in enumerate(columns):
-                typ = "iter"
-                fields = col
-                N0_phi, N0_curl = np.load(f"_N0/{exp}/{typ}/N0_{fields}_T30-3000_P30-5000.npy")
-                col += "_iter"
-                if convert:
-                    Ls = np.arange(2, 5001)
-                    df_phi[col] = N0_phi[2:5001]*4/(Ls**4)
-                    df_curl[col] = N0_curl[2:5001]*4/(Ls**4)
-                else:
-                    df_phi[col] = N0_phi[2:5001]
-                    df_curl[col] = N0_curl[2:5001]
+                for typ in ["iter", "iter_ext"]:
+                    fields = col
+                    N0_phi, N0_curl = np.load(f"_N0/{exp}/{typ}/N0_{fields}_T30-3000_P30-5000.npy")
+                    col_name = col + "_" + typ
+                    if convert:
+                        Ls = np.arange(2, 5001)
+                        df_phi[col_name] = N0_phi[2:5001]*4/(Ls**4)
+                        df_curl[col_name] = N0_curl[2:5001]*4/(Ls**4)
+                    else:
+                        df_phi[col_name] = N0_phi[2:5001]
+                        df_curl[col_name] = N0_curl[2:5001]
             dir = f"../data/N0/{exp}"
             if not os.path.isdir(dir):
                 os.makedirs(dir)

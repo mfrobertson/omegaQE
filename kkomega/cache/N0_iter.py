@@ -9,13 +9,13 @@ import pandas as pd
 
 # Switching path to parent directory to access and run modecoupling
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from noise import Noise
+from covariance import Covariance
 
-def save(N0, fields, exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
+def save(N0, fields, exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax, ext):
     sys.path.append(os.path.dirname(os.path.realpath(__file__)))
     sep = tools.getFileSep()
     current_folder = os.path.dirname(os.path.realpath(__file__))
-    gmv_str = "iter"
+    gmv_str = "iter_ext" if ext else "iter"
     folder = current_folder + sep + "_N0" + sep + exp + sep + gmv_str
     filename_N0 = f"N0_{fields}_T{T_Lmin}-{T_Lmax}_P{P_Lmin}-{P_Lmax}.npy"
     print(f"Saving {filename_N0} at {folder}")
@@ -102,28 +102,30 @@ def get_N_dict(exp, delta_T, beam, Lmax):
     N_dict = {}
     os.chdir("../")
     for fields in ["TT", "EE", "BB"]:
-        N = _noise.get_cmb_gaussian_N(fields, deltaT=delta_T, beam=beam, ellmax=Lmax, exp=exp) * (2.7255 * 1e6) ** 2
+        N = cov.noise.get_cmb_gaussian_N(fields, deltaT=delta_T, beam=beam, ellmax=Lmax, exp=exp) * (2.7255 * 1e6) ** 2
         N_dict[fields.lower()] = np.concatenate((np.array([N[0], N[0]]), N))
     os.chdir("cache/")
     return N_dict
 
-def main(exp, fields, gmv, iters, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
-    global noise
-    noise = Noise()
+def main(exp, fields, gmv, iters, T_Lmin, T_Lmax, P_Lmin, P_Lmax, ext):
+    global cov
+    cov = Covariance()
     cls_path = os.path.join(os.path.dirname(os.path.abspath(plancklens.__file__)), 'data', 'cls')
     cls_unl = utils.camb_clfile(os.path.join(cls_path, 'FFP10_wdipole_lenspotentialCls.dat'))
     qe_key = get_qe_key(fields, gmv)
     delta_T, delta_P, beam = _get_exp_noise(exp)
-    N0_iter = n0s.get_N0_iter(qe_key, delta_T, delta_P, beam, cls_unl, {'t': T_Lmin, 'e': P_Lmin, 'b': P_Lmin}, {'t': T_Lmax, 'e': P_Lmax, 'b': P_Lmax}, lmax_qlm=5000, itermax=iters, ret_delcls=False, ret_curl=True)
+    rho_sqd_ext = cov.get_total_tracer_corr("gI", 5000)**2 if ext else 0
+    for key in cls_unl.keys():
+        cls_unl[key] = cls_unl[key][:5001]
+    N0_iter = n0s.get_N0_iter(qe_key, delta_T, delta_P, beam, cls_unl, {'t': T_Lmin, 'e': P_Lmin, 'b': P_Lmin}, {'t': T_Lmax, 'e': P_Lmax, 'b': P_Lmax}, lmax_qlm=5000, itermax=iters, ret_delcls=False, ret_curl=True, rho_sqd_ext=rho_sqd_ext)
     N0 = (N0_iter[0][iters], N0_iter[2][iters])
-    save(N0, fields, exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
+    save(N0, fields, exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax, ext)
 
 
 if __name__ == "__main__":
-    _noise = Noise()
     args = sys.argv[1:]
-    if len(args) != 8:
-        raise ValueError("Must supply arguments: exp fields gmv iters T_Lmin T_Lmax P_Lmin P_Lmax")
+    if len(args) != 9:
+        raise ValueError("Must supply arguments: exp fields gmv iters T_Lmin T_Lmax P_Lmin P_Lmax ext")
     exp = str(args[0])
     fields = str(args[1])
     gmv = tools.parse_boolean(args[2])
@@ -132,4 +134,5 @@ if __name__ == "__main__":
     T_Lmax = int(args[5])
     P_Lmin = int(args[6])
     P_Lmax = int(args[7])
-    main(exp, fields, gmv, iters, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
+    ext = tools.parse_boolean(args[8])
+    main(exp, fields, gmv, iters, T_Lmin, T_Lmax, P_Lmin, P_Lmax, ext)
