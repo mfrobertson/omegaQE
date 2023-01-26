@@ -11,6 +11,7 @@ def M_matrix(mode, ells, star, typ):
     Nells = np.size(ells)
     M = np.ones((Nells, Nells))
     for iii, ell in enumerate(ells):
+        print(f"{iii}/{Nells}")
         M[iii, :] = mode.components(np.ones(Nells) * ell, ells, typ=typ, star=star)
     return M
 
