@@ -17,12 +17,12 @@ class QE:
             self.gradCl_spline = None
             self.N_spline = None
 
-    def __init__(self, exp, deltaT=None, beam=None, init=True, fields="TEB", L_cuts=(None,None,None,None)):
+    def __init__(self, exp, deltaT=None, beam=None, init=True, fields="TEB", L_cuts=(None,None,None,None), data_dir="data"):
         self._cosmo = Cosmology()
         self._noise = Noise()
         self.cmb = dict.fromkeys(self._cmb_types(), self.CMBsplines())
         if init:
-            self.initialise(exp, deltaT, beam, fields=fields)
+            self.initialise(exp, deltaT, beam, fields=fields, data_dir=data_dir)
         else:
             self._cov_inv_fields = "uninitialised"
         self._setup_qe_L_cuts(L_cuts)
@@ -101,7 +101,7 @@ class QE:
         self.P_Lmin = P_Lmin
         self.P_Lmax = P_Lmax
         Lmin, Lmax = self.get_Lmin_Lmax(fields, True, strict=False)
-        ells = self.get_log_sample_Ls(Lmin, Lmax)
+        ells = self.get_log_sample_Ls(Lmin, Lmax, Nells=500)
         Ntheta = 300
         thetas = np.linspace(0, np.pi, Ntheta)
         I1 = np.zeros(np.size(ells))
@@ -350,7 +350,7 @@ class QE:
 
 
 
-    def _initialise(self, typ, deltaT, beam, exp="SO"):
+    def _initialise(self, typ, deltaT, beam, exp="SO", data_dir="data"):
         if self.cmb[typ].initialised:
             return
         self.cmb[typ] = self.CMBsplines()
@@ -364,7 +364,7 @@ class QE:
         gradCl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], gradCl_lens[2:])
         self.cmb[typ].gradCl_spline = gradCl_lens_spline
 
-        N = self._noise.get_cmb_gaussian_N(typ, ellmax=6000, deltaT=deltaT, beam=beam, exp=exp)
+        N = self._noise.get_cmb_gaussian_N(typ, ellmax=6000, deltaT=deltaT, beam=beam, exp=exp, data_dir=data_dir)
         N_spline = InterpolatedUnivariateSpline(np.arange(np.size(N))[2:], N[2:])
         self.cmb[typ].N_spline = N_spline
         self.cmb[typ].initialised = True
@@ -386,7 +386,7 @@ class QE:
         else:
             raise ValueError(f"Experiment {exp} unexpected.")
 
-    def initialise(self, exp="SO", deltaT=None, beam=None, fields="TEB"):
+    def initialise(self, exp="SO", deltaT=None, beam=None, fields="TEB", data_dir="data"):
         """
         Parameters
         ----------
@@ -397,7 +397,7 @@ class QE:
             deltaT, beam = self.get_noise_args(exp)
         args = self.parse_fields(fields, includeBB=True)
         for arg in args:
-            self._initialise(arg, deltaT, beam, exp)
+            self._initialise(arg, deltaT, beam, exp, data_dir)
         self._build_cmb_Cov_inv_splines(fields=fields)
 
 
