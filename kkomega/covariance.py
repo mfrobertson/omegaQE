@@ -28,31 +28,31 @@ class Covariance:
         ells_sample = np.arange(np.size(arr))
         return InterpolatedUnivariateSpline(ells_sample[1:], arr[1:])
 
-    def _get_Cl_kappa(self,ellmax):
+    def _get_Cl_kappa(self, ellmax):
         ells = np.arange(ellmax + 1)
         return self.power.get_kappa_ps(ells)
 
-    def _get_Cl_gal(self,ellmax, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, use_bins=True, gal_distro="LSST_gold"):
+    def _get_Cl_gal(self, ellmax, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, use_bins=True, gal_distro="LSST_gold"):
         ells = np.arange(ellmax + 1)
         if use_bins:
             return self.power.get_gal_ps(ells, gal_win_zmin_a=gal_win_zmin_a, gal_win_zmax_a=gal_win_zmax_a, gal_win_zmin_b=gal_win_zmin_b, gal_win_zmax_b=gal_win_zmax_b, gal_distro=gal_distro)
         return self.power.get_gal_ps(ells, gal_distro=gal_distro)
 
-    def _get_Cl_cib(self,ellmax, nu=353e9):
+    def _get_Cl_cib(self, ellmax, nu=353e9):
         ells = np.arange(ellmax + 1)
         return self.power.get_cib_ps(ells, nu=nu)
 
-    def _get_Cl_gal_kappa(self,ellmax, gal_win_zmin=None, gal_win_zmax=None, use_bins=True, gal_distro="LSST_gold"):
+    def _get_Cl_gal_kappa(self, ellmax, gal_win_zmin=None, gal_win_zmax=None, use_bins=True, gal_distro="LSST_gold"):
         ells = np.arange(ellmax + 1)
         if use_bins:
             return self.power.get_gal_kappa_ps(ells, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, gal_distro=gal_distro)
         return self.power.get_gal_kappa_ps(ells, gal_distro=gal_distro)
 
-    def _get_Cl_cib_kappa(self,ellmax, nu=353e9):
+    def _get_Cl_cib_kappa(self, ellmax, nu=353e9):
         ells = np.arange(ellmax + 1)
         return self.power.get_cib_kappa_ps(ells, nu=nu)
 
-    def _get_Cl_cib_gal(self,ellmax, nu=353e9, gal_win_zmin=None, gal_win_zmax=None, use_bins=True, gal_distro="LSST_gold"):
+    def _get_Cl_cib_gal(self, ellmax, nu=353e9, gal_win_zmin=None, gal_win_zmax=None, use_bins=True, gal_distro="LSST_gold"):
         ells = np.arange(ellmax + 1)
         if use_bins:
             return self.power.get_cib_gal_ps(ells, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, gal_distro=gal_distro)
@@ -162,8 +162,11 @@ class Covariance:
             cov_a2 = self._get_Cl(typ2, Lmax, nu, gal_bins, use_bins, gal_distro)
         else:
             cov_a2 = self._get_Cov(typ2, Lmax, nu, gal_bins, use_bins, gal_distro)
-        Cl_cross = self._get_Cl(a_1 + a_2, Lmax, nu, gal_bins, use_bins, gal_distro)
-        corr = Cl_cross / (np.sqrt(cov_a1 * cov_a2))
+        if a_1 + a_2 == "kk" and not include_kappa_noise:
+            cov_cross = self._get_Cl(a_1 + a_2, Lmax, nu, gal_bins, use_bins, gal_distro)
+        else:
+            cov_cross = self._get_Cov(a_1 + a_2, Lmax, nu, gal_bins, use_bins, gal_distro)
+        corr = cov_cross / (np.sqrt(cov_a1 * cov_a2))
         return corr
 
     def _get_corr_inv(self, typs, Lmax, nu, gal_bins, use_bins, gal_distro):
@@ -192,7 +195,7 @@ class Covariance:
             for jjj, a_j in enumerate(tracers):
                 rho_jk = self._get_rho(a_j + "k", Lmax, nu, gal_bins, use_bins, gal_distro, include_kappa_noise=False)
                 rho += rho_ik * rho_inv[iii][jjj] * rho_jk
-        return rho
+        return np.sqrt(rho)
 
     def get_C_inv(self, typs, Lmax, nu, gal_bins=(None, None, None, None), gal_distro="LSST_gold"):
         """
