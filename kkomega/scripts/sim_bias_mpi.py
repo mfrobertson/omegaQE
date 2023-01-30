@@ -76,7 +76,7 @@ def _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, out_di
             pass
 
     _output("-------------------------------------", my_rank, _id)
-    _output(f"exp:{exp}, qe_typ:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{fields}, gmv:{gmv}, Nsims: {Nsims}", my_rank, _id)
+    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{fields}, gmv:{gmv}, Nsims: {Nsims}", my_rank, _id)
     nu = 353e9
 
     _output("Initialising Fisher object...", my_rank, _id)
