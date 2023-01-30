@@ -19,7 +19,7 @@ class Fields:
         self.kM, self.k_values = self._get_k_values()
         self.fish = Fisher()
         self.covariance = self.fish.covariance
-        self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, data_dir="data")
+        self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, False, data_dir="data")
         self.rec = None
         input_kappa_map = None
         enforce_sym = True
@@ -37,8 +37,8 @@ class Fields:
             self.fft_maps[field] = self.get_map(field, fft=True, enforce_sym=enforce_sym)
             self.fft_noise_maps[field] = self.get_noise_map(field)
 
-    def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None):
-        return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, data_dir)
+    def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, iter_ext=None, data_dir=None):
+        return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)
 
     def _get_lensit_kappa_map(self, sim=0):
         phi_map = 2 * np.pi * self.rec.get_phi_input(return_map=True, sim=sim)
