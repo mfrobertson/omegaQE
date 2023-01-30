@@ -61,7 +61,7 @@ def _qe_typ(fields, gmv):
     raise ValueError(f"fields: {fields} and gmv: {gmv} combination not yet supported.")
 
 
-def _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir, _id):
+def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -76,21 +76,21 @@ def _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, out_di
             pass
 
     _output("-------------------------------------", my_rank, _id)
-    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{fields}, gmv:{gmv}, Nsims: {Nsims}", my_rank, _id)
+    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}", my_rank, _id)
     nu = 353e9
 
-    _output("Initialising Fisher object...", my_rank, _id)
+    _output("Initialising Fields object...", my_rank, _id)
     if my_rank != 0:
         time.sleep(120)
-    fields = Fields(typ, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=my_rank)
+    field_obj = Fields(typ, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=my_rank)
 
     _output("Setting up noise...", my_rank, _id)
-    fields.setup_noise(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, iter_ext=False, data_dir="data")
+    field_obj.setup_noise(exp=exp, qe=maps, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, iter_ext=False, data_dir="data")
 
     _output("    Preparing C_inv...", my_rank, _id)
     Lmax_C_inv = 5000      # Highest L N0 calculated to
     if my_rank == 0:
-        C_inv = fields.fish.covariance.get_C_inv(typ, Lmax_C_inv, nu)
+        C_inv = field_obj.fish.covariance.get_C_inv(typ, Lmax_C_inv, nu)
     else:
         N_typs = np.size(list(typ))
         C_inv = np.empty((N_typs, N_typs, Lmax_C_inv + 1), dtype='d')
@@ -102,23 +102,23 @@ def _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, out_di
     C_inv_splines = _C_inv_splines(typ, C_inv, Lmax_C_inv, Lmin_cut, Lmax_cut)
 
     _output("    Splining cached F_L...", my_rank, _id)
-    Ls, F_L = _F_L(typ, exp, gmv, fields)
+    Ls, F_L = _F_L(typ, exp, gmv, maps)
     F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
 
     _output("Starting sim bias calculation...", my_rank, _id)
-    qe_typ = _qe_typ(fields, gmv)
+    qe_typ = _qe_typ(maps, gmv)
     start_time = MPI.Wtime()
-    omega_rec = fields.get_omega_rec(qe_typ, include_noise=False)
+    omega_rec = field_obj.get_omega_rec(qe_typ, include_noise=False)
     end_time = MPI.Wtime()
     _output("Lensing reconstruction time: " + str(end_time - start_time), my_rank, _id)
 
     start_time = MPI.Wtime()
-    omega_temp = fields.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines)
+    omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines)
     end_time = MPI.Wtime()
     _output("Template construction time: " + str(end_time - start_time), my_rank, _id)
 
     _output("Calculating cross-spectrum", my_rank, _id)
-    Ls, ps_tmp = fields.get_ps(omega_rec, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
+    Ls, ps_tmp = field_obj.get_ps(omega_rec, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
 
     _output("Broadcasting results...", my_rank, _id)
 
@@ -130,7 +130,7 @@ def _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, out_di
             world_comm.Recv([ps_tmp, MPI.DOUBLE], source=rank, tag=77)
             ps_all[rank] = ps_tmp
         gmv_str = "gmv" if gmv else "single"
-        out_dir += f"/{typ}/{exp}/{gmv_str}/{fields}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/"
+        out_dir += f"/{typ}/{exp}/{gmv_str}/{maps}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
         np.save(out_dir+"/Ls", Ls)
