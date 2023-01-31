@@ -130,7 +130,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
             world_comm.Recv([ps_tmp, MPI.DOUBLE], source=rank, tag=77)
             ps_all[rank] = ps_tmp
         gmv_str = "gmv" if gmv else "single"
-        out_dir += f"/{typ}/{exp}/{gmv_str}/{maps}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/"
+        out_dir += f"/{typ}/{exp}/{gmv_str}/{maps}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/{Nsims}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
         np.save(out_dir+"/Ls", Ls)
