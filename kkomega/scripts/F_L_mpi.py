@@ -30,7 +30,7 @@ def _output(message, my_rank, _id):
         f.close()
 
 
-def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, out_dir, _id):
+def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, iter, out_dir, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -52,7 +52,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, ou
     fish = Fisher()
 
     _output("Setting up noise...", my_rank, _id)
-    fish.setup_noise(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir="data")
+    fish.setup_noise(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=iter, iter_ext=False, data_dir="data")
 
     _output("Setting up bispectra splines...", my_rank, _id)
     fish.setup_bispectra(Nell=200)
@@ -99,6 +99,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, ou
             world_comm.Recv([F_L, MPI.DOUBLE], source=rank, tag=77)
             F_L_arr[start: end] = F_L
         gmv_str = "gmv" if gmv else "single"
+        if iter: gmv_str += "_iter"
         out_dir += f"/{typ}/{exp}/{gmv_str}/{fields}/{Lcut_min}_{Lcut_max}/{dL2}_{Ntheta}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
@@ -113,8 +114,8 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, ou
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 12:
-        raise ValueError("Arguments should be typ exp fields gmv Lmax Lcut_min Lcut_max dL2 Ntheta N_Ls out_dir _id")
+    if len(args) != 13:
+        raise ValueError("Arguments should be typ exp fields gmv Lmax Lcut_min Lcut_max dL2 Ntheta N_Ls iter out_dir _id")
     typ = str(args[0])
     exp = str(args[1])
     fields = str(args[2])
@@ -125,6 +126,7 @@ if __name__ == '__main__':
     dL2 = int(args[7])
     Ntheta = int(args[8])
     N_Ls = int(args[9])
-    out_dir = args[10]
-    _id = args[11]
-    _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, out_dir, _id)
+    iter = parse_boolean(args[10])
+    out_dir = args[11]
+    _id = args[12]
+    _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, iter, out_dir, _id)
