@@ -25,9 +25,13 @@ def _get_start_end(my_rank, workloads):
     return my_start, my_end
 
 
-def _output(message, my_rank, _id):
+def _output(message, my_rank, _id, use_rank=False):
     if my_rank == 0:
         f = open(f"_outlogs/_sim_bias_run_{_id}.out", "a")
+        f.write("[" + str(datetime.datetime.now()) + "] " + message + "\n")
+        f.close()
+    elif use_rank:
+        f = open(f"_outlogs/_sim_bias_run_{_id}_{my_rank}.out", "a")
         f.write("[" + str(datetime.datetime.now()) + "] " + message + "\n")
         f.close()
 
@@ -90,8 +94,8 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
     N_typs = np.size(list(typ))
     C_inv = np.empty((N_typs, N_typs, Lmax_C_inv + 1), dtype='d')
 
-    for sim in np.arange(my_start, my_end):
-        _output("Initialising Fields object...", my_rank, _id)
+    for iii, sim in enumerate(np.arange(my_start, my_end)):
+        _output(f"Initialising Fields object... ({sim})", my_rank, _id, use_rank=True)
         if my_rank != 0:
             time.sleep(120)
         field_obj = Fields(typ, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=my_rank)
@@ -108,26 +112,28 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         Ls, F_L = _F_L(typ, exp, gmv, maps)
         F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
 
-        _output("Setting up noise...", my_rank, _id)
+        _output("Setting up noise... ({sim})", my_rank, _id, use_rank=True)
         field_obj.setup_noise(exp=exp, qe=maps, gmv=gmv, ps="gradient", L_cuts=(30, 3000, 30, 5000), iter=False, iter_ext=False, data_dir="data")
 
         qe_typ = _qe_typ(maps, gmv)
         start_time = MPI.Wtime()
         omega_rec = field_obj.get_omega_rec(qe_typ, include_noise=False)
         end_time = MPI.Wtime()
-        _output("Lensing reconstruction time: " + str(end_time - start_time), my_rank, _id)
+        _output("Lensing reconstruction time: " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
         omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines)
         end_time = MPI.Wtime()
-        _output("Template construction time: " + str(end_time - start_time), my_rank, _id)
+        _output("Template construction time: " + str(end_time - start_time)+ f" ({sim})", my_rank, _id, use_rank=True)
 
-        _output("Calculating cross-spectrum", my_rank, _id)
+        _output(f"Calculating cross-spectrum ({sim})", my_rank, _id, use_rank=True)
         Ls, ps_tmp = field_obj.get_ps(omega_rec, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
 
         if ps_arr is None:
             ps_arr = np.zeros((my_end-my_start, np.size(ps_tmp)))
-        ps_arr[sim] = ps_tmp
+        ps_arr[iii] = ps_tmp
+
+        del field_obj
 
     _output("Broadcasting results...", my_rank, _id)
 
