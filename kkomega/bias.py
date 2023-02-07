@@ -55,7 +55,7 @@ def _bias_prep(bi_typ, fields, gmv, N_L1, N_L3, Ntheta12, Ntheta13, curl):
         else:
             bi_typ = "conv"
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
-    Ls1 = global_qe.get_log_sample_Ls(Lmin, Lmax, N_L1)
+    Ls1 = global_qe.get_log_sample_Ls(Lmin, Lmax, N_L1, dL_small=2)
     Ls3 = np.linspace(Lmin, Lmax, N_L3)
     dTheta1 = np.pi / Ntheta12
     thetas1 = np.linspace(0, np.pi - dTheta1, Ntheta12)
