@@ -60,9 +60,9 @@ class QE:
         if self._cov_inv_fields == "uninitialised":
             raise ValueError("QE class uninitialised, first call 'initialise'.")
 
-    def get_log_sample_Ls(self, Lmin, Lmax, Nells=500):
+    def get_log_sample_Ls(self, Lmin, Lmax, Nells=500, dL_small=1):
         floaty = Lmax / 1000
-        samp1 = np.arange(Lmin, floaty * 10, 1)
+        samp1 = np.arange(Lmin, floaty * 10, dL_small)
         samp2 = np.logspace(1, 3, Nells-np.size(samp1)) * floaty
         return np.concatenate((samp1, samp2))
 
@@ -210,7 +210,7 @@ class QE:
         """
         # TODO: all weight funcs (except TT) are possibly wrong
         if gmv:
-            return self.gmv_weight_function(typ, L_vec, ell_vec, curl, fields, resp_ps)
+            return self.gmv_weight_function(typ, L_vec, ell_vec, curl, fields, resp_ps, apply_Lcuts=apply_Lcuts)
         self._initialisation_check()
         ell = ell_vec.rho
         L3_vec = L_vec - ell_vec
@@ -379,6 +379,8 @@ class QE:
             return None, None
         elif exp == "S4":
             return 1, 3
+        elif exp == "S4_test":
+            return 1, 1
         elif exp == "S4_base":
             return None, None
         elif exp == "HD":
