@@ -5,7 +5,6 @@ from cache.tools import parse_boolean
 import os
 import sys
 import datetime
-import time
 from scipy.interpolate import InterpolatedUnivariateSpline
 
 
@@ -83,37 +82,62 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
     _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}", my_rank, _id)
     nu = 353e9
 
-    _output("Starting sim bias calculation...", my_rank, _id)
+    _output("    Preparing grad Cls...", my_rank, _id)
+    if my_rank == 0:
+        from cosmology import Cosmology
+        cosmo = Cosmology()
+        grad_tt = cosmo.cosmo.get_grad_lens_ps('TT', 6000)
+        grad_ee = cosmo.cosmo.get_grad_lens_ps('EE', 6000)
+        grad_bb = cosmo.cosmo.get_grad_lens_ps('BB', 6000)
+        grad_te = cosmo.cosmo.get_grad_lens_ps('TE', 6000)
+    else:
+        grad_tt = np.empty(6000, dtype='d')
+        grad_ee = np.empty(6000, dtype='d')
+        grad_bb = np.empty(6000, dtype='d')
+        grad_te = np.empty(6000, dtype='d')
+
+    _output("    Broadcasting and storing grad Cls...", my_rank, _id)
+    world_comm.Bcast([grad_tt, MPI.DOUBLE], root=0)
+    world_comm.Bcast([grad_ee, MPI.DOUBLE], root=0)
+    world_comm.Bcast([grad_bb, MPI.DOUBLE], root=0)
+    world_comm.Bcast([grad_te, MPI.DOUBLE], root=0)
+    resp_cls = dict.fromkeys(['tt','ee', 'te', 'bb'])
+    resp_cls['tt'] = grad_tt
+    resp_cls['ee'] = grad_ee
+    resp_cls['bb'] = grad_bb
+    resp_cls['te'] = grad_te
 
     workloads = _get_workloads(Nsims, world_size)
     my_start, my_end = _get_start_end(my_rank, workloads)
 
-    ps_arr = None
+    _output(f"Initialising Fields object...", my_rank, _id, use_rank=True)
+    field_obj = Fields(typ, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=0, resp_cls=resp_cls)
+
+    _output(f"Setting up noise...", my_rank, _id)
+    field_obj.setup_noise(exp=exp, qe=maps, gmv=gmv, ps="gradient", L_cuts=(30, 3000, 30, 5000), iter=False, iter_ext=False, data_dir="data")
 
     Lmax_C_inv = 5000  # Highest L N0 calculated to
     N_typs = np.size(list(typ))
     C_inv = np.empty((N_typs, N_typs, Lmax_C_inv + 1), dtype='d')
 
+    if my_rank == 0:
+        _output("    Preparing C_inv...", my_rank, _id)
+        C_inv = field_obj.fish.covariance.get_C_inv(typ, Lmax_C_inv, nu)
+
+        _output("    Broadcasting and storing C_inv...", my_rank, _id)
+        world_comm.Bcast([C_inv, MPI.DOUBLE], root=0)
+
+    C_inv_splines = _C_inv_splines(typ, C_inv, Lmax_C_inv, Lmin_cut, Lmax_cut)
+
+    Ls, F_L = _F_L(typ, exp, gmv, maps)
+    F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
+
+    ps_arr = None
     for iii, sim in enumerate(np.arange(my_start, my_end)):
-        _output(f"Initialising Fields object... ({sim})", my_rank, _id, use_rank=True)
-        if my_rank != 0:
-            time.sleep(120)
-        field_obj = Fields(typ, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=sim)
+        _output("Changing simulation: " + f" ({sim})", my_rank, _id, use_rank=True)
+        field_obj.change_sim(sim)
 
-        if my_rank == 0 and sim == 0:
-            _output("    Preparing C_inv...", my_rank, _id)
-            C_inv = field_obj.fish.covariance.get_C_inv(typ, Lmax_C_inv, nu)
-
-            _output("    Broadcasting and storing C_inv...", my_rank, _id)
-            world_comm.Bcast([C_inv, MPI.DOUBLE], root=0)
-
-        C_inv_splines = _C_inv_splines(typ, C_inv, Lmax_C_inv, Lmin_cut, Lmax_cut)
-
-        Ls, F_L = _F_L(typ, exp, gmv, maps)
-        F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
-
-        _output(f"Setting up noise... ({sim})", my_rank, _id, use_rank=True)
-        field_obj.setup_noise(exp=exp, qe=maps, gmv=gmv, ps="gradient", L_cuts=(30, 3000, 30, 5000), iter=False, iter_ext=False, data_dir="data")
+        _output("Starting sim bias calculation..."+ f" ({sim})", my_rank, _id, use_rank=True)
 
         qe_typ = _qe_typ(maps, gmv)
         start_time = MPI.Wtime()
@@ -132,8 +156,6 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         if ps_arr is None:
             ps_arr = np.zeros((my_end-my_start, np.size(ps_tmp)))
         ps_arr[iii] = ps_tmp
-
-        del field_obj
 
     _output("Broadcasting results...", my_rank, _id)
 
