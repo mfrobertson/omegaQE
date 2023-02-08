@@ -91,10 +91,10 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         grad_bb = cosmo.cosmo.get_grad_lens_ps('BB', 6000)
         grad_te = cosmo.cosmo.get_grad_lens_ps('TE', 6000)
     else:
-        grad_tt = np.empty(6000, dtype='d')
-        grad_ee = np.empty(6000, dtype='d')
-        grad_bb = np.empty(6000, dtype='d')
-        grad_te = np.empty(6000, dtype='d')
+        grad_tt = np.empty(6001, dtype='d')
+        grad_ee = np.empty(6001, dtype='d')
+        grad_bb = np.empty(6001, dtype='d')
+        grad_te = np.empty(6001, dtype='d')
 
     _output("    Broadcasting and storing grad Cls...", my_rank, _id)
     world_comm.Bcast([grad_tt, MPI.DOUBLE], root=0)
