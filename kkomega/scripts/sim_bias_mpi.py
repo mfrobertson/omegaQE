@@ -98,7 +98,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         _output(f"Initialising Fields object... ({sim})", my_rank, _id, use_rank=True)
         if my_rank != 0:
             time.sleep(120)
-        field_obj = Fields(typ, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=my_rank)
+        field_obj = Fields(typ, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=sim)
 
         if my_rank == 0 and sim == 0:
             _output("    Preparing C_inv...", my_rank, _id)
@@ -112,7 +112,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         Ls, F_L = _F_L(typ, exp, gmv, maps)
         F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
 
-        _output("Setting up noise... ({sim})", my_rank, _id, use_rank=True)
+        _output(f"Setting up noise... ({sim})", my_rank, _id, use_rank=True)
         field_obj.setup_noise(exp=exp, qe=maps, gmv=gmv, ps="gradient", L_cuts=(30, 3000, 30, 5000), iter=False, iter_ext=False, data_dir="data")
 
         qe_typ = _qe_typ(maps, gmv)
