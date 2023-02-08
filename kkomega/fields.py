@@ -37,6 +37,17 @@ class Fields:
             self.fft_maps[field] = self.get_map(field, fft=True, enforce_sym=enforce_sym)
             self.fft_noise_maps[field] = self.get_noise_map(field)
 
+    def change_sim(self, sim):
+        self._sim = sim
+        input_kappa_map = self._get_lensit_kappa_map(sim=self._sim)
+        enforce_sym = False
+        self.y = self._get_y(input_kappa_map)
+        self.fft_maps = dict.fromkeys(self.fields)
+        self.fft_noise_maps = dict.fromkeys(self.fields)
+        for field in self.fields:
+            self.fft_maps[field] = self.get_map(field, fft=True, enforce_sym=enforce_sym)
+            self.fft_noise_maps[field] = self.get_noise_map(field)
+
     def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, iter_ext=None, data_dir=None):
         return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)
 
