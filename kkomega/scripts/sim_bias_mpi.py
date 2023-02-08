@@ -137,7 +137,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
     ps_arr = None
     for iii, sim in enumerate(np.arange(my_start, my_end)):
         _output("Changing simulation: " + f" ({sim})", my_rank, _id, use_rank=True)
-        field_obj.change_sim(sim)
+        field_obj.change_sim(int(sim))
 
         _output("Starting sim bias calculation..."+ f" ({sim})", my_rank, _id, use_rank=True)
 
