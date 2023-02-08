@@ -87,8 +87,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         from cosmology import Cosmology
         cosmo = Cosmology()
         Tcmb = 2.7255
-        Ls = np.arange(6001)
-        conv_fac = Ls*(Ls+1)*(Tcmb*1e6)**2/(2*np.pi)
+        conv_fac = (Tcmb*1e6)**2
         grad_tt = cosmo.cosmo.get_grad_lens_ps('TT', 6000) * conv_fac
         grad_ee = cosmo.cosmo.get_grad_lens_ps('EE', 6000) * conv_fac
         grad_bb = cosmo.cosmo.get_grad_lens_ps('BB', 6000) * conv_fac
