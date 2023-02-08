@@ -88,10 +88,10 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         cosmo = Cosmology()
         Tcmb = 2.7255
         conv_fac = (Tcmb*1e6)**2
-        grad_tt = cosmo.cosmo.get_grad_lens_ps('TT', 6000) * conv_fac
-        grad_ee = cosmo.cosmo.get_grad_lens_ps('EE', 6000) * conv_fac
-        grad_bb = cosmo.cosmo.get_grad_lens_ps('BB', 6000) * conv_fac
-        grad_te = cosmo.cosmo.get_grad_lens_ps('TE', 6000) * conv_fac
+        grad_tt = cosmo.get_grad_lens_ps('TT', 6000) * conv_fac
+        grad_ee = cosmo.get_grad_lens_ps('EE', 6000) * conv_fac
+        grad_bb = cosmo.get_grad_lens_ps('BB', 6000) * conv_fac
+        grad_te = cosmo.get_grad_lens_ps('TE', 6000) * conv_fac
     else:
         grad_tt = np.empty(6001, dtype='d')
         grad_ee = np.empty(6001, dtype='d')
