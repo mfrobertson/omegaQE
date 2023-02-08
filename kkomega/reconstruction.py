@@ -7,11 +7,14 @@ import os
 
 class Reconstruction:
 
-    def __init__(self, exp="SO", LDres=12, HDres=12, nsims=1, Lcuts=(30,3000,30,5000)):
+    def __init__(self, exp="SO", LDres=12, HDres=12, nsims=1, Lcuts=(30,3000,30,5000), resp_cls=None):
         if not 'LENSIT' in os.environ.keys():
             os.environ['LENSIT'] = '_tmp'
         self.noise = Noise()
         self.exp = exp
+        self.LDres = LDres
+        self.N_pix = 2**self.LDres
+        self.resp_cls = resp_cls
         exp_conf = tuple(self._get_lensit_config(exp, Lcuts))
         self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=nsims, num_threads=4)
         self.isocov = li.get_isocov(exp_conf, LDres, HD_res=HDres, pyFFTWthreads=4)
@@ -102,13 +105,47 @@ class Reconstruction:
 
     def Tmap(self, include_noise=True, sim=0):
         if include_noise:
-            return self.maps.get_sim_tmap(sim)
+            return self.maps.get_sim_tmap(sim) - self.maps.get_noise_sim_tmap(sim) + self.noiseMap("TT")
         return self.maps.get_sim_tmap(sim) - self.maps.get_noise_sim_tmap(sim)
 
     def QUmap(self, include_noise=True, sim=0):
         if include_noise:
-            return self.maps.get_sim_qumap(sim)
+            return self.maps.get_sim_qumap(sim)[0] - self.maps.get_noise_sim_qmap(sim) + self.noiseMap("EE"), self.maps.get_sim_qumap(sim)[1] - self.maps.get_noise_sim_umap(sim) + self.noiseMap("EE")
         return self.maps.get_sim_qumap(sim)[0] - self.maps.get_noise_sim_qmap(sim), self.maps.get_sim_qumap(sim)[1] - self.maps.get_noise_sim_umap(sim)
+
+    def _get_gauss_matrix(self, shape):
+        mean = 0
+        var = 1 / np.sqrt(2)
+        real = np.random.normal(mean, var, shape)
+        imag = np.random.normal(mean, var, shape)
+        return real + (1j * imag)
+
+    def _enforce_symmetries(self, fft_map):
+        # Setting divergent point to 0 (this point represents mean of real field so this is reasonable)
+        fft_map[0, 0] = 0
+
+        # Ensuring Nyquist points are real
+        fft_map[self.N_pix // 2, 0] = np.real(fft_map[self.N_pix // 2, 0]) * np.sqrt(2)
+        fft_map[0, self.N_pix // 2] = np.real(fft_map[0, self.N_pix // 2]) * np.sqrt(2)
+        fft_map[self.N_pix // 2, self.N_pix // 2] = np.real(fft_map[self.N_pix // 2, self.N_pix // 2]) * np.sqrt(2)
+
+        # +ve k_y mirrors -ve conj(k_y) at k_x = 0
+        fft_map[self.N_pix // 2 + 1:, 0] = np.conjugate(fft_map[1:self.N_pix // 2, 0][::-1])
+
+        # +ve k_y mirrors -ve conj(k_y) at k_x = N/2 (Nyquist freq)
+        fft_map[self.N_pix // 2 + 1:, -1] = np.conjugate(fft_map[1:self.N_pix // 2, -1][::-1])
+        return fft_map
+
+    def noiseMap(self, typ):
+        Lmax_data = 5000
+        n = np.sqrt(self.noise.get_cmb_gaussian_N(typ, None, None, Lmax_data, exp=self.exp))
+        Ls = np.arange(np.size(n))
+        n_spline = InterpolatedUnivariateSpline(Ls, n)
+        n_rfft = n_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1])
+        physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
+        gauss_matrix = self._get_gauss_matrix((2**self.LDres, 2**self.LDres//2+1))
+        Tcmb = 2.7255
+        return np.fft.irfft2(self._enforce_symmetries(n_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
 
     def _get_iblm(self, fields, include_noise, sim):
         if fields == "T":
@@ -135,8 +172,8 @@ class Reconstruction:
 
     def _QE(self, fields, idx, include_noise, sim):
         estimator, iblm = self._get_iblm(fields, include_noise, sim)
-        alm_no_norm = 0.5 * self.isocov.get_qlms(estimator, iblm, self.isocov.lib_skyalm, use_cls_len=True)[idx]
-        f = self.isocov.get_response(estimator, self.isocov.lib_skyalm)[idx]
+        alm_no_norm = 0.5 * self.isocov.get_qlms(estimator, iblm, self.isocov.lib_skyalm, use_cls_len=True, resp_cls=self.resp_cls)[idx]
+        f = self.isocov.get_response(estimator, self.isocov.lib_skyalm, cls_weights=self.resp_cls, cls_cmb=self.resp_cls)[idx]
         f_inv = self._inverse_nonzero(f)
         alm_norm = self.isocov.lib_skyalm.almxfl(alm_no_norm, f_inv)
         return alm_norm
@@ -162,7 +199,7 @@ class Reconstruction:
     def _get_rfft_map(self, alm):
         map = self.isocov.lib_skyalm.alm2map(alm)
         rfft = np.fft.rfft2(map, norm="forward")
-        physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
+        physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))  # Why is this needed?
         return rfft * physical_length
 
 
