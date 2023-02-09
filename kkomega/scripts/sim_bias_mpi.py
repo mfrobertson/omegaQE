@@ -103,7 +103,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
     world_comm.Bcast([grad_ee, MPI.DOUBLE], root=0)
     world_comm.Bcast([grad_bb, MPI.DOUBLE], root=0)
     world_comm.Bcast([grad_te, MPI.DOUBLE], root=0)
-    resp_cls = dict.fromkeys(['tt','ee', 'te', 'bb'])
+    resp_cls = dict.fromkeys(['tt', 'ee', 'te', 'bb'])
     resp_cls['tt'] = grad_tt
     resp_cls['ee'] = grad_ee
     resp_cls['bb'] = grad_bb
@@ -126,8 +126,8 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         _output("    Preparing C_inv...", my_rank, _id)
         C_inv = field_obj.fish.covariance.get_C_inv(typ, Lmax_C_inv, nu)
 
-        _output("    Broadcasting and storing C_inv...", my_rank, _id)
-        world_comm.Bcast([C_inv, MPI.DOUBLE], root=0)
+    _output("    Broadcasting and storing C_inv...", my_rank, _id)
+    world_comm.Bcast([C_inv, MPI.DOUBLE], root=0)
 
     C_inv_splines = _C_inv_splines(typ, C_inv, Lmax_C_inv, Lmin_cut, Lmax_cut)
 
