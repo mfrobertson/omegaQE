@@ -44,7 +44,6 @@ def _main(exp, Nbins, Nell, dL2, Ntheta, out_dir, _id):
 
     _output("-------------------------------------", my_rank, _id)
     _output(f"exp: {exp}, Nbins: {Nbins}, Nell: {Nell}, dL2: {dL2}, Ntheta: {Ntheta}", my_rank, _id)
-    nu = 353e9
 
     _output("Initialising Fisher object...", my_rank, _id)
     fish = Fisher(exp=exp)
@@ -79,11 +78,14 @@ def _main(exp, Nbins, Nell, dL2, Ntheta, out_dir, _id):
 
     F_tot = 0
     my_indices = indices[my_start:my_end]
+    count = 1
     for iii, jjj in my_indices:
         index_a1, index_a2 = iii * 2, iii * 2 + 1
         index_b1, index_b2 = jjj * 2, jjj * 2 + 1
         gal_bins_tmp = (gal_bins[index_a1], gal_bins[index_a2], gal_bins[index_b1], gal_bins[index_b2])
         F_tot += fish.get_bispectrum_Fisher("abw", Ls=Ls_samp, Ntheta=Ntheta, f_sky=0.4, gal_bins=gal_bins_tmp, gal_distro="perfect")
+        _output(f"Finished {count}/{np.size(my_indices)}", my_rank, _id)
+        count += 1
     end_time = MPI.Wtime()
 
     _output("Broadcasting results...", my_rank, _id)
