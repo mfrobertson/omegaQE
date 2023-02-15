@@ -113,7 +113,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
     my_start, my_end = _get_start_end(my_rank, workloads)
 
     _output(f"Initialising Fields object...", my_rank, _id, use_rank=True)
-    field_obj = Fields(typ, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=0, resp_cls=resp_cls)
+    field_obj = Fields(typ, exp=exp, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=0, resp_cls=resp_cls)
 
     _output(f"Setting up noise...", my_rank, _id)
     field_obj.setup_noise(exp=exp, qe=maps, gmv=gmv, ps="gradient", L_cuts=(30, 3000, 30, 5000), iter=False, iter_ext=False, data_dir="data")
