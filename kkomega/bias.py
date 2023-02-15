@@ -262,4 +262,5 @@ def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=N
         Cl_gk = global_fish.covariance.get_Cl("gk", ellmax=5000)
         Cl_Ik = global_fish.covariance.get_Cl("Ik", ellmax=5000)
 
+    Ls = np.ones(1, dtype=int)*Ls if np.size(Ls) == 1 else Ls
     return _bias(bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl)
