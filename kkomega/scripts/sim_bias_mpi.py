@@ -148,7 +148,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         _output("Lensing reconstruction time: " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines)
+        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True)
         end_time = MPI.Wtime()
         _output("Template construction time: " + str(end_time - start_time)+ f" ({sim})", my_rank, _id, use_rank=True)
 
