@@ -29,7 +29,7 @@ class Noise:
         """
         self.N0 = None
         self.cmb_offset = 2
-        self._cosmo = Cosmology()
+        self.cosmo = Cosmology()
 
     def _get_N0_phi(self, ellmax):
         return np.concatenate((np.zeros(self.cmb_offset), self.N0[0][:ellmax + 1 - self.cmb_offset]))
@@ -105,7 +105,7 @@ class Noise:
     def get_gal_shot_N(self, n=40, ellmax=4000, zmin=None, zmax=None):
         fraction = 1
         if zmin is not None and zmax is not None:
-            fraction = self._cosmo.gal_window_fraction(zmin, zmax)
+            fraction = self.cosmo.gal_window_fraction(zmin, zmax)
         arcmin2_to_strad = 11818080
         ones = np.ones(ellmax + 1)
         return ones/(arcmin2_to_strad * n * fraction)
@@ -178,7 +178,7 @@ class Noise:
 
     def get_cmb_N(self, nu, ellmax=4000):
         # Important for 353e9 according to 1609.08942
-        cmb_ps = self._cosmo.get_cmb_ps(ellmax)
+        cmb_ps = self.cosmo.get_cmb_ps(ellmax)
         return self._microK2_to_MJy2(cmb_ps, nu)
 
     def _get_cached_cmb_gaussian_N(self, typ, ellmax, exp, data_dir):

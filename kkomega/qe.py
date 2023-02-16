@@ -1,5 +1,4 @@
 import numpy as np
-from cosmology import Cosmology
 from scipy.interpolate import InterpolatedUnivariateSpline
 from noise import Noise
 from sympy.matrices import Matrix
@@ -18,8 +17,8 @@ class QE:
             self.N_spline = None
 
     def __init__(self, exp, deltaT=None, beam=None, init=True, fields="TEB", L_cuts=(None,None,None,None), data_dir="data"):
-        self._cosmo = Cosmology()
         self._noise = Noise()
+        self.cosmo = self._noise.cosmo
         self.cmb = dict.fromkeys(self._cmb_types(), self.CMBsplines())
         if init:
             self.initialise(exp, deltaT, beam, fields=fields, data_dir=data_dir)
