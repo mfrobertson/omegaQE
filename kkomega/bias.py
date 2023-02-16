@@ -5,13 +5,13 @@ from qe import QE
 import vector
 from cache.tools import getFileSep, path_exists
 
-def _get_Cl(typ):
+def _get_Cl_spline(typ):
     if typ == "kk":
-        return Cl_kk
+        return Cl_kk_spline
     elif typ == "gk":
-        return Cl_gk
+        return Cl_gk_spline
     elif typ == "Ik":
-        return Cl_Ik
+        return Cl_Ik_spline
     else:
         raise ValueError(f"Type {typ} does not exist.")
 
@@ -37,14 +37,14 @@ def _get_cached_F_L(F_L_path, typs):
     return sample_Ls, F_L
 
 
-def _get_cov_invs(typ, typs, C_inv):
+def _get_cov_inv_spline(typ, typs):
     combo1_idx1 = np.where(typs == typ[0])[0][0]
     combo1_idx2 = np.where(typs == typ[2])[0][0]
     combo2_idx1 = np.where(typs == typ[1])[0][0]
     combo2_idx2 = np.where(typs == typ[3])[0][0]
 
-    cov_inv1 = C_inv[combo1_idx1][combo1_idx2]
-    cov_inv2 = C_inv[combo2_idx1][combo2_idx2]
+    cov_inv1 = C_inv_splines[combo1_idx1][combo1_idx2]
+    cov_inv2 = C_inv_splines[combo2_idx1][combo2_idx2]
     return cov_inv1, cov_inv2
 
 
@@ -152,17 +152,12 @@ def _get_third_L(L1, L2, theta):
     return np.sqrt(L1 ** 2 + L2 ** 2 + (2 * L1 * L2 * np.cos(theta).astype("double"))).astype("double")
 
 
-def _mixed_bi_innerloop(typ, typs, L1, L2, C_inv):
+def _mixed_bi_innerloop(typ, typs, L1, L2):
     p = typ[2]
     q = typ[3]
-    cov_inv1, cov_inv2 = _get_cov_invs(typ, typs, C_inv)
-    Ls = np.arange(np.size(cov_inv1))
-    cov_inv1_spline = InterpolatedUnivariateSpline(Ls[1:], cov_inv1[1:])
-    cov_inv2_spline = InterpolatedUnivariateSpline(Ls[1:], cov_inv2[1:])
-    Cl_pk = _get_Cl(p + "k")
-    Cl_qk = _get_Cl(q + "k")
-    Cl_pk_spline = InterpolatedUnivariateSpline(Ls[1:], Cl_pk[1:])
-    Cl_qk_spline = InterpolatedUnivariateSpline(Ls[1:], Cl_qk[1:])
+    cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(typ, typs)
+    Cl_pk_spline = _get_Cl_spline(p + "k")
+    Cl_qk_spline = _get_Cl_spline(q + "k")
     return cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_pk_spline(L1) * Cl_qk_spline(L2)
 
 
@@ -179,7 +174,7 @@ def _mixed_bispectrum(typs, L1, L2, theta12, nu):
         bi_ij = global_fish.bi.get_bispectrum(combos[iii]+"w", L1, L2, theta=theta12, M_spline=True, nu=nu)
         for jjj in np.arange(Ncombos):
             typ = combos[iii] + combos[jjj]
-            mixed_bi_element = bi_ij * _mixed_bi_innerloop(typ, typs, L1, L2, C_inv)
+            mixed_bi_element = bi_ij * _mixed_bi_innerloop(typ, typs, L1, L2)
             if combos[iii] != combos[jjj]:
                 factor = 1
             else:
@@ -215,6 +210,16 @@ def mixed_bispectrum(typs, L1, L2, theta12, nu=353e9):
         L = _get_third_L(L1, L2, theta12)
         return 4 * global_fish.bi.get_bispectrum("kkk", L1, L2, L, M_spline=True) / (L1 ** 2 * L2 ** 2)
     return _mixed_bispectrum(list(typs), L1, L2, theta12, nu)
+
+def _build_C_inv_splines(C_inv, bi_typ):
+    N_fields = np.size(list(bi_typ))
+    C_inv_splines = np.empty((N_fields, N_fields), dtype=InterpolatedUnivariateSpline)
+    Ls = np.arange(np.size(C_inv[0][0]))
+    for iii in range(N_fields):
+        for jjj in range(N_fields):
+            C_inv_ij = C_inv[iii, jjj]
+            C_inv_splines[iii, jjj] = InterpolatedUnivariateSpline(Ls[1:], C_inv_ij[1:])
+    return C_inv_splines
 
 
 def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path="_results/F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60):
@@ -257,14 +262,19 @@ def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=N
 
 
     if bi_typ != "theory":
-        global F_L_spline, C_inv, Cl_kk, Cl_gk, Cl_Ik
+        global F_L_spline, C_inv_splines, Cl_kk_spline, Cl_gk_spline, Cl_Ik_spline
         sample_Ls, F_L = _get_cached_F_L(F_L_path, bi_typ)
         F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
         C_inv = global_fish.covariance.get_C_inv(bi_typ, Lmax=int(np.ceil(np.max(sample_Ls))), nu=353e9)
+        C_inv_splines = _build_C_inv_splines(C_inv, bi_typ)
 
         Cl_kk = global_fish.covariance.get_Cl("kk", ellmax=5000)
+        Ls_sample = np.arange(np.size(Cl_kk))
+        Cl_kk_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_kk[1:])
         Cl_gk = global_fish.covariance.get_Cl("gk", ellmax=5000)
+        Cl_gk_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_gk[1:])
         Cl_Ik = global_fish.covariance.get_Cl("Ik", ellmax=5000)
+        Cl_Ik_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_Ik[1:])
 
     Ls = np.ones(1, dtype=int)*Ls if np.size(Ls) == 1 else Ls
     return _bias(bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl)
