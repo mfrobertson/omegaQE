@@ -229,8 +229,9 @@ class QE:
         ell = ell_vec.rho
         L3_vec = L_vec - ell_vec
         L3 = L3_vec.rho
-        h1 = self._get_response_geo_fac(typ, 1, theta12=ell_vec.deltaphi(L3_vec))
-        h2 = self._get_response_geo_fac(typ, 2, theta12=ell_vec.deltaphi(L3_vec))
+        theta12 = ell_vec.deltaphi(L3_vec)
+        h1 = self._get_response_geo_fac(typ, 1, theta12=theta12)
+        h2 = self._get_response_geo_fac(typ, 2, theta12=theta12)
         if typ == "BT" or typ == "TB" or typ == "TE" or typ == "ET":
             typ1 = typ2 = "TE"
         else:
@@ -247,8 +248,9 @@ class QE:
         ell = ell_vec.rho
         L3_vec = L_vec - ell_vec
         L3 = L3_vec.rho
-        h1 = self._get_response_geo_fac(typ, 1, theta12=ell_vec.deltaphi(L3_vec))
-        h2 = self._get_response_geo_fac(typ, 2, theta12=ell_vec.deltaphi(L3_vec))
+        theta12 = ell_vec.deltaphi(L3_vec)
+        h1 = self._get_response_geo_fac(typ, 1, theta12=theta12)
+        h2 = self._get_response_geo_fac(typ, 2, theta12=theta12)
         if typ == "BT" or typ == "TB" or typ == "TE" or typ == "ET":
             typ1 = typ2 = "TE"
         else:

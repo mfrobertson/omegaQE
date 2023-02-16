@@ -87,32 +87,36 @@ def _bias_calc(XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl):
                 w5 = np.ones(np.shape(Ls5))
                 w5[Ls5 < Lmin] = 0
                 w5[Ls5 > Lmax] = 0
-                Xbar_Ybar = XY.replace("B", "E")
-                X_Ybar = XY[0] + XY[1].replace("B", "E")
-                Xbar_Y = XY[0].replace("B", "E") + XY[1]
-                C_L5 = global_qe.cmb[Xbar_Ybar].gradCl_spline(Ls5)
-                C_Ybar_L3 = global_qe.cmb[X_Ybar].gradCl_spline(Ls3[None, :])
-                C_Xbar_L3 = global_qe.cmb[Xbar_Y].gradCl_spline(Ls3[None, :])
-                L_A1_fac = (L5_vec @ L1_vec) * (L5_vec @ L2_vec)
-                L_C1_fac = (L3_vec @ L1_vec) * (L3_vec @ L2_vec)
-                g_XY = global_qe.weight_function(XY, L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
-                g_YX = global_qe.weight_function(XY[::-1], L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
                 L4_vec = L_vec - L3_vec
                 Ls4 = L4_vec.rho
                 w4 = np.ones(np.shape(Ls4))
                 w4[Ls4 < Lmin] = 0
                 w4[Ls4 > Lmax] = 0
-                h_X_A1 = global_qe.geo_fac(XY[0], theta12=L5_vec.deltaphi(L4_vec))
-                h_Y_A1 = global_qe.geo_fac(XY[1], theta12=L5_vec.deltaphi(L3_vec))
-                h_X_C1 = global_qe.geo_fac(XY[0], theta12=L3_vec.deltaphi(L4_vec))
-                h_Y_C1 = global_qe.geo_fac(XY[1], theta12=L3_vec.deltaphi(L4_vec))
-                I_A1_theta1[jjj] = dTheta3 * dL3 * np.sum(bi * Ls3[None, :] * w4 * w5 * L_A1_fac * C_L5 * g_XY * h_X_A1 * h_Y_A1)
-                I_C1_theta1[jjj] = dTheta3 * dL3 * np.sum(bi * Ls3[None, :] * w4 * L_C1_fac * ((C_Ybar_L3 * g_XY * h_Y_C1) + (C_Xbar_L3 * g_YX * h_X_C1)))
+                if np.sum(w4) != 0 and np.sum(w5) != 0:
+                    Xbar_Ybar = XY.replace("B", "E")
+                    X_Ybar = XY[0] + XY[1].replace("B", "E")
+                    Xbar_Y = XY[0].replace("B", "E") + XY[1]
+                    C_L5 = global_qe.cmb[Xbar_Ybar].gradCl_spline(Ls5)
+                    C_Ybar_L3 = global_qe.cmb[X_Ybar].gradCl_spline(Ls3[None, :])
+                    C_Xbar_L3 = global_qe.cmb[Xbar_Y].gradCl_spline(Ls3[None, :])
+                    L_A1_fac = (L5_vec @ L1_vec) * (L5_vec @ L2_vec)
+                    L_C1_fac = (L3_vec @ L1_vec) * (L3_vec @ L2_vec)
+                    g_XY = global_qe.weight_function(XY, L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
+                    h_X_A1 = global_qe.geo_fac(XY[0], theta12=L5_vec.deltaphi(L4_vec))
+                    h_Y_A1 = global_qe.geo_fac(XY[1], theta12=L5_vec.deltaphi(L3_vec))
+                    h_X_C1 = global_qe.geo_fac(XY[0], theta12=L3_vec.deltaphi(L4_vec))
+                    h_Y_C1 = global_qe.geo_fac(XY[1], theta12=L3_vec.deltaphi(L4_vec))
+                    I_A1_theta1[jjj] = dTheta3 * dL3 * np.sum(bi * Ls3[None, :] * w4 * w5 * L_A1_fac * C_L5 * g_XY * h_X_A1 * h_Y_A1)
+                    I_C1_theta1[jjj] = dTheta3 * dL3 * np.sum(bi * Ls3[None, :] * w4 * L_C1_fac * (C_Ybar_L3 * g_XY * h_Y_C1))
+                    if not gmv:
+                        g_YX = global_qe.weight_function(XY[::-1], L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
+                        I_C1_theta1[jjj] += dTheta3 * dL3 * np.sum(bi * Ls3[None, :] * w4 * L_C1_fac * (C_Xbar_L3 * g_YX * h_X_C1))
 
         I_A1_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_A1_theta1).integral(0, np.pi)
         I_C1_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_C1_theta1).integral(0, np.pi)
     N_A1 = -0.5 * L ** 2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_A1_L1).integral(Lmin, Lmax)
-    N_C1 = 0.25 * L ** 2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_C1_L1).integral(Lmin, Lmax)
+    C1_fac = 0.5 if gmv else 0.25
+    N_C1 = C1_fac * L ** 2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_C1_L1).integral(Lmin, Lmax)
     return N_A1, N_C1
 
 
