@@ -138,7 +138,7 @@ def _bias(bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, verbose
     N_C1 = np.zeros(np.shape(Ls))
     XYs = global_qe.parse_fields(fields, unique=False) if gmv else [fields]
     for iii, L in enumerate(Ls):
-        if verbose: print(f"L = {L} ({iii}/{N_Ls})")
+        if verbose: print(f"L = {L} ({iii}/{N_Ls-1})")
         for XY in XYs:
             if verbose: print(f"  XY = {XY}")
             if gmv:
