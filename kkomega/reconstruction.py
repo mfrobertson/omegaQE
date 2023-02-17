@@ -103,15 +103,15 @@ class Reconstruction:
         ret[np.where(array != 0.)] = 1. / array[np.where(array != 0.)]
         return ret
 
-    def Tmap(self, include_noise=True, sim=0):
+    def Tmap(self, include_noise=True, sim=0, phi_idx=None):
         if include_noise:
-            return self.maps.get_sim_tmap(sim) - self.maps.get_noise_sim_tmap(sim) + self.noiseMap("TT")
-        return self.maps.get_sim_tmap(sim) - self.maps.get_noise_sim_tmap(sim)
+            return self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim) + self.noiseMap("TT")
+        return self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim)
 
-    def QUmap(self, include_noise=True, sim=0):
+    def QUmap(self, include_noise=True, sim=0, phi_idx=None):
         if include_noise:
-            return self.maps.get_sim_qumap(sim)[0] - self.maps.get_noise_sim_qmap(sim) + self.noiseMap("EE"), self.maps.get_sim_qumap(sim)[1] - self.maps.get_noise_sim_umap(sim) + self.noiseMap("EE")
-        return self.maps.get_sim_qumap(sim)[0] - self.maps.get_noise_sim_qmap(sim), self.maps.get_sim_qumap(sim)[1] - self.maps.get_noise_sim_umap(sim)
+            return self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim) + self.noiseMap("EE"), self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim) + self.noiseMap("EE")
+        return self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim), self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim)
 
     def _get_gauss_matrix(self, shape):
         mean = 0
@@ -147,45 +147,45 @@ class Reconstruction:
         Tcmb = 2.7255
         return np.fft.irfft2(self._enforce_symmetries(n_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
 
-    def _get_iblm(self, fields, include_noise, sim):
+    def _get_iblm(self, fields, include_noise, sim, phi_idx):
         if fields == "T":
             estimator = "T"
-            T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise, sim))
+            T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise, sim, phi_idx))
             iblm = self.isocov.get_iblms(estimator, np.atleast_2d(T_alm), use_cls_len=True)[0]
             return estimator, iblm
         if fields == "EB":
             estimator = "QU"
-            Qmap, Umap = self.QUmap(include_noise, sim)
+            Qmap, Umap = self.QUmap(include_noise, sim, phi_idx)
             Q_alm = self.isocov.lib_datalm.map2alm(Qmap)
             U_alm = self.isocov.lib_datalm.map2alm(Umap)
             iblm = self.isocov.get_iblms(estimator, np.array([Q_alm, U_alm]), use_cls_len=True)[0]
             return estimator, iblm
         if fields == "TEB":
             estimator = "TQU"
-            T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise, sim))
-            Qmap, Umap = self.QUmap(include_noise, sim)
+            T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise, sim, phi_idx))
+            Qmap, Umap = self.QUmap(include_noise, sim, phi_idx)
             Q_alm = self.isocov.lib_datalm.map2alm(Qmap)
             U_alm = self.isocov.lib_datalm.map2alm(Umap)
             iblm = self.isocov.get_iblms(estimator, np.array([T_alm, Q_alm, U_alm]), use_cls_len=True)[0]
             return estimator, iblm
         raise ValueError(f"Supplied fields {fields} not one of T, EB, or TEB")
 
-    def _QE(self, fields, idx, include_noise, sim):
-        estimator, iblm = self._get_iblm(fields, include_noise, sim)
+    def _QE(self, fields, idx, include_noise, sim, phi_idx):
+        estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx)
         alm_no_norm = 0.5 * self.isocov.get_qlms(estimator, iblm, self.isocov.lib_skyalm, use_cls_len=True, resp_cls=self.resp_cls)[idx]
         f = self.isocov.get_response(estimator, self.isocov.lib_skyalm, cls_weights=self.resp_cls, cls_cmb=self.resp_cls)[idx]
         f_inv = self._inverse_nonzero(f)
         alm_norm = self.isocov.lib_skyalm.almxfl(alm_no_norm, f_inv)
         return alm_norm
 
-    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0):
-        self.phi = self._QE(fields, 0, include_noise, sim)
+    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None):
+        self.phi = self._QE(fields, 0, include_noise, sim, phi_idx)
         if return_map:
             return self._get_rfft_map(self.phi)
         return self.phi
 
-    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0):
-        self.curl = self._QE(fields, 1, include_noise, sim)
+    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None):
+        self.curl = self._QE(fields, 1, include_noise, sim, phi_idx)
         if return_map:
             return self._get_rfft_map(self.curl)
         return self.curl

@@ -10,7 +10,7 @@ import copy
 
 class Fields:
 
-    def __init__(self, fields, exp="SO", N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None, Nsims=1, sim=0, resp_cls=None):
+    def __init__(self, fields, exp, N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None, Nsims=1, sim=0, resp_cls=None):
         # TODO: Lensit has ellM = int(np.around(kM - 1/2))?? So my maps disagree with lensit of small scales...
         self.N_pix = 2**N_pix_pow
         self.HDres = HDres
@@ -220,10 +220,10 @@ class Fields:
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
 
-    def get_omega_rec(self, cmb_fields="T", include_noise="True"):
+    def get_omega_rec(self, cmb_fields="T", include_noise="True", phi_idx=None):
         if self.rec is None:
             raise ValueError(f"CMB lensing reconstruction not setup for this Fields instance.")
-        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim)
+        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx)
         return curl_map * self.kM **2 / 2
 
     def get_omega_fiducial(self):

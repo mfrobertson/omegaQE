@@ -113,7 +113,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
     my_start, my_end = _get_start_end(my_rank, workloads)
 
     _output(f"Initialising Fields object...", my_rank, _id, use_rank=True)
-    field_obj = Fields(typ, exp=exp, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=Nsims, sim=0, resp_cls=resp_cls)
+    field_obj = Fields(typ, exp=exp, N_pix_pow=LDres, setup_cmb_lens_rec=True, HDres=HDres, Nsims=2*Nsims, sim=0, resp_cls=resp_cls)
 
     _output(f"Setting up noise...", my_rank, _id)
     field_obj.setup_noise(exp=exp, qe=maps, gmv=gmv, ps="gradient", L_cuts=(30, 3000, 30, 5000), iter=False, iter_ext=False, data_dir="data")
@@ -134,18 +134,25 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
     Ls, F_L = _F_L(typ, exp, gmv, maps)
     F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
 
+    qe_typ = _qe_typ(maps, gmv)
+
     ps_arr = None
+    ps_arr_dp = None
     for iii, sim in enumerate(np.arange(my_start, my_end)):
         _output("Changing simulation: " + f" ({sim})", my_rank, _id, use_rank=True)
         field_obj.change_sim(int(sim))
 
         _output("Starting sim bias calculation..."+ f" ({sim})", my_rank, _id, use_rank=True)
 
-        qe_typ = _qe_typ(maps, gmv)
         start_time = MPI.Wtime()
         omega_rec = field_obj.get_omega_rec(qe_typ, include_noise=False)
         end_time = MPI.Wtime()
         _output("Lensing reconstruction time: " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
+
+        start_time = MPI.Wtime()
+        omega_rec_dp = field_obj.get_omega_rec(qe_typ, include_noise=False, phi_idx=sim + Nsims)
+        end_time = MPI.Wtime()
+        _output("Lensing reconstruction time (different phi): " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
         omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True)
@@ -155,31 +162,46 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         _output(f"Calculating cross-spectrum ({sim})", my_rank, _id, use_rank=True)
         Ls, ps_tmp = field_obj.get_ps(omega_rec, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
 
+        _output(f"Calculating cross-spectrum ({sim}) (different phi)", my_rank, _id, use_rank=True)
+        Ls, ps_tmp_dp = field_obj.get_ps(omega_rec_dp, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
+
         if ps_arr is None:
             ps_arr = np.zeros((my_end-my_start, np.size(ps_tmp)))
+        if ps_arr_dp is None:
+            ps_arr_dp = np.zeros((my_end - my_start, np.size(ps_tmp)))
         ps_arr[iii] = ps_tmp
+        ps_arr_dp[iii] = ps_tmp_dp
 
     _output("Broadcasting results...", my_rank, _id)
 
     if my_rank == 0:
         ps_all = np.zeros((Nsims, np.size(ps_arr[0])))
         ps_all[my_start:my_end] = ps_arr
+
+        ps_all_dp = np.zeros((Nsims, np.size(ps_arr_dp[0])))
+        ps_all_dp[my_start:my_end] = ps_arr_dp
         for rank in range(1, world_size):
             start, end = _get_start_end(rank, workloads)
             ps_tmp = np.empty((end-start, np.size(ps_all[0])))
             world_comm.Recv([ps_tmp, MPI.DOUBLE], source=rank, tag=77)
             ps_all[start:end] = ps_tmp
+
+            ps_tmp_dp = np.empty((end - start, np.size(ps_all[0])))
+            world_comm.Recv([ps_tmp_dp, MPI.DOUBLE], source=rank, tag=77)
+            ps_all_dp[start:end] = ps_tmp_dp
         gmv_str = "gmv" if gmv else "single"
         out_dir += f"/{typ}/{exp}/{gmv_str}/{maps}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/{Nsims}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
         np.save(out_dir+"/Ls", Ls)
         np.save(out_dir+"/ps", ps_all)
+        np.save(out_dir + "/ps_dp", ps_all_dp)
         end_time_tot = MPI.Wtime()
         print("Total time: " + str(end_time_tot - start_time_tot))
         _output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
     else:
         world_comm.Send([ps_arr, MPI.DOUBLE], dest=0, tag=77)
+        world_comm.Send([ps_arr_dp, MPI.DOUBLE], dest=0, tag=77)
 
 
 if __name__ == '__main__':
