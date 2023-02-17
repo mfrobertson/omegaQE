@@ -150,7 +150,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         _output("Lensing reconstruction time: " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_rec_dp = field_obj.get_omega_rec(qe_typ, include_noise=False, phi_idx=sim + Nsims)
+        omega_rec_dp = field_obj.get_omega_rec(qe_typ, include_noise=False, phi_idx=int(sim + Nsims))
         end_time = MPI.Wtime()
         _output("Lensing reconstruction time (different phi): " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
