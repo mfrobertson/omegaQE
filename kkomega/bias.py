@@ -130,7 +130,7 @@ def _get_normalisation(Ls, curl):
     return InterpolatedUnivariateSpline(sample_Ls, N0)(Ls)
 
 
-def _bias(bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl):
+def _bias(bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, verbose):
     A = _get_normalisation(Ls, curl)
     N_Ls = np.size(Ls)
     if N_Ls == 1: Ls = np.ones(1) * Ls
@@ -138,7 +138,9 @@ def _bias(bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl):
     N_C1 = np.zeros(np.shape(Ls))
     XYs = global_qe.parse_fields(fields, unique=False) if gmv else [fields]
     for iii, L in enumerate(Ls):
+        if verbose: print(f"L = {L} ({iii}/{N_Ls})")
         for XY in XYs:
+            if verbose: print(f"  XY = {XY}")
             if gmv:
                 N_A1_tmp, N_C1_tmp = _bias_calc(XY, L, True, fields, *_bias_prep(bi_typ, fields, True, N_L1, N_L3, Ntheta12, Ntheta13, curl))
             else:
@@ -222,7 +224,7 @@ def _build_C_inv_splines(C_inv, bi_typ):
     return C_inv_splines
 
 
-def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path="_results/F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60):
+def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path="_results/F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False):
     """
 
     Parameters
@@ -262,6 +264,7 @@ def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=N
 
 
     if bi_typ != "theory":
+        if verbose: print("Caching bispectrum splines")
         global F_L_spline, C_inv_splines, Cl_kk_spline, Cl_gk_spline, Cl_Ik_spline
         sample_Ls, F_L = _get_cached_F_L(F_L_path, bi_typ)
         F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
@@ -277,4 +280,4 @@ def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=N
         Cl_Ik_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_Ik[1:])
 
     Ls = np.ones(1, dtype=int)*Ls if np.size(Ls) == 1 else Ls
-    return _bias(bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl)
+    return _bias(bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, verbose)
