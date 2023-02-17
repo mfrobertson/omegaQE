@@ -64,7 +64,7 @@ def _bias_prep(bi_typ, fields, gmv, N_L1, N_L3, Ntheta12, Ntheta13, curl):
     return bi_typ, Ls1, thetas1, Ls3, thetas3, curl
 
 
-def _bias_calc(XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl):
+def _bias_calc(XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl, verbose):
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
     dTheta3 = thetas3[1] - thetas3[0]
     dL3 = Ls3[1] - Ls3[0]
@@ -72,6 +72,7 @@ def _bias_calc(XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl):
     I_A1_L1 = np.zeros(np.size(Ls1))
     I_C1_L1 = np.zeros(np.size(Ls1))
     for iii, L1 in enumerate(Ls1):
+        if verbose: print(f"L1 = {L1} ({iii}/{np.size(Ls1) - 1})")
         I_A1_theta1 = np.zeros(np.size(thetas1))
         I_C1_theta1 = np.zeros(np.size(thetas1))
         for jjj, theta1 in enumerate(thetas1):
@@ -142,9 +143,9 @@ def _bias(bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, verbose
         for XY in XYs:
             if verbose: print(f"  XY = {XY}")
             if gmv:
-                N_A1_tmp, N_C1_tmp = _bias_calc(XY, L, True, fields, *_bias_prep(bi_typ, fields, True, N_L1, N_L3, Ntheta12, Ntheta13, curl))
+                N_A1_tmp, N_C1_tmp = _bias_calc(XY, L, True, fields, *_bias_prep(bi_typ, fields, True, N_L1, N_L3, Ntheta12, Ntheta13, curl), verbose=verbose)
             else:
-                N_A1_tmp, N_C1_tmp = _bias_calc(XY, L, False, XY, *_bias_prep(bi_typ, XY, False, N_L1, N_L3, Ntheta12, Ntheta13, curl))
+                N_A1_tmp, N_C1_tmp = _bias_calc(XY, L, False, XY, *_bias_prep(bi_typ, XY, False, N_L1, N_L3, Ntheta12, Ntheta13, curl), verbose=verbose)
             N_A1[iii] += A[iii] * N_A1_tmp
             N_C1[iii] += A[iii] * N_C1_tmp
     return N_A1, N_C1
