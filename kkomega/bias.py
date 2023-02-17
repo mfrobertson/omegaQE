@@ -72,7 +72,7 @@ def _bias_calc(XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl, ver
     I_A1_L1 = np.zeros(np.size(Ls1))
     I_C1_L1 = np.zeros(np.size(Ls1))
     for iii, L1 in enumerate(Ls1):
-        if verbose: print(f"L1 = {L1} ({iii}/{np.size(Ls1) - 1})")
+        if verbose: print(f"    L1 = {L1} ({iii}/{np.size(Ls1) - 1})")
         I_A1_theta1 = np.zeros(np.size(thetas1))
         I_C1_theta1 = np.zeros(np.size(thetas1))
         for jjj, theta1 in enumerate(thetas1):
