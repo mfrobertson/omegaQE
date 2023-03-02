@@ -64,7 +64,7 @@ def _qe_typ(fields, gmv):
     raise ValueError(f"fields: {fields} and gmv: {gmv} combination not yet supported.")
 
 
-def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir, _id):
+def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, out_dir, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -155,7 +155,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
         _output("Lensing reconstruction time (different phi): " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True)
+        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True, use_kappa_rec=use_kappa_rec)
         end_time = MPI.Wtime()
         _output("Template construction time: " + str(end_time - start_time)+ f" ({sim})", my_rank, _id, use_rank=True)
 
@@ -190,7 +190,8 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
             world_comm.Recv([ps_tmp_dp, MPI.DOUBLE], source=rank, tag=77)
             ps_all_dp[start:end] = ps_tmp_dp
         gmv_str = "gmv" if gmv else "single"
-        out_dir += f"/{typ}/{exp}/{gmv_str}/{maps}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/{Nsims}/"
+        kappa_rec_str = "kappa_rec" if use_kappa_rec else ""
+        out_dir += f"/{typ}/{exp}/{gmv_str}/{maps}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/{Nsims}/{kappa_rec_str}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
         np.save(out_dir+"/Ls", Ls)
@@ -206,8 +207,8 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir,
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 11:
-        raise ValueError("Arguments should be exp typ LDres HDres fields gmv Nsims Lmin_cut Lmax_cut out_dir _id")
+    if len(args) != 12:
+        raise ValueError("Arguments should be exp typ LDres HDres fields gmv Nsims Lmin_cut Lmax_cut kappa_rec out_dir _id")
     exp = str(args[0])
     typ = str(args[1])
     LDres = int(args[2])
@@ -217,6 +218,7 @@ if __name__ == '__main__':
     Nsims = int(args[6])
     Lmin_cut=int(args[7])
     Lmax_cut = int(args[8])
-    out_dir = str(args[9])
-    _id = str(args[10])
-    _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, out_dir, _id)
+    use_kappa_rec = parse_boolean(args[9])
+    out_dir = str(args[10])
+    _id = str(args[11])
+    _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, out_dir, _id)
