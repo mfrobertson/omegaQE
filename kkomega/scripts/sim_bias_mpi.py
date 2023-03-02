@@ -79,7 +79,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
             pass
 
     _output("-------------------------------------", my_rank, _id)
-    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}", my_rank, _id)
+    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}, kappa_rec: {use_kappa_rec}", my_rank, _id)
     nu = 353e9
 
     _output("    Preparing grad Cls...", my_rank, _id)
