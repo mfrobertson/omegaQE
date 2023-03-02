@@ -113,7 +113,17 @@ class Reconstruction:
             return self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim) + self.noiseMap("EE"), self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim) + self.noiseMap("EE")
         return self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim), self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim)
 
-    def _get_gauss_matrix(self, shape):
+    def _get_seed(self, typ, sim):
+        seed = 3 * sim
+        if typ == "EE":
+            seed += 1
+        elif typ == "BB":
+            seed += 2
+        return seed
+
+    def _get_gauss_matrix(self, shape, typ, sim):
+        seed = self._get_seed(typ, sim)
+        np.random.seed(seed)
         mean = 0
         var = 1 / np.sqrt(2)
         real = np.random.normal(mean, var, shape)
@@ -136,14 +146,15 @@ class Reconstruction:
         fft_map[self.N_pix // 2 + 1:, -1] = np.conjugate(fft_map[1:self.N_pix // 2, -1][::-1])
         return fft_map
 
-    def noiseMap(self, typ):
+    def noiseMap(self, typ, sim):
+        # TODO: This return different noise map every call
         Lmax_data = 5000
         n = np.sqrt(self.noise.get_cmb_gaussian_N(typ, None, None, Lmax_data, exp=self.exp))
         Ls = np.arange(np.size(n))
         n_spline = InterpolatedUnivariateSpline(Ls, n)
         n_rfft = n_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1])
         physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
-        gauss_matrix = self._get_gauss_matrix((2**self.LDres, 2**self.LDres//2+1))
+        gauss_matrix = self._get_gauss_matrix((2**self.LDres, 2**self.LDres//2+1), typ, sim)
         Tcmb = 2.7255
         return np.fft.irfft2(self._enforce_symmetries(n_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
 
