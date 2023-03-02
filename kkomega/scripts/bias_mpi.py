@@ -58,7 +58,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     verbose = True if my_rank == 0 else False
 
     start_time = MPI.Wtime()
-    N_A1, N_C1 = bias(Ls[my_start: my_end], bi_typ, curl=True, exp=exp, qe_fields=fields, gmv=gmv, N_L1=100, N_L3=200, Ntheta12=100, Ntheta13=100, F_L_path="_results/F_L_results", qe_setup_path=f"cache/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose)
+    N_A1, N_C1 = bias(Ls[my_start: my_end], bi_typ, curl=True, exp=exp, qe_fields=fields, gmv=gmv, N_L1=200, N_L3=300, Ntheta12=200, Ntheta13=400, F_L_path="_results/F_L_results", qe_setup_path=f"cache/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose)
     end_time = MPI.Wtime()
 
     _output("Bias calculation finished.", my_rank, _id)
