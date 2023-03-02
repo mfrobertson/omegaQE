@@ -64,7 +64,7 @@ def _qe_typ(fields, gmv):
     raise ValueError(f"fields: {fields} and gmv: {gmv} combination not yet supported.")
 
 
-def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, out_dir, _id):
+def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, out_dir, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -79,7 +79,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
             pass
 
     _output("-------------------------------------", my_rank, _id)
-    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}, kappa_rec: {use_kappa_rec}", my_rank, _id)
+    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}, kappa_rec: {use_kappa_rec}, include_noise: {include_noise}", my_rank, _id)
     nu = 353e9
 
     _output("    Preparing grad Cls...", my_rank, _id)
@@ -145,17 +145,17 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
         _output("Starting sim bias calculation..."+ f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_rec = field_obj.get_omega_rec(qe_typ, include_noise=False)
+        omega_rec = field_obj.get_omega_rec(qe_typ, include_noise=include_noise)
         end_time = MPI.Wtime()
         _output("Lensing reconstruction time: " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_rec_dp = field_obj.get_omega_rec(qe_typ, include_noise=False, phi_idx=int(sim + Nsims))
+        omega_rec_dp = field_obj.get_omega_rec(qe_typ, include_noise=include_noise, phi_idx=int(sim + Nsims))
         end_time = MPI.Wtime()
         _output("Lensing reconstruction time (different phi): " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True, use_kappa_rec=use_kappa_rec)
+        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True, use_kappa_rec=use_kappa_rec, tracer_noise=include_noise)
         end_time = MPI.Wtime()
         _output("Template construction time: " + str(end_time - start_time)+ f" ({sim})", my_rank, _id, use_rank=True)
 
@@ -207,8 +207,8 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 12:
-        raise ValueError("Arguments should be exp typ LDres HDres fields gmv Nsims Lmin_cut Lmax_cut kappa_rec out_dir _id")
+    if len(args) != 13:
+        raise ValueError("Arguments should be exp typ LDres HDres fields gmv Nsims Lmin_cut Lmax_cut kappa_rec include_noise out_dir _id")
     exp = str(args[0])
     typ = str(args[1])
     LDres = int(args[2])
@@ -219,6 +219,7 @@ if __name__ == '__main__':
     Lmin_cut=int(args[7])
     Lmax_cut = int(args[8])
     use_kappa_rec = parse_boolean(args[9])
-    out_dir = str(args[10])
-    _id = str(args[11])
-    _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, out_dir, _id)
+    include_noise = parse_boolean(args[10])
+    out_dir = str(args[11])
+    _id = str(args[12])
+    _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, out_dir, _id)
