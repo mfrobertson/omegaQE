@@ -147,18 +147,23 @@ class Reconstruction:
         Tcmb = 2.7255
         return np.fft.irfft2(self._enforce_symmetries(n_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
 
-    def _get_iblm(self, fields, include_noise, sim, phi_idx):
+    def _get_iblm(self, fields, include_noise, sim, phi_idx, return_data_alms=False):
         if fields == "T":
             estimator = "T"
             T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise, sim, phi_idx))
             iblm = self.isocov.get_iblms(estimator, np.atleast_2d(T_alm), use_cls_len=True)[0]
+            if return_data_alms:
+                return estimator, iblm, T_alm
             return estimator, iblm
         if fields == "EB":
             estimator = "QU"
             Qmap, Umap = self.QUmap(include_noise, sim, phi_idx)
             Q_alm = self.isocov.lib_datalm.map2alm(Qmap)
             U_alm = self.isocov.lib_datalm.map2alm(Umap)
-            iblm = self.isocov.get_iblms(estimator, np.array([Q_alm, U_alm]), use_cls_len=True)[0]
+            data_alms = np.array([Q_alm, U_alm])
+            iblm = self.isocov.get_iblms(estimator, data_alms, use_cls_len=True)[0]
+            if return_data_alms:
+                return estimator, iblm, data_alms
             return estimator, iblm
         if fields == "TEB":
             estimator = "TQU"
@@ -166,9 +171,67 @@ class Reconstruction:
             Qmap, Umap = self.QUmap(include_noise, sim, phi_idx)
             Q_alm = self.isocov.lib_datalm.map2alm(Qmap)
             U_alm = self.isocov.lib_datalm.map2alm(Umap)
-            iblm = self.isocov.get_iblms(estimator, np.array([T_alm, Q_alm, U_alm]), use_cls_len=True)[0]
+            data_alms = np.array([T_alm, Q_alm, U_alm])
+            iblm = self.isocov.get_iblms(estimator, data_alms, use_cls_len=True)[0]
+            if return_data_alms:
+                return estimator, iblm, data_alms
             return estimator, iblm
         raise ValueError(f"Supplied fields {fields} not one of T, EB, or TEB")
+
+    def _iter_starting_point(self, fields, include_noise, sim, phi_idx):
+        estimator, iblm, data_alms = self._get_iblm(fields, include_noise, sim, phi_idx, True)
+        alm_no_norm = 0.5 * self.isocov.get_qlms(estimator, iblm, self.isocov.lib_skyalm, use_cls_len=True)
+        N0 = self.isocov.get_N0cls(estimator, self.isocov.lib_skyalm, use_cls_len=True)
+        Cl_phi = li.get_fidcls(wrotationCls=True)[0]['pp'][:self.isocov.lib_skyalm.ellmax + 1]
+        Cl_omega = li.get_fidcls(wrotationCls=True)[0]['oo'][:self.isocov.lib_skyalm.ellmax + 1]
+        wiener_filter_phi = self._inverse_nonzero(self._inverse_nonzero(N0[0]) + self._inverse_nonzero(Cl_phi))
+        wiener_filter_omega = self._inverse_nonzero(self._inverse_nonzero(N0[1]) + self._inverse_nonzero(Cl_omega))
+        alm_norm_phi = self.isocov.lib_skyalm.almxfl(alm_no_norm[0], wiener_filter_phi)
+        alm_norm_omega = self.isocov.lib_skyalm.almxfl(alm_no_norm[1], wiener_filter_omega)
+        return estimator, alm_norm_phi, alm_norm_omega, data_alms
+
+    def _get_iter_instance(self, estimator, POlm0, datalms):
+        from lensit.ffs_iterators.ffs_iterator_wcurl import ffs_iterator_cstMF
+        from lensit.misc.misc_utils import gauss_beam
+        from lensit.qcinv import ffs_ninv_filt_ideal, chain_samples
+        from lensit.ffs_covs import ell_mat
+        from lensit import LMAX_SKY
+
+        N0s = self.isocov.get_N0cls('QU', self.isocov.lib_skyalm, use_cls_len=False)
+        H0s = [self._inverse_nonzero(N0s[0]), self._inverse_nonzero(N0s[1])]
+
+        cls_unl = li.get_fidcls(LMAX_SKY, wrotationCls=True)[0]
+        cpp_priors = [np.copy(cls_unl['pp'][:LMAX_SKY + 1]), np.copy(cls_unl['oo'][:LMAX_SKY + 1])]
+
+        lib_skyalm = ell_mat.ffs_alm_pyFFTW(self.isocov.lib_datalm.ell_mat, filt_func=lambda ell: ell <= LMAX_SKY)
+
+        nT, nP, beam = self._get_exp_noise(self.exp)
+        nT = 1
+        nP = np.sqrt(2)*nT
+        beam = 0.5
+
+        transf = gauss_beam(beam / 180. / 60. * np.pi, lmax=LMAX_SKY)  #: fiducial beam
+
+        filt = ffs_ninv_filt_ideal.ffs_ninv_filt(self.isocov.lib_datalm, lib_skyalm, cls_unl, transf, nT, nP)
+
+        chain_descr = chain_samples.get_isomgchain(filt.lib_skyalm.ellmax, filt.lib_datalm.shape, tol=1e-6, iter_max=200)
+
+        opfilt = li.qcinv.opfilt_cinv_noBB
+        opfilt._type = estimator
+
+        iterator = ffs_iterator_cstMF(os.environ['LENSIT'], estimator, filt, datalms, self.isocov.lib_skyalm, POlm0, H0s, POlm0 * 0., cpp_priors, chain_descr=chain_descr, opfilt=opfilt, verbose=True)
+        return iterator
+
+    def _QE_iter(self, fields, idx, include_noise, sim, phi_idx):
+        estimator, phi_alm_0, omega_alm_0, data_alms = self._iter_starting_point(fields, include_noise, sim, phi_idx)
+        iter_lib = self._get_iter_instance(estimator, np.array([phi_alm_0, omega_alm_0]), data_alms)
+        iter_lib.soltn_cond = True
+        N_iters = 3
+        for i in range(N_iters + 1):
+            iter_lib.iterate(i, 'p')
+        size = iter_lib.lib_qlm.alm_size
+        start, end = idx*size, (idx+1)*size
+        return iter_lib.get_POlm(N_iters)[start:end]
 
     def _QE(self, fields, idx, include_noise, sim, phi_idx):
         estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx)
@@ -178,14 +241,16 @@ class Reconstruction:
         alm_norm = self.isocov.lib_skyalm.almxfl(alm_no_norm, f_inv)
         return alm_norm
 
-    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None):
-        self.phi = self._QE(fields, 0, include_noise, sim, phi_idx)
+    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False):
+        qe_func = self._QE_iter if iter_rec else self._QE
+        self.phi = qe_func(fields, 0, include_noise, sim, phi_idx)
         if return_map:
             return self._get_rfft_map(self.phi)
         return self.phi
 
-    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None):
-        self.curl = self._QE(fields, 1, include_noise, sim, phi_idx)
+    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False):
+        qe_func = self._QE_iter if iter_rec else self._QE
+        self.curl = qe_func(fields, 1, include_noise, sim, phi_idx)
         if return_map:
             return self._get_rfft_map(self.curl)
         return self.curl

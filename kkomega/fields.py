@@ -220,10 +220,10 @@ class Fields:
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
 
-    def get_omega_rec(self, cmb_fields="T", include_noise="True", phi_idx=None):
+    def get_omega_rec(self, cmb_fields="T", include_noise="True", phi_idx=None, iter_rec=False):
         if self.rec is None:
             raise ValueError(f"CMB lensing reconstruction not setup for this Fields instance.")
-        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx)
+        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx, iter_rec=iter_rec)
         return curl_map * self.kM **2 / 2
 
     def get_omega_fiducial(self):
