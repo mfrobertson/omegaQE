@@ -105,12 +105,12 @@ class Reconstruction:
 
     def Tmap(self, include_noise=True, sim=0, phi_idx=None):
         if include_noise:
-            return self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim) + self.noiseMap("TT")
+            return self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim) + self.noiseMap("TT", sim)
         return self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim)
 
     def QUmap(self, include_noise=True, sim=0, phi_idx=None):
         if include_noise:
-            return self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim) + self.noiseMap("EE"), self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim) + self.noiseMap("EE")
+            return self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim) + self.noiseMap("EE", sim), self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim) + self.noiseMap("BB", sim)
         return self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim), self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim)
 
     def _get_seed(self, typ, sim):
