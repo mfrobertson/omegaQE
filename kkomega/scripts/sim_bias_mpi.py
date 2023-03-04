@@ -191,6 +191,8 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
             ps_all_dp[start:end] = ps_tmp_dp
         gmv_str = "gmv" if gmv else "single"
         kappa_rec_str = "kappa_rec" if use_kappa_rec else ""
+        if include_noise:
+            kappa_rec_str += "_wN"
         out_dir += f"/{typ}/{exp}/{gmv_str}/{maps}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/{Nsims}/{kappa_rec_str}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
