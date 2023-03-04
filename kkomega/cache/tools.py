@@ -13,7 +13,7 @@ def getFileSep():
         return r"/"
 
 def parse_boolean(string):
-    return string == "True" or string == "true"
+    return string.lower() == "true"
 
 def save_array(directory, filename, array):
     if not os.path.isdir(directory):
