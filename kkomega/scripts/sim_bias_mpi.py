@@ -6,6 +6,7 @@ import os
 import sys
 import datetime
 from scipy.interpolate import InterpolatedUnivariateSpline
+import socket
 
 
 
@@ -79,6 +80,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
             pass
 
     _output("-------------------------------------", my_rank, _id)
+    _output(f"Node: {socket.gethostname()}", my_rank, _id, use_rank=True)
     _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}, kappa_rec: {use_kappa_rec}, include_noise: {include_noise}", my_rank, _id)
     nu = 353e9
 
