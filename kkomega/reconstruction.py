@@ -14,9 +14,10 @@ class Reconstruction:
         self.exp = exp
         self.LDres = LDres
         self.N_pix = 2**self.LDres
+        self.Lcuts = Lcuts
         self.resp_cls = resp_cls
-        exp_conf = tuple(self._get_lensit_config(exp, Lcuts))
-        self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=nsims, num_threads=4)
+        exp_conf = tuple(self._get_lensit_config(self.exp, self.Lcuts))
+        self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=nsims, num_threads=4, wrotation=True)
         self.isocov = li.get_isocov(exp_conf, LDres, HD_res=HDres, pyFFTWthreads=4)
         self.curl = None
         self.phi = None
@@ -35,42 +36,34 @@ class Reconstruction:
         Ls = np.arange(lensit_ellmax_sky + 1)
         return InterpolatedUnivariateSpline(Ls_sample, n)(Ls)
 
-    def _get_exp_noise(self, exp):
-        lensit_ellmax_sky = 6000
+    def _get_exp_config(self, exp):
         if exp == "SO":
             nT = 3
-            nT = np.ones(lensit_ellmax_sky + 1) * nT
-            nP = np.sqrt(2) * nT
             beam = 3
-            return nT, nP, beam
+            return nT, beam
         if exp == "SO_base":
-            beam = 0
-            nT = self._deconstruct_noise_curve("TT", exp, beam)
-            nP = self._deconstruct_noise_curve("EE", exp, beam)
-            return nT, nP, beam
+            return None, None
         if exp == "SO_goal":
-            beam = 0
-            nT = self._deconstruct_noise_curve("TT", exp, beam)
-            nP = self._deconstruct_noise_curve("EE", exp, beam)
-            return nT, nP, beam
+            return None, None
         if exp == "S4":
             nT = 1
-            nT = np.ones(lensit_ellmax_sky + 1) * nT
-            nP = np.sqrt(2) * nT
             beam = 3
-            return nT, nP, beam
+            return nT, beam
         if exp == "S4_base":
-            beam = 0
-            nT = self._deconstruct_noise_curve("TT", exp, beam)
-            nP = self._deconstruct_noise_curve("EE", exp, beam)
-            return nT, nP, beam
+            return None, None
         if exp == "HD":
             nT = 0.5
-            nT = np.ones(lensit_ellmax_sky + 1) * nT
-            nP = np.sqrt(2) * nT
             beam = 0.25
-            return nT, nP, beam
+            return nT, beam
         raise ValueError(f"Experiment {exp} unexpected.")
+
+    def _get_exp_noise(self, exp, Lmax=None):
+        lensit_ellmax_sky = 6000 if Lmax is None else Lmax
+        nT, beam = self._get_exp_config(exp)
+        if nT is not None and beam is not None:
+            nT = np.ones(lensit_ellmax_sky + 1) * nT
+            return nT, np.sqrt(2) * nT, beam
+        return self._deconstruct_noise_curve("TT", exp, 0), self._deconstruct_noise_curve("EE", exp, 0), 0
 
     def _get_Lcuts(self, T_Lmin, T_Lmax, P_Lmin, P_Lmax, strict):
         if strict:
@@ -149,7 +142,8 @@ class Reconstruction:
     def noiseMap(self, typ, sim):
         # TODO: This return different noise map every call
         Lmax_data = 5000
-        n = np.sqrt(self.noise.get_cmb_gaussian_N(typ, None, None, Lmax_data, exp=self.exp))
+        nT, beam = self._get_exp_config(self.exp)
+        n = np.sqrt(self.noise.get_cmb_gaussian_N(typ, nT, beam, Lmax_data, exp=self.exp))
         Ls = np.arange(np.size(n))
         n_spline = InterpolatedUnivariateSpline(Ls, n)
         n_rfft = n_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1])
@@ -208,7 +202,7 @@ class Reconstruction:
         from lensit.ffs_covs import ell_mat
         from lensit import LMAX_SKY
 
-        N0s = self.isocov.get_N0cls('QU', self.isocov.lib_skyalm, use_cls_len=False)
+        N0s = self.isocov.get_N0cls(estimator, self.isocov.lib_skyalm, use_cls_len=False)
         H0s = [self._inverse_nonzero(N0s[0]), self._inverse_nonzero(N0s[1])]
 
         cls_unl = li.get_fidcls(LMAX_SKY, wrotationCls=True)[0]
@@ -217,9 +211,7 @@ class Reconstruction:
         lib_skyalm = ell_mat.ffs_alm_pyFFTW(self.isocov.lib_datalm.ell_mat, filt_func=lambda ell: ell <= LMAX_SKY)
 
         nT, nP, beam = self._get_exp_noise(self.exp)
-        nT = 1
-        nP = np.sqrt(2)*nT
-        beam = 0.5
+        # _,_, nT, nP = self._apply_Lcuts(self.Lcuts, nT, nP)    #TODO: Should the Lcuts be applied? (doesn't work)
 
         transf = gauss_beam(beam / 180. / 60. * np.pi, lmax=LMAX_SKY)  #: fiducial beam
 
@@ -239,7 +231,7 @@ class Reconstruction:
         iter_lib.soltn_cond = True
         N_iters = 3
         for i in range(N_iters + 1):
-            iter_lib.iterate(i, 'p')
+            iter_lib.iterate(i)
         size = iter_lib.lib_qlm.alm_size
         start, end = idx*size, (idx+1)*size
         return iter_lib.get_POlm(N_iters)[start:end]
