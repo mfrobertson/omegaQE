@@ -28,12 +28,13 @@ class Fields:
             self._sim = sim
             input_kappa_map = self._get_lensit_kappa_map(sim=self._sim)
             enforce_sym = False
-        self.fields = self._get_rearanged_fields(fields) if ("k" in fields and setup_cmb_lens_rec) else self._get_fields(fields)
+        self._fields = self._get_rearanged_fields(fields) if setup_cmb_lens_rec else self._get_fields(fields)   # includes lensit input kappa
+        self.fields = self._get_fields(fields)
         self.template = None
         self.y = self._get_y(input_kappa_map)
-        self.fft_maps = dict.fromkeys(self.fields)
-        self.fft_noise_maps = dict.fromkeys(self.fields)
-        for field in self.fields:
+        self.fft_maps = dict.fromkeys(self._fields)
+        self.fft_noise_maps = dict.fromkeys(self._fields)
+        for field in self._fields:
             self.fft_maps[field] = self.get_map(field, fft=True, enforce_sym=enforce_sym)
             self.fft_noise_maps[field] = self.get_noise_map(field)
 
@@ -42,9 +43,9 @@ class Fields:
         input_kappa_map = self._get_lensit_kappa_map(sim=self._sim)
         enforce_sym = False
         self.y = self._get_y(input_kappa_map)
-        self.fft_maps = dict.fromkeys(self.fields)
-        self.fft_noise_maps = dict.fromkeys(self.fields)
-        for field in self.fields:
+        self.fft_maps = dict.fromkeys(self._fields)
+        self.fft_noise_maps = dict.fromkeys(self._fields)
+        for field in self._fields:
             self.fft_maps[field] = self.get_map(field, fft=True, enforce_sym=enforce_sym)
             self.fft_noise_maps[field] = self.get_noise_map(field)
 
@@ -74,15 +75,15 @@ class Fields:
         return fields
 
     def _get_cov(self):
-        N_fields = np.size(self.fields)
+        N_fields = np.size(self._fields)
         C = np.empty((self.kmax_map_round, N_fields, N_fields))
-        for iii, field_i in enumerate(self.fields):
-            for jjj, field_j in enumerate(self.fields):
+        for iii, field_i in enumerate(self._fields):
+            for jjj, field_j in enumerate(self._fields):
                 C[:, iii, jjj] = self.covariance.get_Cl(field_i + field_j, ellmax=self.kmax_map_round)[1:]
         return C * (2*np.pi)**2
 
     def _get_L(self, C):
-        N_fields = np.size(self.fields)
+        N_fields = np.size(self._fields)
         ks_sample = np.arange(1, self.kmax_map_round + 1)
         L = np.linalg.cholesky(C)
         L_new = np.empty((np.size(self.k_values), N_fields, N_fields))
@@ -101,7 +102,7 @@ class Fields:
 
     def _get_y(self, kappa_map=None):
         C = self._get_cov()
-        N_fields = np.size(self.fields)
+        N_fields = np.size(self._fields)
         L = self._get_L(C)
         v = self._get_gauss_matrix((np.size(self.k_values), N_fields, 1))
         if kappa_map is not None:
@@ -135,7 +136,7 @@ class Fields:
         return kM, k_values
 
     def _get_index(self, field):
-        return np.where(self.fields == field)[0][0]
+        return np.where(self._fields == field)[0][0]
 
     def _enforce_symmetries(self, fft_map):
         # Setting divergent point to 0 (this point represents mean of real field so this is reasonable)
