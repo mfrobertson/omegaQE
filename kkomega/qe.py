@@ -355,12 +355,12 @@ class QE:
         if self.cmb[typ].initialised:
             return
         self.cmb[typ] = self.CMBsplines()
-        Cl_lens = self._cosmo.get_lens_ps(typ, 6000)
+        Cl_lens = self.cosmo.get_lens_ps(typ, 6000)
         Ls = np.arange(np.size(Cl_lens))
         Cl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], Cl_lens[2:])
         self.cmb[typ].lenCl_spline = Cl_lens_spline
 
-        gradCl_lens = self._cosmo.get_grad_lens_ps(typ, 6000)
+        gradCl_lens = self.cosmo.get_grad_lens_ps(typ, 6000)
         Ls = np.arange(np.size(gradCl_lens))
         gradCl_lens_spline = InterpolatedUnivariateSpline(Ls[2:], gradCl_lens[2:])
         self.cmb[typ].gradCl_spline = gradCl_lens_spline
