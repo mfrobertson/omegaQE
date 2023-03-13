@@ -43,7 +43,7 @@ def _get_cmb_gaussian_N(typ, ellmax, exp):
         N = np.concatenate((np.zeros(2), N))
         return N
 
-def _deconstruct_noise_curve(typ, exp, beam):
+def _deconstruct_noise_curve(typ, exp, beam, Lmax):
     Lmax_data = 5000
     N = _get_cmb_gaussian_N(typ, Lmax_data, exp)
     T_cmb = 2.7255
@@ -52,48 +52,25 @@ def _deconstruct_noise_curve(typ, exp, beam):
     beam *= arcmin_to_rad
     deconvolve_beam = np.exp(Ls * (Ls + 1) * beam ** 2 / (8 * np.log(2)))
     n = np.sqrt(N / deconvolve_beam) * T_cmb / 1e-6 / arcmin_to_rad
-    plancklens_ellmax_sky = 5000
+    # plancklens_ellmax_sky = 5000
+    plancklens_ellmax_sky = Lmax
     Ls_sample = np.arange(np.size(N))
     Ls = np.arange(plancklens_ellmax_sky + 1)
     return InterpolatedUnivariateSpline(Ls_sample, n)(Ls)
 
 
-def _get_exp_noise(exp):
+def _noise_args(delta_T, beam, Lmax):
     lensit_ellmax_sky = 6000
-    if exp == "SO":
-        nT = 3
-        nT = np.ones(lensit_ellmax_sky + 1) * nT
-        nP = np.sqrt(2) * nT
-        beam = 3
-        return nT, nP, beam
-    if exp == "SO_base":
+    lensit_ellmax_sky = Lmax
+    if delta_T is None or beam is None:
         beam = 0
-        nT = _deconstruct_noise_curve("TT", exp, beam)
-        nP = _deconstruct_noise_curve("EE", exp, beam)
+        nT = _deconstruct_noise_curve("TT", exp, beam, lensit_ellmax_sky)
+        nP = _deconstruct_noise_curve("EE", exp, beam, lensit_ellmax_sky)
         return nT, nP, beam
-    if exp == "SO_goal":
-        beam = 0
-        nT = _deconstruct_noise_curve("TT", exp, beam)
-        nP = _deconstruct_noise_curve("EE", exp, beam)
-        return nT, nP, beam
-    if exp == "S4":
-        nT = 1
-        nT = np.ones(lensit_ellmax_sky + 1) * nT
-        nP = np.sqrt(2) * nT
-        beam = 3
-        return nT, nP, beam
-    if exp == "S4_base":
-        beam = 0
-        nT = _deconstruct_noise_curve("TT", exp, beam)
-        nP = _deconstruct_noise_curve("EE", exp, beam)
-        return nT, nP, beam
-    if exp == "HD":
-        nT = 0.5
-        nT = np.ones(lensit_ellmax_sky + 1) * nT
-        nP = np.sqrt(2) * nT
-        beam = 0.25
-        return nT, nP, beam
-    raise ValueError(f"Experiment {exp} unexpected.")
+    nT = np.ones(lensit_ellmax_sky + 1) * delta_T
+    nP = np.sqrt(2) * nT
+    beam = 3
+    return nT, nP, beam
 
 def get_N_dict(exp, delta_T, beam, Lmax):
     if exp == "SO_base" or exp == "S4_base":
@@ -113,7 +90,8 @@ def main(exp, fields, gmv, iters, T_Lmin, T_Lmax, P_Lmin, P_Lmax, ext):
     cls_path = os.path.join(os.path.dirname(os.path.abspath(plancklens.__file__)), 'data', 'cls')
     cls_unl = utils.camb_clfile(os.path.join(cls_path, 'FFP10_wdipole_lenspotentialCls.dat'))
     qe_key = get_qe_key(fields, gmv)
-    delta_T, delta_P, beam = _get_exp_noise(exp)
+    delta_T, beam = cov.noise.get_noise_args(exp)
+    delta_T, delta_P, beam = _noise_args(delta_T, beam, np.max([T_Lmax, P_Lmax]))
     rho_sqd_ext = cov.get_total_tracer_corr("gI", 5000)**2 if ext else 0
     for key in cls_unl.keys():
         cls_unl[key] = cls_unl[key][:5001]

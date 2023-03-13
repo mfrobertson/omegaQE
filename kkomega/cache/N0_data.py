@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 
-def save_N0(exps, powerspectra, single_fields, gmv_fields, convert=False):
+def save_N0(exps, powerspectra, single_fields, gmv_fields, L_cuts, convert=False):
     columns = np.array(single_fields + gmv_fields)
     Ls = np.arange(2, 5001)
     for exp in exps:
@@ -12,7 +12,7 @@ def save_N0(exps, powerspectra, single_fields, gmv_fields, convert=False):
             for iii, col in enumerate(columns):
                 typ = "single" if iii < np.size(single_fields) else "gmv"
                 fields = col
-                N0_phi, N0_curl = np.load(f"_N0/{exp}/{typ}/N0_{fields}_{ps}_T30-3000_P30-5000.npy")
+                N0_phi, N0_curl = np.load(f"_N0/{exp}/{typ}/N0_{fields}_{ps}_T{L_cuts[0]}-{L_cuts[1]}_P{L_cuts[2]}-{L_cuts[3]}.npy")
                 if typ == "gmv": col += "_gmv"
                 if convert:
                     df_phi[col] = N0_phi*4/(Ls**4)
@@ -24,9 +24,9 @@ def save_N0(exps, powerspectra, single_fields, gmv_fields, convert=False):
             if not os.path.isdir(dir):
                 os.makedirs(dir)
             df_phi.set_index("Ls", inplace=True)
-            df_phi.to_csv(f"{dir}/N0_phi_{ps}_T30-3000_P30-5000.csv", sep=" ", float_format='{:,.6e}'.format)
+            df_phi.to_csv(f"{dir}/N0_phi_{ps}_T{L_cuts[0]}-{L_cuts[1]}_P{L_cuts[2]}-{L_cuts[3]}.csv", sep=" ", float_format='{:,.6e}'.format)
             df_curl.set_index("Ls", inplace=True)
-            df_curl.to_csv(f"{dir}/N0_curl_{ps}_T30-3000_P30-5000.csv", sep=" ", float_format='{:,.6e}'.format)
+            df_curl.to_csv(f"{dir}/N0_curl_{ps}_T{L_cuts[0]}-{L_cuts[1]}_P{L_cuts[2]}-{L_cuts[3]}.csv", sep=" ", float_format='{:,.6e}'.format)
 
 def save_N(exps, fields):
     columns = np.array(fields)
@@ -48,13 +48,17 @@ def main():
     gmv_fields = ["TE", "EB", "TEB"]
     exps = np.array(["SO", "SO_base", "SO_goal","S4", "S4_base", "HD"])
     powerspectra = ["gradient"]
-    save_N0(exps, powerspectra, single_fields, gmv_fields)
+    save_N0(exps, powerspectra, single_fields, gmv_fields, (30, 3000, 30, 5000))
     exps = np.array(["SO_base", "SO_goal", "S4_base"])
     powerspectra = ["lensed"]
     gmv_fields = ["EB", "TEB"]
-    save_N0(exps, powerspectra, single_fields, gmv_fields, convert=True)
+    save_N0(exps, powerspectra, single_fields, gmv_fields, (30, 3000, 30, 5000), convert=True)
+
     fields = ["T", "E", "B"]
     save_N(exps, fields)
+
+    # save_N0(["SO_goal"], ["gradient"], ["TT"], ["EB", "TEB"], (40, 3000, 40, 3000))
+    # save_N0(["S4_test"], ["gradient"], ["TT"], ["EB", "TEB"], (2, 4000, 2, 4000))
 
 
 if __name__ == '__main__':
