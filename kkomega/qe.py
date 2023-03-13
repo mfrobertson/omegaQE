@@ -371,24 +371,6 @@ class QE:
         self.cmb[typ].initialised = True
         self._initialise(typ[::-1], deltaT, beam, exp)
 
-    def get_noise_args(self, exp):
-        if exp == "SO":
-            return 3, 3
-        elif exp == "SO_base":
-            return None, None
-        elif exp == "SO_goal":
-            return None, None
-        elif exp == "S4":
-            return 1, 3
-        elif exp == "S4_test":
-            return 1, 1
-        elif exp == "S4_base":
-            return None, None
-        elif exp == "HD":
-            return 0.5, 0.25
-        else:
-            raise ValueError(f"Experiment {exp} unexpected.")
-
     def initialise(self, exp="SO", deltaT=None, beam=None, fields="TEB", data_dir="data"):
         """
         Parameters
@@ -397,7 +379,7 @@ class QE:
         -------
         """
         if deltaT is None or beam is None:
-            deltaT, beam = self.get_noise_args(exp)
+            deltaT, beam = self._noise.get_noise_args(exp)
         args = self.parse_fields(fields, includeBB=True)
         for arg in args:
             self._initialise(arg, deltaT, beam, exp, data_dir)

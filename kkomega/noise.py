@@ -176,6 +176,26 @@ class Noise:
         N_dust[0] = 0
         return N_dust
 
+    def get_noise_args(self, exp):
+        if exp == "SO":
+            return 3, 3
+        elif exp == "SO_base":
+            return None, None
+        elif exp == "SO_goal":
+            return None, None
+        elif exp == "S4":
+            return 1, 3
+        elif exp == "S4_dp":
+            return 1, 1.4
+        elif exp == "S4_test":
+            return 1, 1
+        elif exp == "S4_base":
+            return None, None
+        elif exp == "HD":
+            return 0.5, 0.25
+        else:
+            raise ValueError(f"Experiment {exp} unexpected.")
+
     def get_cmb_N(self, nu, ellmax=4000):
         # Important for 353e9 according to 1609.08942
         cmb_ps = self.cosmo.get_cmb_ps(ellmax)
