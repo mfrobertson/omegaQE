@@ -69,7 +69,6 @@ def _noise_args(delta_T, beam, Lmax):
         return nT, nP, beam
     nT = np.ones(lensit_ellmax_sky + 1) * delta_T
     nP = np.sqrt(2) * nT
-    beam = 3
     return nT, nP, beam
 
 def get_N_dict(exp, delta_T, beam, Lmax):
