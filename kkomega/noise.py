@@ -186,7 +186,7 @@ class Noise:
         elif exp == "S4":
             return 1, 3
         elif exp == "S4_dp":
-            return 1, 1.4
+            return 0.4, 2.3
         elif exp == "S4_test":
             return 1, 1
         elif exp == "S4_base":
