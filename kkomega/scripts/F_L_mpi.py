@@ -45,7 +45,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
             pass
 
     _output("-------------------------------------", my_rank, _id)
-    _output(f"typ:{typ}, exp:{exp}, fields:{fields}, gmv:{gmv}, Lmax:{Lmax}, Lcut_min:{Lcut_min}, Lcut_max:{Lcut_max}, dL2:{dL2}, Ntheta:{Ntheta}, N_Ls:{N_Ls}", my_rank, _id)
+    _output(f"typ:{typ}, exp:{exp}, fields:{fields}, gmv:{gmv}, iter:{iter}, Lmax:{Lmax}, Lcut_min:{Lcut_min}, Lcut_max:{Lcut_max}, dL2:{dL2}, Ntheta:{Ntheta}, N_Ls:{N_Ls}", my_rank, _id)
     nu = 353e9
 
     _output("Initialising Fisher object...", my_rank, _id)
