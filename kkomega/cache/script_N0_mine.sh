@@ -1,5 +1,5 @@
 EXP=$1
-declare -a gmv_typs=("TEB")
+declare -a gmv_typs=("EB" "TEB")
 for typ in "${gmv_typs[@]}"
 do
 echo "$typ"

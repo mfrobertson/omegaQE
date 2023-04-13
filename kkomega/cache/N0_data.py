@@ -57,8 +57,9 @@ def main():
     fields = ["T", "E", "B"]
     save_N(exps, fields)
 
-    # save_N0(["SO_goal"], ["gradient"], ["TT"], ["EB", "TEB"], (40, 3000, 40, 3000))
-    # save_N0(["S4_test"], ["gradient"], ["TT"], ["EB", "TEB"], (2, 4000, 2, 4000))
+    save_N0(["SO_goal"], ["gradient"], ["TT"], ["EB", "TEB"], (40, 3000, 40, 3000))
+    save_N0(["S4_test"], ["gradient"], ["TT"], ["EB", "TEB"], (2, 4000, 2, 4000))
+    save_N0(["S4_dp"], ["gradient"], ["TT"], ["EB", "TEB"], (30, 3000, 30, 5000))
 
 
 if __name__ == '__main__':
