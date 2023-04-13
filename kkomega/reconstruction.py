@@ -2,7 +2,9 @@ import numpy as np
 import lensit as li
 from noise import Noise
 from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy import signal
 import os
+import shutil
 
 
 class Reconstruction:
@@ -17,10 +19,12 @@ class Reconstruction:
         self.Lcuts = Lcuts
         self.resp_cls = resp_cls
         exp_conf = tuple(self._get_lensit_config(self.exp, self.Lcuts))
-        self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=nsims, num_threads=4, wrotation=True)
+        self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=nsims, num_threads=4)
         self.isocov = li.get_isocov(exp_conf, LDres, HD_res=HDres, pyFFTWthreads=4)
         self.curl = None
         self.phi = None
+        self.phi_iter_norm = None
+        self.curl_iter_norm = None
 
     def _deconstruct_noise_curve(self, typ, exp, beam):
         Lmax_data = 5000
@@ -36,30 +40,9 @@ class Reconstruction:
         Ls = np.arange(lensit_ellmax_sky + 1)
         return InterpolatedUnivariateSpline(Ls_sample, n)(Ls)
 
-    def _get_exp_config(self, exp):
-        if exp == "SO":
-            nT = 3
-            beam = 3
-            return nT, beam
-        if exp == "SO_base":
-            return None, None
-        if exp == "SO_goal":
-            return None, None
-        if exp == "S4":
-            nT = 1
-            beam = 3
-            return nT, beam
-        if exp == "S4_base":
-            return None, None
-        if exp == "HD":
-            nT = 0.5
-            beam = 0.25
-            return nT, beam
-        raise ValueError(f"Experiment {exp} unexpected.")
-
     def _get_exp_noise(self, exp, Lmax=None):
         lensit_ellmax_sky = 6000 if Lmax is None else Lmax
-        nT, beam = self._get_exp_config(exp)
+        nT, beam = self.noise.get_noise_args(exp)
         if nT is not None and beam is not None:
             nT = np.ones(lensit_ellmax_sky + 1) * nT
             return nT, np.sqrt(2) * nT, beam
@@ -140,9 +123,8 @@ class Reconstruction:
         return fft_map
 
     def noiseMap(self, typ, sim):
-        # TODO: This return different noise map every call
         Lmax_data = 5000
-        nT, beam = self._get_exp_config(self.exp)
+        nT, beam = self.noise.get_noise_args(self.exp)
         n = np.sqrt(self.noise.get_cmb_gaussian_N(typ, nT, beam, Lmax_data, exp=self.exp))
         Ls = np.arange(np.size(n))
         n_spline = InterpolatedUnivariateSpline(Ls, n)
@@ -221,11 +203,32 @@ class Reconstruction:
 
         opfilt = li.qcinv.opfilt_cinv_noBB
         opfilt._type = estimator
-
-        iterator = ffs_iterator_cstMF(os.environ['LENSIT'], estimator, filt, datalms, self.isocov.lib_skyalm, POlm0, H0s, POlm0 * 0., cpp_priors, chain_descr=chain_descr, opfilt=opfilt, verbose=True)
+        iter_dir = os.path.join(os.environ['LENSIT'],"iter")
+        if os.path.exists(iter_dir) and os.path.isdir(iter_dir):
+            shutil.rmtree(iter_dir)
+        iterator = ffs_iterator_cstMF(iter_dir, estimator, filt, datalms, self.isocov.lib_skyalm, POlm0, H0s, POlm0 * 0., cpp_priors, chain_descr=chain_descr, opfilt=opfilt, verbose=True)
         return iterator
 
-    def _QE_iter(self, fields, idx, include_noise, sim, phi_idx):
+    def _gaussian_smooth_1d(self, data, sigma, nsigma=5):
+        win = signal.gaussian(nsigma * sigma, std=sigma)
+        res = np.convolve(data, win, mode='same')
+        return res / np.convolve(np.ones(data.shape), win, mode='same')
+
+    def _get_iter_normalisation(self, alm, idx, sim, phi_idx):
+        phi_idx = sim if phi_idx is None else phi_idx
+        alm_input = self.maps.lencmbs.get_sim_plm(phi_idx) if idx==0 else self.maps.lencmbs.get_sim_olm(sim)
+        alm_input = self.isocov.lib_skyalm.udgrade(self.maps.lencmbs.lib_skyalm, alm_input)
+        cl_cross = self.isocov.lib_skyalm.alm2cl(alm, alm_input)
+        cl_corr = self._inverse_nonzero(cl_cross) * self.isocov.lib_skyalm.alm2cl(alm_input)
+        Ls = np.where(cl_corr != 0)[0]
+        cl_corr = self._gaussian_smooth_1d(cl_corr[Ls], 50)
+        return InterpolatedUnivariateSpline(Ls, cl_corr)
+
+    def _renorm(self, alm, idx, sim, phi_idx):
+        #TODO: finish this...
+        return alm
+
+    def _QE_iter(self, fields, idx, include_noise, sim, phi_idx, renorm=False):
         estimator, phi_alm_0, omega_alm_0, data_alms = self._iter_starting_point(fields, include_noise, sim, phi_idx)
         iter_lib = self._get_iter_instance(estimator, np.array([phi_alm_0, omega_alm_0]), data_alms)
         iter_lib.soltn_cond = True
@@ -234,7 +237,10 @@ class Reconstruction:
             iter_lib.iterate(i)
         size = iter_lib.lib_qlm.alm_size
         start, end = idx*size, (idx+1)*size
-        return iter_lib.get_POlm(N_iters)[start:end]
+        alm = iter_lib.get_POlm(N_iters)[start:end]
+        if renorm:
+            return self._renorm(alm, idx, sim, phi_idx)
+        return alm
 
     def _QE(self, fields, idx, include_noise, sim, phi_idx):
         estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx)
