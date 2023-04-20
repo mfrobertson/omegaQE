@@ -119,7 +119,7 @@ class QE:
                 I2 = 0
                 for XY in XYs:
                     w = np.ones(np.size(Ls3))
-                    resp = self._response(XY, L_vec, ell_vec, curl, resp_ps)
+                    resp = self.response(XY, L_vec, ell_vec, curl, resp_ps)
                     g = self.gmv_weight_function(XY, L_vec, ell_vec, curl, fields, resp_ps, apply_Lcuts=True)
                     I2 += w * resp * g
                 I1[jjj] = 2 * ell * InterpolatedUnivariateSpline(thetas, I2).integral(0, np.pi)
@@ -156,7 +156,7 @@ class QE:
             L_vec = vector.obj(rho=L, phi=0)
             for jjj, ell in enumerate(ells):
                 ell_vec = vector.obj(rho=ell, phi=thetas)
-                resp = self._response(typ, L_vec, ell_vec, curl, resp_ps)
+                resp = self.response(typ, L_vec, ell_vec, curl, resp_ps)
                 g = self.weight_function(typ, L_vec, ell_vec, curl, gmv=False, resp_ps=resp_ps, apply_Lcuts=True)
                 I2 = g * resp
                 I1[jjj] = 2 * ell * InterpolatedUnivariateSpline(thetas, I2).integral(0, np.pi)
@@ -188,7 +188,7 @@ class QE:
             fac = 1 if i == j else 2
             C_inv_ip = self._get_cmb_Cov_inv_spline(i + p, fields)(ell)
             C_inv_jq = self._get_cmb_Cov_inv_spline(j + q, fields)(L3)
-            weight_tmp = self._response(i + j, L_vec, ell_vec, curl, resp_ps) * C_inv_ip * C_inv_jq
+            weight_tmp = self.response(i + j, L_vec, ell_vec, curl, resp_ps) * C_inv_ip * C_inv_jq
             if apply_Lcuts:
                 w1, w2 = self._get_L_cut_weights(typ, ell, L3)
                 weight_tmp *= w1 * w2
@@ -222,8 +222,8 @@ class QE:
         fac = 0.5 if typ1 == typ2 else 1
         if apply_Lcuts:
             w1, w2 = self._get_L_cut_weights(typ, ell, L3)
-            return w1*w2*fac*self._response(typ, L_vec, ell_vec, curl, resp_ps)/(C_typ1 * C_typ2)
-        return fac*self._response(typ, L_vec, ell_vec, curl, resp_ps)/(C_typ1 * C_typ2)
+            return w1*w2*fac*self.response(typ, L_vec, ell_vec, curl, resp_ps)/(C_typ1 * C_typ2)
+        return fac*self.response(typ, L_vec, ell_vec, curl, resp_ps)/(C_typ1 * C_typ2)
 
     def _response_phi(self, typ, L_vec, ell_vec, cl="gradient"):
         ell = ell_vec.rho
@@ -239,7 +239,21 @@ class QE:
             typ2 = typ[1] + typ[1]
         return ((L_vec @ ell_vec) * h1 * self._get_cmb_cl(ell, typ1, cl)) + ((L_vec @ L3_vec) * h2 * self._get_cmb_cl(L3, typ2, cl))
 
-    def _response(self, typ, L_vec, ell_vec, curl=True, cl="gradient"):
+    def response(self, typ, L_vec, ell_vec, curl=True, cl="gradient"):
+        """
+
+        Parameters
+        ----------
+        typ
+        L_vec
+        ell_vec
+        curl
+        cl
+
+        Returns
+        -------
+
+        """
         # TODO: if typ = BB then this is wrong - see 1906.08760 (I don't believe that BB is used though...)
         # TODO: also the curl terms (i.e. C^TP and C^PP) are not implimented
         if not curl:
