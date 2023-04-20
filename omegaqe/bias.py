@@ -1,3 +1,4 @@
+import omegaqe
 from omegaqe.fisher import Fisher
 from omegaqe.qe import QE
 import numpy as np
@@ -48,33 +49,53 @@ def _get_cov_inv_spline(typ, typs):
     return cov_inv1, cov_inv2
 
 
-def _bias_prep(bi_typ, fields, gmv, N_L1, N_L3, Ntheta12, Ntheta13, curl):
+def _bias_prep(bi_typ, fields, gmv, N_L1, N_l, Ntheta12, Ntheta1l, curl):
     if bi_typ == "theory":
         if curl:
             bi_typ = "rot"
         else:
             bi_typ = "conv"
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
-    Ls1 = global_qe.get_log_sample_Ls(Lmin, Lmax, N_L1, dL_small=1)
-    Ls3 = np.linspace(Lmin, Lmax, N_L3)
+    L1s = global_qe.get_log_sample_Ls(Lmin, Lmax, N_L1, dL_small=1)
+    ls = np.linspace(Lmin, Lmax, N_l)
     dTheta1 = np.pi / Ntheta12
     thetas1 = np.linspace(0, np.pi - dTheta1, Ntheta12)
-    dTheta3 = 2 * np.pi / Ntheta13
-    thetas3 = np.linspace(0, 2 * np.pi - dTheta3, Ntheta13)
-    return bi_typ, Ls1, thetas1, Ls3, thetas3, curl
+    dThetal = 2 * np.pi / Ntheta1l
+    thetasl = np.linspace(0, 2 * np.pi - dThetal, Ntheta1l)
+    return bi_typ, L1s, thetas1, ls, thetasl, curl
 
+def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec):
+    Xbar_Ybar = XY.replace("B", "E")
+    X_Ybar = XY[0] + XY[1].replace("B", "E")
+    Xbar_Y = XY[0].replace("B", "E") + XY[1]
+    C_l_primprim = global_qe.cmb[Xbar_Ybar].gradCl_spline(l_primprims)
+    C_Ybar_l = global_qe.cmb[X_Ybar].gradCl_spline(ls[None, :])
+    C_Xbar_l = global_qe.cmb[Xbar_Y].gradCl_spline(ls[None, :])
+    L_A1_fac = (l_primprim_vec @ L1_vec) * (l_primprim_vec @ L2_vec)
+    L_C1_fac = (l_vec @ L1_vec) * (l_vec @ L2_vec)
+    g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
+    h_X_A1 = global_qe.geo_fac(XY[0], theta12=l_primprim_vec.deltaphi(l_vec))
+    h_Y_A1 = global_qe.geo_fac(XY[1], theta12=l_primprim_vec.deltaphi(l_prim_vec))
+    h_X_C1 = global_qe.geo_fac(XY[0], theta12=l_vec.deltaphi(l_prim_vec))
+    h_Y_C1 = global_qe.geo_fac(XY[1], theta12=l_vec.deltaphi(l_prim_vec))
+    I_A1_theta1 = -0.5 * dThetal * dl * np.sum(bi * ls[None, :] * w_prim * w_primprim * L_A1_fac * C_l_primprim * g_XY * h_X_A1 * h_Y_A1)
+    C1_fac = 0.5 if gmv else 0.25
+    I_C1_theta1 = C1_fac * dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * (C_Ybar_l * g_XY * h_Y_C1))
+    if not gmv:
+        g_YX = global_qe.weight_function(XY[::-1], L_vec, l_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
+        I_C1_theta1 += dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * (C_Xbar_l * g_YX * h_X_C1))
+    return I_A1_theta1 + I_C1_theta1
 
-def _bias_calc(XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl, verbose):
+def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, L1s, thetas1, ls, thetasl, curl, verbose):
+    innerloop_func = _get_N2_innerloop if bias_typ is "N2" else _get_N2_innerloop
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
-    dTheta3 = thetas3[1] - thetas3[0]
-    dL3 = Ls3[1] - Ls3[0]
+    dThetal = thetasl[1] - thetasl[0]
+    dl = ls[1] - ls[0]
     L_vec = vector.obj(rho=L, phi=0)
-    I_A1_L1 = np.zeros(np.size(Ls1))
-    I_C1_L1 = np.zeros(np.size(Ls1))
-    for iii, L1 in enumerate(Ls1):
-        if verbose: print(f"    L1 = {L1} ({iii}/{np.size(Ls1) - 1})")
-        I_A1_theta1 = np.zeros(np.size(thetas1))
-        I_C1_theta1 = np.zeros(np.size(thetas1))
+    I_L1 = np.zeros(np.size(L1s))
+    for iii, L1 in enumerate(L1s):
+        if verbose: print(f"    L1 = {L1} ({iii}/{np.size(L1s) - 1})")
+        I_theta1 = np.zeros(np.size(thetas1))
         for jjj, theta1 in enumerate(thetas1):
             L1_vec = vector.obj(rho=L1, phi=theta1)
             L2_vec = L_vec - L1_vec
@@ -82,43 +103,23 @@ def _bias_calc(XY, L, gmv, fields, bi_typ, Ls1, thetas1, Ls3, thetas3, curl, ver
             w2 = 0 if (L2 < Lmin or L2 > Lmax) else 1
             if w2 != 0:
                 bi = w2 * mixed_bispectrum(bi_typ, L1, L2, L1_vec.deltaphi(L2_vec))
-                L3_vec = vector.obj(rho=Ls3[None, :], phi=thetas3[:, None])
-                L5_vec = L1_vec - L3_vec
-                Ls5 = L5_vec.rho
-                w5 = np.ones(np.shape(Ls5))
-                w5[Ls5 < Lmin] = 0
-                w5[Ls5 > Lmax] = 0
-                L4_vec = L_vec - L3_vec
-                Ls4 = L4_vec.rho
-                w4 = np.ones(np.shape(Ls4))
-                w4[Ls4 < Lmin] = 0
-                w4[Ls4 > Lmax] = 0
-                if np.sum(w4) != 0 and np.sum(w5) != 0:
-                    Xbar_Ybar = XY.replace("B", "E")
-                    X_Ybar = XY[0] + XY[1].replace("B", "E")
-                    Xbar_Y = XY[0].replace("B", "E") + XY[1]
-                    C_L5 = global_qe.cmb[Xbar_Ybar].gradCl_spline(Ls5)
-                    C_Ybar_L3 = global_qe.cmb[X_Ybar].gradCl_spline(Ls3[None, :])
-                    C_Xbar_L3 = global_qe.cmb[Xbar_Y].gradCl_spline(Ls3[None, :])
-                    L_A1_fac = (L5_vec @ L1_vec) * (L5_vec @ L2_vec)
-                    L_C1_fac = (L3_vec @ L1_vec) * (L3_vec @ L2_vec)
-                    g_XY = global_qe.weight_function(XY, L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
-                    h_X_A1 = global_qe.geo_fac(XY[0], theta12=L5_vec.deltaphi(L4_vec))
-                    h_Y_A1 = global_qe.geo_fac(XY[1], theta12=L5_vec.deltaphi(L3_vec))
-                    h_X_C1 = global_qe.geo_fac(XY[0], theta12=L3_vec.deltaphi(L4_vec))
-                    h_Y_C1 = global_qe.geo_fac(XY[1], theta12=L3_vec.deltaphi(L4_vec))
-                    I_A1_theta1[jjj] = dTheta3 * dL3 * np.sum(bi * Ls3[None, :] * w4 * w5 * L_A1_fac * C_L5 * g_XY * h_X_A1 * h_Y_A1)
-                    I_C1_theta1[jjj] = dTheta3 * dL3 * np.sum(bi * Ls3[None, :] * w4 * L_C1_fac * (C_Ybar_L3 * g_XY * h_Y_C1))
-                    if not gmv:
-                        g_YX = global_qe.weight_function(XY[::-1], L_vec, L3_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
-                        I_C1_theta1[jjj] += dTheta3 * dL3 * np.sum(bi * Ls3[None, :] * w4 * L_C1_fac * (C_Xbar_L3 * g_YX * h_X_C1))
+                l_vec = vector.obj(rho=ls[None, :], phi=thetasl[:, None])
+                l_primprim_vec = L1_vec - l_vec
+                l_primprims = l_primprim_vec.rho
+                w_primprim = np.ones(np.shape(l_primprims))
+                w_primprim[l_primprims < Lmin] = 0
+                w_primprim[l_primprims > Lmax] = 0
+                l_prim_vec = L_vec - l_vec
+                l_prims = l_prim_vec.rho
+                w_prim = np.ones(np.shape(l_prims))
+                w_prim[l_prims < Lmin] = 0
+                w_prim[l_prims > Lmax] = 0
+                if np.sum(w_prim) != 0 and np.sum(w_primprim) != 0:
+                    I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec)
 
-        I_A1_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_A1_theta1).integral(0, np.pi)
-        I_C1_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_C1_theta1).integral(0, np.pi)
-    N_A1 = -0.5 * L ** 2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_A1_L1).integral(Lmin, Lmax)
-    C1_fac = 0.5 if gmv else 0.25
-    N_C1 = C1_fac * L ** 2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(Ls1, I_C1_L1).integral(Lmin, Lmax)
-    return N_A1, N_C1
+        I_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, np.pi)
+    N = L ** 2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin, Lmax)
+    return N
 
 
 def _get_normalisation(Ls, curl):
@@ -131,24 +132,22 @@ def _get_normalisation(Ls, curl):
     return InterpolatedUnivariateSpline(sample_Ls, N0)(Ls)
 
 
-def _bias(bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, verbose):
+def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, verbose):
     A = _get_normalisation(Ls, curl)
     N_Ls = np.size(Ls)
     if N_Ls == 1: Ls = np.ones(1) * Ls
-    N_A1 = np.zeros(np.shape(Ls))
-    N_C1 = np.zeros(np.shape(Ls))
+    N = np.zeros(np.shape(Ls))
     XYs = global_qe.parse_fields(fields, unique=False) if gmv else [fields]
     for iii, L in enumerate(Ls):
         if verbose: print(f"L = {L} ({iii}/{N_Ls-1})")
         for XY in XYs:
             if verbose: print(f"  XY = {XY}")
             if gmv:
-                N_A1_tmp, N_C1_tmp = _bias_calc(XY, L, True, fields, *_bias_prep(bi_typ, fields, True, N_L1, N_L3, Ntheta12, Ntheta13, curl), verbose=verbose)
+                N_tmp = _bias_calc(bias_typ, XY, L, True, fields, *_bias_prep(bi_typ, fields, True, N_L1, N_L3, Ntheta12, Ntheta13, curl), verbose=verbose)
             else:
-                N_A1_tmp, N_C1_tmp = _bias_calc(XY, L, False, XY, *_bias_prep(bi_typ, XY, False, N_L1, N_L3, Ntheta12, Ntheta13, curl), verbose=verbose)
-            N_A1[iii] += A[iii] * N_A1_tmp
-            N_C1[iii] += A[iii] * N_C1_tmp
-    return N_A1, N_C1
+                N_tmp = _bias_calc(bias_typ, XY, L, False, XY, *_bias_prep(bi_typ, XY, False, N_L1, N_L3, Ntheta12, Ntheta13, curl), verbose=verbose)
+            N[iii] += A[iii] * N_tmp
+    return N
 
 
 def _get_third_L(L1, L2, theta):
@@ -225,27 +224,8 @@ def _build_C_inv_splines(C_inv, bi_typ):
     return C_inv_splines
 
 
-def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path="_results/F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False):
-    """
+def bias(bias_typ, Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False):
 
-    Parameters
-    ----------
-    Ls
-    bi_typ
-    curl
-    exp
-    qe_fields
-    gmv
-    ps
-    L_cuts
-    iter
-    data_dir
-    F_L_path
-
-    Returns
-    -------
-
-    """
     global global_qe, global_fish
     global_fish = Fisher()
     global_fish.setup_noise(exp, qe_fields, gmv, ps, L_cuts, iter, data_dir)
@@ -281,4 +261,4 @@ def bias(Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=N
         Cl_Ik_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_Ik[1:])
 
     Ls = np.ones(1, dtype=int)*Ls if np.size(Ls) == 1 else Ls
-    return _bias(bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, verbose)
+    return _bias(bias_typ, bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, verbose)
