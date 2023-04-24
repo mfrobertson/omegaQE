@@ -56,7 +56,7 @@ def _bias_prep(bi_typ, fields, gmv, N_L1, N_l, Ntheta12, Ntheta1l, curl):
         else:
             bi_typ = "conv"
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
-    L1s = global_qe.get_log_sample_Ls(Lmin, Lmax, N_L1, dL_small=1)
+    L1s = global_qe.get_log_sample_Ls(Lmin, Lmax, N_L1, dL_small=1)  # dL_small should be 2 if not enough L steps (which is default)
     ls = np.linspace(Lmin, Lmax, N_l)
     dTheta1 = np.pi / Ntheta12
     thetas1 = np.linspace(0, np.pi - dTheta1, Ntheta12)
@@ -74,20 +74,39 @@ def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim
     L_A1_fac = (l_primprim_vec @ L1_vec) * (l_primprim_vec @ L2_vec)
     L_C1_fac = (l_vec @ L1_vec) * (l_vec @ L2_vec)
     g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
-    h_X_A1 = global_qe.geo_fac(XY[0], theta12=l_primprim_vec.deltaphi(l_vec))
-    h_Y_A1 = global_qe.geo_fac(XY[1], theta12=l_primprim_vec.deltaphi(l_prim_vec))
+    h_X_A1 = global_qe.geo_fac(XY[0], theta12=l_primprim_vec.deltaphi(l_vec))   # this is different to N32 paper
+    h_Y_A1 = global_qe.geo_fac(XY[1], theta12=l_primprim_vec.deltaphi(l_prim_vec))       # ^^^ same ^^^
     h_X_C1 = global_qe.geo_fac(XY[0], theta12=l_vec.deltaphi(l_prim_vec))
     h_Y_C1 = global_qe.geo_fac(XY[1], theta12=l_vec.deltaphi(l_prim_vec))
-    I_A1_theta1 = -0.5 * dThetal * dl * np.sum(bi * ls[None, :] * w_prim * w_primprim * L_A1_fac * C_l_primprim * g_XY * h_X_A1 * h_Y_A1)
-    C1_fac = 0.5 if gmv else 0.25
-    I_C1_theta1 = C1_fac * dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * (C_Ybar_l * g_XY * h_Y_C1))
+    I_A1_theta1 = (-1) * dThetal * dl * np.sum(bi * ls[None, :] * w_prim * w_primprim * L_A1_fac * C_l_primprim * g_XY * h_X_A1 * h_Y_A1)
+    C1_fac = 1 if gmv else 0.5
+    I_C1_theta1 = C1_fac * dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * C_Ybar_l * g_XY * h_Y_C1)
     if not gmv:
         g_YX = global_qe.weight_function(XY[::-1], L_vec, l_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
         I_C1_theta1 += dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * (C_Xbar_l * g_YX * h_X_C1))
     return I_A1_theta1 + I_C1_theta1
 
+def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec):
+    g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True)
+    XprimsYprims = global_qe.parse_fields(fields, unique=False) if gmv else [fields]
+    inner_brackets = np.zeros(np.shape(w_prim))
+    for XprimYprim in XprimsYprims:
+        XXprim = XY[0]+XprimYprim[0]
+        YYprim = XY[1] + XprimYprim[1]
+        YprimXprim = XprimYprim[::-1]
+        C_XXprim_l = global_qe.cmb[XXprim].gradCl_spline(ls)
+        C_YYprim_l = global_qe.cmb[YYprim].gradCl_spline(l_primprims)
+        g_XprimYprim = global_qe.weight_function(XprimYprim, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
+        g_YprimXprim = global_qe.weight_function(YprimXprim, L1_vec, l_prim_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
+        resp_YYprim = global_qe.response(YYprim, L2_vec, l_prim_vec, curl=False)
+        resp_XXprim = global_qe.response(XXprim, L2_vec, l_vec, curl=False)
+        part1 = g_XprimYprim * C_XXprim_l * resp_YYprim
+        part2 = g_YprimXprim * C_YYprim_l * resp_XXprim
+        inner_brackets += np.sum( (part1 + part2))
+    return dThetal * dl * np.sum(alpha * g_XY * inner_brackets * ls[None, :] * w_prim)
+
 def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, L1s, thetas1, ls, thetasl, curl, verbose):
-    innerloop_func = _get_N2_innerloop if bias_typ is "N2" else _get_N2_innerloop
+    innerloop_func = _get_N2_innerloop if bias_typ == "N2" else _get_N1_innerloop
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
     dThetal = thetasl[1] - thetasl[0]
     dl = ls[1] - ls[0]
@@ -118,18 +137,22 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, L1s, thetas1, ls, thetasl, 
                     I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec)
 
         I_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, np.pi)
-    N = L ** 2 / ((2 * np.pi) ** 4) * InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin, Lmax)
+    N = InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin, Lmax) / ((2 * np.pi) ** 4)
     return N
 
 
 def _get_normalisation(Ls, curl):
     if curl:
-        typ = "curl"
+        return Ls**2/2 / N0_w_spline(Ls)
     else:
-        typ = "phi"
-    N0 = global_fish.covariance.noise.get_N0(typ, ellmax=5000)
-    sample_Ls = np.arange(np.size(N0))
-    return InterpolatedUnivariateSpline(sample_Ls, N0)(Ls)
+        return Ls**2/2 / N0_k_spline(Ls)
+
+def _setup_norms():
+    N0_w = global_fish.covariance.noise.get_N0("omega", ellmax=5000)
+    sample_Ls_w = np.arange(np.size(N0_w))
+    N0_k = global_fish.covariance.noise.get_N0("kappa", ellmax=5000)
+    sample_Ls_k = np.arange(np.size(N0_w))
+    return InterpolatedUnivariateSpline(sample_Ls_w, N0_w), InterpolatedUnivariateSpline(sample_Ls_k, N0_k)
 
 
 def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, curl, verbose):
@@ -146,7 +169,7 @@ def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, cur
                 N_tmp = _bias_calc(bias_typ, XY, L, True, fields, *_bias_prep(bi_typ, fields, True, N_L1, N_L3, Ntheta12, Ntheta13, curl), verbose=verbose)
             else:
                 N_tmp = _bias_calc(bias_typ, XY, L, False, XY, *_bias_prep(bi_typ, XY, False, N_L1, N_L3, Ntheta12, Ntheta13, curl), verbose=verbose)
-            N[iii] += A[iii] * N_tmp
+            N[iii] += N_tmp / A[iii]
     return N
 
 
@@ -190,6 +213,33 @@ def _mixed_bispectrum(typs, L1, L2, theta12, nu):
         raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
     return 4 / (F_L * L1 ** 2 * L2 ** 2) * mixed_bi
 
+def _alpha(typs, L1, L2, theta12, nu):
+    L = _get_third_L(L1, L2, theta12)
+    F_L = F_L_spline(L)
+    typs = np.char.array(typs)
+    all_combos = typs[:, None] + typs[None, :]
+    combos = all_combos.flatten()
+    Ncombos = np.size(combos)
+    perms = 0
+    mixed_bi = None
+    for iii in np.arange(Ncombos):
+        bi_ij = global_fish.bi.get_bispectrum(combos[iii] + "w", L1, L2, theta=theta12, M_spline=True, nu=nu)
+        for jjj in np.arange(np.size(typs)):
+            kq = "k" + typs[jjj]
+            mixed_bi_element = bi_ij * _mixed_bi_innerloop(combos[iii]+kq, typs, L1, L2)
+            if combos[iii] != combos[jjj]:
+                factor = 1
+            else:
+                factor = 1
+            perms += factor
+            if mixed_bi is None:
+                mixed_bi = mixed_bi_element
+            else:
+                mixed_bi += factor * mixed_bi_element
+    if perms != np.size(typs) ** 4:
+        raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
+    A_k = _get_normalisation(curl=False, Ls=L1)
+    return mixed_bi / A_k / F_L
 
 def mixed_bispectrum(typs, L1, L2, theta12, nu=353e9):
     """
@@ -226,7 +276,7 @@ def _build_C_inv_splines(C_inv, bi_typ):
 
 def bias(bias_typ, Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False):
 
-    global global_qe, global_fish
+    global global_qe, global_fish, N0_w_spline, N0_k_spline
     global_fish = Fisher()
     global_fish.setup_noise(exp, qe_fields, gmv, ps, L_cuts, iter, data_dir)
     global_fish.setup_bispectra()
@@ -242,6 +292,7 @@ def bias(bias_typ, Ls, bi_typ, curl, exp=None, qe_fields=None, gmv=None, ps=None
             N = Cls[iii, 2, :]
             global_qe.initialise_manual(field, lenCl, gradCl, N)
         global_qe.initialise()
+    N0_w_spline, N0_k_spline = _setup_norms()
 
 
     if bi_typ != "theory":
