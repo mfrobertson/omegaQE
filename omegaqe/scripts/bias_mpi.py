@@ -37,7 +37,7 @@ def _output(message, my_rank, _id):
         f.close()
 
 
-def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
+def _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -46,7 +46,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     start_time_tot = MPI.Wtime()
 
     _output("-------------------------------------", my_rank, _id)
-    _output(f"exp: {exp}, N_Ls: {N_Ls}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
+    _output(f"bias_typ: {bias_typ}, exp: {exp}, N_Ls: {N_Ls}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
     _output("Setting up parallisation of workload.", my_rank, _id)
 
     Ls = _get_log_sample_Ls(30, 3000, N_Ls)
@@ -59,7 +59,7 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     verbose = True if my_rank == 0 else False
 
     start_time = MPI.Wtime()
-    N_A1, N_C1 = bias(Ls[my_start: my_end], bi_typ, curl=True, exp=exp, qe_fields=fields, gmv=gmv, N_L1=200, N_L3=300, Ntheta12=200, Ntheta13=400, F_L_path=f"{omegaqe.RESULTS_DIR}/F_L_results", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose)
+    N_A1, N_C1 = bias(bias_typ, Ls[my_start: my_end], bi_typ, curl=True, exp=exp, qe_fields=fields, gmv=gmv, N_L1=200, N_L3=300, Ntheta12=200, Ntheta13=400, F_L_path=f"{omegaqe.RESULTS_DIR}/F_L_results", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose)
     end_time = MPI.Wtime()
 
     _output("Bias calculation finished.", my_rank, _id)
@@ -90,13 +90,14 @@ def _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 7:
-        raise ValueError("Must supply arguments: exp bi_typ fields gmv Nell dir id")
-    exp = str(args[0])
-    bi_typ = str(args[1])
-    fields = str(args[2])
-    gmv = parse_boolean(args[3])
-    N_Ls = int(args[4])
-    dir = args[5]
-    _id = args[6]
-    _main(exp, N_Ls, dir, bi_typ, gmv, fields, _id)
+    if len(args) != 8:
+        raise ValueError("Must supply arguments: bias_typ exp bi_typ fields gmv Nell dir id")
+    bias_typ = str(args[0])
+    exp = str(args[1])
+    bi_typ = str(args[2])
+    fields = str(args[3])
+    gmv = parse_boolean(args[4])
+    N_Ls = int(args[5])
+    dir = args[6]
+    _id = args[7]
+    _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id)
