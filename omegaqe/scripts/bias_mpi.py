@@ -59,7 +59,7 @@ def _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     verbose = True if my_rank == 0 else False
 
     start_time = MPI.Wtime()
-    N_A1, N_C1 = bias(bias_typ, Ls[my_start: my_end], bi_typ, curl=True, exp=exp, qe_fields=fields, gmv=gmv, N_L1=200, N_L3=300, Ntheta12=200, Ntheta13=400, F_L_path=f"{omegaqe.RESULTS_DIR}/F_L_results", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose)
+    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=fields, gmv=gmv, N_L1=200, N_L3=300, Ntheta12=200, Ntheta13=400, F_L_path=f"{omegaqe.RESULTS_DIR}/F_L_results", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose)
     end_time = MPI.Wtime()
 
     _output("Bias calculation finished.", my_rank, _id)
@@ -68,7 +68,7 @@ def _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id):
         print("Bias time: " + str(end_time - start_time))
         _output("Bias time: " + str(end_time - start_time), my_rank, _id)
         N_arr = np.ones(N_Ls)
-        N_arr[my_start: my_end] = N_A1 + N_C1
+        N_arr[my_start: my_end] = N
         for rank in range(1, world_size):
             start, end = _get_start_end(rank, workloads)
             N = np.empty(end - start)
@@ -84,7 +84,6 @@ def _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id):
         print("Total time: " + str(end_time_tot - start_time_tot))
         _output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
     else:
-        N = N_A1 + N_C1
         world_comm.Send([N, MPI.DOUBLE], dest=0, tag=77)
 
 
