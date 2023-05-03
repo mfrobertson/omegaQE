@@ -48,7 +48,7 @@ def _get_cov_inv_spline(typ, typs):
     cov_inv2 = C_inv_splines[combo2_idx1][combo2_idx2]
     return cov_inv1, cov_inv2
 
-def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec):
+def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
     Xbar_Ybar = XY.replace("B", "E")
     X_Ybar = XY[0] + XY[1].replace("B", "E")
     Xbar_Y = XY[0].replace("B", "E") + XY[1]
@@ -70,37 +70,45 @@ def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim
         I_C1_theta1 += dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * (C_Xbar_l * g_YX * h_X_C1))
     return I_A1_theta1 + I_C1_theta1
 
-def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec):
+def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
     g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True)
     XprimsYprims = global_qe.parse_fields(fields, unique=False) if gmv else [fields]
     inner_sum = np.zeros(np.shape(w_prim))
     for XprimYprim in XprimsYprims:
         XXprim = XY[0]+XprimYprim[0]
         YYprim = XY[1] + XprimYprim[1]
-        C_XXprim_l = global_qe.cmb[XXprim].lenCl_spline(ls) + global_qe.cmb[XXprim].N_spline(ls)
+        C_XXprim_l = global_qe.cmb[XXprim].lenCl_spline(ls)
+        if noise:
+            C_XXprim_l += global_qe.cmb[XXprim].N_spline(ls)
         g_XprimYprim = global_qe.weight_function(XprimYprim, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
         resp_YYprim = global_qe.response(YYprim, L2_vec, l_prim_vec, curl=False)
         inner_sum += g_XprimYprim * C_XXprim_l * resp_YYprim
     return 4 * dThetal * dl * np.sum(alpha * g_XY * inner_sum * ls[None, :] * w_prim)
 
-def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec):
+def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
     g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True)
     XpYps = global_qe.parse_fields(fields, unique=False) if gmv else [fields]
     inner_sum = np.zeros(np.shape(w_prim))
     for XpYp in XpYps:
         g_XpYp = global_qe.weight_function(XpYp, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
         XXp = XY[0] + XpYp[0]
-        C_XXp_l = global_qe.cmb[XXp].lenCl_spline(ls) + global_qe.cmb[XXp].N_spline(ls)
+        C_XXp_l = global_qe.cmb[XXp].lenCl_spline(ls)
+        if noise:
+            C_XXp_l += global_qe.cmb[XXp].N_spline(ls)
         for XppYpp in XpYps:
             g_XppYpp= global_qe.weight_function(XppYpp, L2_vec, l_prim_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
             YXpp = XY[1] + XppYpp[0]
             YpYpp = XpYp[1] + XppYpp[1]
-            C_YXpp_l = global_qe.cmb[YXpp].lenCl_spline(l_prim_vec.rho) + global_qe.cmb[YXpp].N_spline(l_prim_vec.rho)
-            C_YpYpp_l = global_qe.cmb[YpYpp].lenCl_spline(l_primprims) + global_qe.cmb[YpYpp].N_spline(l_primprims)
+            C_YXpp_l = global_qe.cmb[YXpp].lenCl_spline(l_prim_vec.rho)
+            if noise:
+                C_YXpp_l += global_qe.cmb[YXpp].N_spline(l_prim_vec.rho)
+            C_YpYpp_l = global_qe.cmb[YpYpp].lenCl_spline(l_primprims)
+            if noise:
+                C_YpYpp_l += global_qe.cmb[YpYpp].N_spline(l_primprims)
             inner_sum += g_XpYp * g_XppYpp * C_XXp_l * C_YXpp_l * C_YpYpp_l
     return 4 * dThetal * dl * np.sum(beta * g_XY * inner_sum * ls[None, :] * w_prim * w_primprim)
 
-def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, thetasl, verbose):
+def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, thetasl, verbose, noise):
 
     if bias_typ == "N2" or bias_typ == "N32":
         innerloop_func = _get_N2_innerloop
@@ -137,7 +145,7 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
                 w_prim[l_prims < Lmin] = 0
                 w_prim[l_prims > Lmax] = 0
                 if np.sum(w_prim) != 0 and np.sum(w_primprim) != 0:
-                    I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec)
+                    I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise)
 
         I_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, np.pi)
     N = InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin, Lmax) / ((2 * np.pi) ** 4)
@@ -167,7 +175,7 @@ def _bias_prep(fields, gmv, N_L1, N_l, Ntheta12, Ntheta1l):
     thetasl = np.linspace(0, 2 * np.pi - dThetal, Ntheta1l)
     return L1s, thetas1, ls, thetasl
 
-def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose):
+def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose, noise):
     curl = False if bias_typ == "N32" else True
     A = _get_normalisation(Ls, curl)
     N_Ls = np.size(Ls)
@@ -179,9 +187,9 @@ def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, ver
         for XY in XYs:
             if verbose: print(f"  XY = {XY}")
             if gmv:
-                N_tmp = _bias_calc(bias_typ, XY, L, True, fields, bi_typ, curl, *_bias_prep(fields, True, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose)
+                N_tmp = _bias_calc(bias_typ, XY, L, True, fields, bi_typ, curl, *_bias_prep(fields, True, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose, noise=noise)
             else:
-                N_tmp = _bias_calc(bias_typ, XY, L, False, XY, bias_typ, curl, *_bias_prep(XY, False, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose)
+                N_tmp = _bias_calc(bias_typ, XY, L, False, XY, bias_typ, curl, *_bias_prep(XY, False, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose, noise=noise)
             N[iii] += N_tmp / A[iii]
     return N
 
@@ -237,14 +245,15 @@ def _alpha(typs, L1, L2, theta12, nu):
     for iii in np.arange(Ncombos):
         bi_ij = global_fish.bi.get_bispectrum(combos[iii] + "w", L1, L2, theta=theta12, M_spline=True, nu=nu)
         for q in typs:
-            kq = "k" + q
-            cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(combos[iii]+kq, typs)
-            Cl_qk_spline = _get_Cl_spline(q + "k")
-            mixed_bi_element = bi_ij * cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_qk_spline(L2)
-            if mixed_bi is None:
-                mixed_bi = mixed_bi_element
-            else:
-                mixed_bi += mixed_bi_element
+            if q != "k":
+                kq = "k" + q
+                cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(combos[iii]+kq, typs)
+                Cl_qk_spline = _get_Cl_spline(q + "k")
+                mixed_bi_element = bi_ij * cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_qk_spline(L2)
+                if mixed_bi is None:
+                    mixed_bi = mixed_bi_element
+                else:
+                    mixed_bi += mixed_bi_element
     A_k = _get_normalisation(curl=False, Ls=L1)
     return mixed_bi / A_k * 2/(L2**2 * F_L)
 
@@ -312,7 +321,7 @@ def _build_C_inv_splines(C_inv, bi_typ):
     return C_inv_splines
 
 
-def bias(bias_typ, Ls, bi_typ="theory", exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False):
+def bias(bias_typ, Ls, bi_typ="theory", exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False, noise=True):
 
     global global_qe, global_fish, N0_w_spline, N0_k_spline
     global_fish = Fisher()
@@ -350,4 +359,4 @@ def bias(bias_typ, Ls, bi_typ="theory", exp=None, qe_fields=None, gmv=None, ps=N
         Cl_Ik_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_Ik[1:])
 
     Ls = np.ones(1, dtype=int)*Ls if np.size(Ls) == 1 else Ls
-    return _bias(bias_typ, bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose)
+    return _bias(bias_typ, bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose, noise)
