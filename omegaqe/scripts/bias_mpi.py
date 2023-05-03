@@ -37,7 +37,7 @@ def _output(message, my_rank, _id):
         f.close()
 
 
-def _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id):
+def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_typ, gmv, fields, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -46,7 +46,7 @@ def _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id):
     start_time_tot = MPI.Wtime()
 
     _output("-------------------------------------", my_rank, _id)
-    _output(f"bias_typ: {bias_typ}, exp: {exp}, N_Ls: {N_Ls}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
+    _output(f"bias_typ: {bias_typ}, exp: {exp}, N_Ls: {N_Ls}, N_L1: {N_L1}, N_L3: {N_L3}, Ntheta12: {Ntheta12}, Ntheta13: {Ntheta13}, noise: {noise}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
     _output("Setting up parallisation of workload.", my_rank, _id)
 
     Ls = _get_log_sample_Ls(30, 3000, N_Ls)
@@ -89,14 +89,19 @@ def _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 8:
-        raise ValueError("Must supply arguments: bias_typ exp bi_typ fields gmv Nell dir id")
+    if len(args) != 13:
+        raise ValueError("Must supply arguments: bias_typ exp bi_typ fields gmv Nell N_L1 N_L3 Ntheta12 Ntheta13 noise dir id")
     bias_typ = str(args[0])
     exp = str(args[1])
     bi_typ = str(args[2])
     fields = str(args[3])
     gmv = parse_boolean(args[4])
     N_Ls = int(args[5])
-    dir = args[6]
-    _id = args[7]
-    _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id)
+    N_L1 = int(args[6])
+    N_L3 = int(args[7])
+    Ntheta12 = int(args[8])
+    Ntheta13 = int(args[9])
+    noise = parse_boolean(args[10])
+    dir = args[11]
+    _id = args[12]
+    _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_typ, gmv, fields, _id)
