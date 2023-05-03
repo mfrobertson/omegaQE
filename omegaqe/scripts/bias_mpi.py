@@ -75,7 +75,7 @@ def _main(bias_typ, exp, N_Ls, dir, bi_typ, gmv, fields, _id):
             world_comm.Recv([N, MPI.DOUBLE], source=rank, tag=77)
             N_arr[start: end] = N
         gmv_str = "gmv" if gmv else "single"
-        dir += f"{exp}/{fields}_{gmv_str}/{bi_typ}"
+        dir += f"{exp}/{fields}_{gmv_str}/{bi_typ}/{bias_typ}"
         if not os.path.isdir(dir):
             os.makedirs(dir)
         np.save(dir+"/Ls", Ls)
