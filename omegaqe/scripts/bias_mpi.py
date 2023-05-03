@@ -59,7 +59,7 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_ty
     verbose = True if my_rank == 0 else False
 
     start_time = MPI.Wtime()
-    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=fields, gmv=gmv, N_L1=200, N_L3=300, Ntheta12=200, Ntheta13=400, F_L_path=f"{omegaqe.RESULTS_DIR}/F_L_results", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose)
+    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=fields, gmv=gmv, N_L1=N_L1, N_L3=N_L3, Ntheta12=Ntheta12, Ntheta13=Ntheta13, F_L_path=f"{omegaqe.RESULTS_DIR}/F_L_results", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose, noise=noise)
     end_time = MPI.Wtime()
 
     _output("Bias calculation finished.", my_rank, _id)
