@@ -75,6 +75,7 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_ty
             world_comm.Recv([N, MPI.DOUBLE], source=rank, tag=77)
             N_arr[start: end] = N
         gmv_str = "gmv" if gmv else "single"
+        bias_typ += "_nN" if not noise else ""
         dir += f"{exp}/{fields}_{gmv_str}/{bi_typ}/{bias_typ}"
         if not os.path.isdir(dir):
             os.makedirs(dir)
