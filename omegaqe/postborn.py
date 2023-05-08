@@ -6,15 +6,24 @@ from omegaqe.tools import getFileSep
 from scipy.interpolate import InterpolatedUnivariateSpline
 import vector
 
+mode = Modecoupling()
 
-def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb):
+
+def _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax):
+    if (zmin == 0 and zmax) is None:
+        sep = getFileSep()
+        mode_typ = "ww" if cmb else "rr"
+        ells_sample = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "ells.npy")
+        M = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "M.npy")
+        return mode.spline(ells_sample, M)
+    mode_typ = "kk" if cmb else "ss"
+    return mode.spline(ells_sample=mode.generate_sample_ells(Lmax, 100), typ=mode_typ, star=False, zmin=zmin, zmax=zmax)
+
+
+def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb, zmin=0, zmax=None):
     Lmin = np.min(Ls)
     Lmax = 2*np.max(Ls)
-    sep = getFileSep()
-    mode_typ = "ww" if cmb else "rr"
-    ells_sample = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "ells.npy")
-    M = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "M.npy")
-    M_spline = Modecoupling().spline(ells_sample, M)
+    M_spline = _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax)
     dTheta = np.pi / Ntheta
     thetas = np.linspace(dTheta, np.pi, Ntheta, dtype=float)
     floaty = Lmax / 1000
@@ -39,7 +48,7 @@ def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb)
     return 4 * I / ((2 * np.pi) ** 2)
 
 
-def omega_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True):
+def omega_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None):
     """
 
     Parameters
@@ -52,4 +61,4 @@ def omega_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500,
     -------
 
     """
-    return _get_postborn_omega_ps(ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb)
+    return _get_postborn_omega_ps(ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax)
