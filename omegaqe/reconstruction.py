@@ -5,7 +5,8 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy import signal
 import os
 import shutil
-
+import warnings
+warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
 
 class Reconstruction:
 
@@ -29,10 +30,9 @@ class Reconstruction:
 
     def _ell_check(self):
         ellmax_lim = 5000
-        lensit_lmax = self.maps.lib_datalm.ell_mat()[0][2**self.LDres//2]
-        print(lensit_lmax)
+        lensit_lmax = self.maps.lib_datalm.ell_mat()[2**self.LDres//2][2**self.LDres//2]
         if lensit_lmax > ellmax_lim:
-            raise ValueError(f"LDres and HDres setting produce ells > {ellmax_lim}. (lensit maps have ells up to {lensit_lmax})")
+            warnings.warn(f"LDres and HDres setting produce ells > {ellmax_lim}. (lensit maps have ells up to {lensit_lmax})")
 
     def _deconstruct_noise_curve(self, typ, exp, beam):
         Lmax_data = 5000
@@ -91,7 +91,8 @@ class Reconstruction:
         if gauss:
             map = self.gauss_cmbMap("TT", sim)
             if include_noise:
-                return map + self.noiseMap("TT", sim)
+                tmp = map + self.noiseMap("TT", sim)
+                return tmp
             return map
         map = self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim)
         if include_noise:
@@ -103,7 +104,8 @@ class Reconstruction:
             Emap = self.gauss_cmbMap("EE", sim)
             Bmap = self.gauss_cmbMap("BB", sim)
             if include_noise:
-                return Emap + self.noiseMap("EE", sim), Bmap + self.noiseMap("BB", sim)
+                tmp = Emap + self.noiseMap("EE", sim), Bmap + self.noiseMap("BB", sim)
+                return tmp
             return Emap, Bmap
         Emap = self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim)
         Bmap = self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim)
@@ -152,7 +154,10 @@ class Reconstruction:
         N = self.noise.get_cmb_gaussian_N(typ, nT, beam, Lmax_data, exp=self.exp)
         Ls = np.arange(np.size(N))
         N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
-        n_rfft = np.sqrt(N_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1]))
+        N_rfft = N_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1])
+        if np.any(N_rfft<0):
+            warnings.warn(f"Negative values in CMB {typ} map noise will be converted to positive values")
+        n_rfft = np.sqrt(np.abs(N_rfft))
         physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
         gauss_matrix = self._get_gauss_matrix((2**self.LDres, 2**self.LDres//2+1), typ, sim)
         Tcmb = 2.7255
@@ -163,23 +168,26 @@ class Reconstruction:
         Cl = self.noise.cosmo.get_lens_ps(typ, Lmax_data)
         Ls = np.arange(np.size(Cl))
         Cl_spline = InterpolatedUnivariateSpline(Ls[2:], Cl[2:])
-        Cl_sqrt_rfft = np.sqrt(Cl_spline(self.maps.lib_datalm.ell_mat()[:2 ** self.LDres, :2 ** self.LDres // 2 + 1]))
+        Cl_rfft = Cl_spline(self.maps.lib_datalm.ell_mat()[:2 ** self.LDres, :2 ** self.LDres // 2 + 1])
+        if np.any(Cl_rfft < 0):
+            warnings.warn(f"Negative values in gaussian lensed CMB {typ} map will be converted to positive values")
+        Cl_sqrt_rfft = np.sqrt(np.abs(Cl_rfft))
         physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
         gauss_matrix = self._get_gauss_matrix((2 ** self.LDres, 2 ** self.LDres // 2 + 1), typ, sim, False)
         Tcmb = 2.7255
         return np.fft.irfft2(self._enforce_symmetries(Cl_sqrt_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
 
-    def _get_iblm(self, fields, include_noise, sim, phi_idx, return_data_alms=False):
+    def _get_iblm(self, fields, include_noise, sim, phi_idx, return_data_alms=False, gaussCMB=False):
         if fields == "T":
             estimator = "T"
-            T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise, sim, phi_idx))
+            T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise, sim, phi_idx, gaussCMB))
             iblm = self.isocov.get_iblms(estimator, np.atleast_2d(T_alm), use_cls_len=True)[0]
             if return_data_alms:
                 return estimator, iblm, T_alm
             return estimator, iblm
         if fields == "EB":
             estimator = "QU"
-            Qmap, Umap = self.QUmap(include_noise, sim, phi_idx)
+            Qmap, Umap = self.QUmap(include_noise, sim, phi_idx, gaussCMB)
             Q_alm = self.isocov.lib_datalm.map2alm(Qmap)
             U_alm = self.isocov.lib_datalm.map2alm(Umap)
             data_alms = np.array([Q_alm, U_alm])
@@ -189,10 +197,13 @@ class Reconstruction:
             return estimator, iblm
         if fields == "TEB":
             estimator = "TQU"
-            T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise, sim, phi_idx))
-            Qmap, Umap = self.QUmap(include_noise, sim, phi_idx)
+            T_alm = self.isocov.lib_datalm.map2alm(self.Tmap(include_noise, sim, phi_idx, gaussCMB))
+            Qmap, Umap = self.QUmap(include_noise, sim, phi_idx, gaussCMB)
             Q_alm = self.isocov.lib_datalm.map2alm(Qmap)
             U_alm = self.isocov.lib_datalm.map2alm(Umap)
+            print(T_alm)
+            print(Q_alm)
+            print(U_alm)
             data_alms = np.array([T_alm, Q_alm, U_alm])
             iblm = self.isocov.get_iblms(estimator, data_alms, use_cls_len=True)[0]
             if return_data_alms:
@@ -277,24 +288,26 @@ class Reconstruction:
             return self._renorm(alm, idx, sim, phi_idx)
         return alm
 
-    def _QE(self, fields, idx, include_noise, sim, phi_idx):
-        estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx)
+    def _QE(self, fields, idx, include_noise, sim, phi_idx, gaussCMB):
+        estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
         alm_no_norm = 0.5 * self.isocov.get_qlms(estimator, iblm, self.isocov.lib_skyalm, use_cls_len=True, resp_cls=self.resp_cls)[idx]
         f = self.isocov.get_response(estimator, self.isocov.lib_skyalm, cls_weights=self.resp_cls, cls_cmb=self.resp_cls)[idx]
         f_inv = self._inverse_nonzero(f)
         alm_norm = self.isocov.lib_skyalm.almxfl(alm_no_norm, f_inv)
         return alm_norm
 
-    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False):
-        qe_func = self._QE_iter if iter_rec else self._QE
-        self.phi = qe_func(fields, 0, include_noise, sim, phi_idx)
+    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False):
+        # qe_func = self._QE_iter if iter_rec else self._QE
+        qe_func = self._QE
+        self.phi = qe_func(fields, 0, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
         if return_map:
             return self._get_rfft_map(self.phi)
         return self.phi
 
-    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False):
-        qe_func = self._QE_iter if iter_rec else self._QE
-        self.curl = qe_func(fields, 1, include_noise, sim, phi_idx)
+    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False):
+        # qe_func = self._QE_iter if iter_rec else self._QE
+        qe_func = self._QE
+        self.curl = qe_func(fields, 1, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
         if return_map:
             return self._get_rfft_map(self.curl)
         return self.curl

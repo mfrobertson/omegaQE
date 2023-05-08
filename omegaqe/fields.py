@@ -222,16 +222,16 @@ class Fields:
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
 
-    def get_omega_rec(self, cmb_fields="T", include_noise=True, phi_idx=None, iter_rec=False):
+    def get_omega_rec(self, cmb_fields="T", include_noise=True, phi_idx=None, iter_rec=False, gaussCMB=False):
         if self.rec is None:
             raise ValueError(f"CMB lensing reconstruction not setup for this Fields instance.")
-        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx, iter_rec=iter_rec)
+        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx, iter_rec=iter_rec, gaussCMB=gaussCMB)
         return curl_map * self.kM **2 / 2
 
-    def get_kappa_rec(self, cmb_fields="T", include_noise=True, phi_idx=None, iter_rec=False):
+    def get_kappa_rec(self, cmb_fields="T", include_noise=True, phi_idx=None, iter_rec=False, gaussCMB=False):
         if self.rec is None:
             raise ValueError(f"CMB lensing reconstruction not setup for this Fields instance.")
-        kappa_map = 2 * np.pi * self.rec.get_phi_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx, iter_rec=iter_rec)
+        kappa_map = 2 * np.pi * self.rec.get_phi_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx, iter_rec=iter_rec, gaussCMB=gaussCMB)
         return kappa_map * self.kM **2 / 2
 
     def get_omega_fiducial(self):
@@ -241,8 +241,8 @@ class Fields:
         gauss_matrix = self._get_gauss_matrix(np.shape(self.kM))
         return self._enforce_symmetries(np.sqrt(C_omega_spline(self.kM) * (2 * np.pi) ** 2) * gauss_matrix)
 
-    def get_omega_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, tracer_noise=False, reinitialise=False, use_kappa_rec=False):
+    def get_omega_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, tracer_noise=False, reinitialise=False, use_kappa_rec=False, gaussCMB=False):
         if self.template is None or reinitialise:
-            self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, tracer_noise=tracer_noise, use_kappa_rec=use_kappa_rec)
+            self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, tracer_noise=tracer_noise, use_kappa_rec=use_kappa_rec, gaussCMB=gaussCMB)
         return self.template.get_omega(Nchi)
 
