@@ -66,7 +66,7 @@ def _qe_typ(fields, gmv):
     raise ValueError(f"fields: {fields} and gmv: {gmv} combination not yet supported.")
 
 
-def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, out_dir, _id):
+def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, gauss_cmb, out_dir, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -82,12 +82,12 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
 
     _output("-------------------------------------", my_rank, _id)
     _output(f"Node: {socket.gethostname()}", my_rank, _id, use_rank=True)
-    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}, kappa_rec: {use_kappa_rec}, include_noise: {include_noise}", my_rank, _id)
+    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}, kappa_rec: {use_kappa_rec}, include_noise: {include_noise}, gauss_cmb: {gauss_cmb}", my_rank, _id)
     nu = 353e9
 
     _output("    Preparing grad Cls...", my_rank, _id)
     if my_rank == 0:
-        from cosmology import Cosmology
+        from omegaqe.cosmology import Cosmology
         cosmo = Cosmology()
         Tcmb = 2.7255
         conv_fac = (Tcmb*1e6)**2
@@ -148,25 +148,27 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
         _output("Starting sim bias calculation..."+ f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_rec = field_obj.get_omega_rec(qe_typ, include_noise=include_noise)
+        omega_rec = field_obj.get_omega_rec(qe_typ, include_noise=include_noise, gaussCMB=gauss_cmb)
         end_time = MPI.Wtime()
         _output("Lensing reconstruction time: " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
-        start_time = MPI.Wtime()
-        omega_rec_dp = field_obj.get_omega_rec(qe_typ, include_noise=include_noise, phi_idx=int(sim + Nsims))
-        end_time = MPI.Wtime()
-        _output("Lensing reconstruction time (different phi): " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
+        if not gauss_cmb:
+            start_time = MPI.Wtime()
+            omega_rec_dp = field_obj.get_omega_rec(qe_typ, include_noise=include_noise, phi_idx=int(sim + Nsims), gaussCMB=gauss_cmb)
+            end_time = MPI.Wtime()
+            _output("Lensing reconstruction time (different phi): " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True, use_kappa_rec=use_kappa_rec, tracer_noise=include_noise)
+        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True, use_kappa_rec=use_kappa_rec, tracer_noise=include_noise, gaussCMB=gauss_cmb)
         end_time = MPI.Wtime()
         _output("Template construction time: " + str(end_time - start_time)+ f" ({sim})", my_rank, _id, use_rank=True)
 
         _output(f"Calculating cross-spectrum ({sim})", my_rank, _id, use_rank=True)
         Ls, ps_tmp = field_obj.get_ps(omega_rec, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
 
-        _output(f"Calculating cross-spectrum ({sim}) (different phi)", my_rank, _id, use_rank=True)
-        Ls, ps_tmp_dp = field_obj.get_ps(omega_rec_dp, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
+        if not gauss_cmb:
+            _output(f"Calculating cross-spectrum ({sim}) (different phi)", my_rank, _id, use_rank=True)
+            Ls, ps_tmp_dp = field_obj.get_ps(omega_rec_dp, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
 
         if ps_arr is None:
             ps_arr = np.zeros((my_end-my_start, np.size(ps_tmp)))
@@ -196,6 +198,8 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
         kappa_rec_str = "kappa_rec" if use_kappa_rec else ""
         if include_noise:
             kappa_rec_str += "_wN"
+        if gauss_cmb:
+            kappa_rec_str += "_gaussCMB"
         out_dir += f"/{typ}/{exp}/{gmv_str}/{maps}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/{Nsims}/{kappa_rec_str}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
@@ -212,8 +216,8 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 13:
-        raise ValueError("Arguments should be exp typ LDres HDres fields gmv Nsims Lmin_cut Lmax_cut kappa_rec include_noise out_dir _id")
+    if len(args) != 14:
+        raise ValueError("Arguments should be exp typ LDres HDres fields gmv Nsims Lmin_cut Lmax_cut kappa_rec include_noise gauss_cmb out_dir _id")
     exp = str(args[0])
     typ = str(args[1])
     LDres = int(args[2])
@@ -225,6 +229,7 @@ if __name__ == '__main__':
     Lmax_cut = int(args[8])
     use_kappa_rec = parse_boolean(args[9])
     include_noise = parse_boolean(args[10])
-    out_dir = str(args[11])
-    _id = str(args[12])
-    _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, out_dir, _id)
+    gauss_cmb = parse_boolean(args[11])
+    out_dir = str(args[12])
+    _id = str(args[13])
+    _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, gauss_cmb, out_dir, _id)
