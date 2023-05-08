@@ -25,6 +25,14 @@ class Reconstruction:
         self.phi = None
         self.phi_iter_norm = None
         self.curl_iter_norm = None
+        self._ell_check()
+
+    def _ell_check(self):
+        ellmax_lim = 5000
+        lensit_lmax = self.maps.lib_datalm.ell_mat()[0][2**self.LDres//2]
+        print(lensit_lmax)
+        if lensit_lmax > ellmax_lim:
+            raise ValueError(f"LDres and HDres setting produce ells > {ellmax_lim}. (lensit maps have ells up to {lensit_lmax})")
 
     def _deconstruct_noise_curve(self, typ, exp, beam):
         Lmax_data = 5000
@@ -79,26 +87,42 @@ class Reconstruction:
         ret[np.where(array != 0.)] = 1. / array[np.where(array != 0.)]
         return ret
 
-    def Tmap(self, include_noise=True, sim=0, phi_idx=None):
+    def Tmap(self, include_noise=True, sim=0, phi_idx=None, gauss=False):
+        if gauss:
+            map = self.gauss_cmbMap("TT", sim)
+            if include_noise:
+                return map + self.noiseMap("TT", sim)
+            return map
+        map = self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim)
         if include_noise:
-            return self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim) + self.noiseMap("TT", sim)
-        return self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim)
+            return map + self.noiseMap("TT", sim)
+        return map
 
-    def QUmap(self, include_noise=True, sim=0, phi_idx=None):
+    def QUmap(self, include_noise=True, sim=0, phi_idx=None, gauss=False):
+        if gauss:
+            Emap = self.gauss_cmbMap("EE", sim)
+            Bmap = self.gauss_cmbMap("BB", sim)
+            if include_noise:
+                return Emap + self.noiseMap("EE", sim), Bmap + self.noiseMap("BB", sim)
+            return Emap, Bmap
+        Emap = self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim)
+        Bmap = self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim)
         if include_noise:
-            return self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim) + self.noiseMap("EE", sim), self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim) + self.noiseMap("BB", sim)
-        return self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim), self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim)
+            return Emap + self.noiseMap("EE", sim), Bmap + self.noiseMap("BB", sim)
+        return Emap, Bmap
 
-    def _get_seed(self, typ, sim):
+    def _get_seed(self, typ, sim, noise):
         seed = 3 * sim
         if typ == "EE":
             seed += 1
         elif typ == "BB":
             seed += 2
-        return seed
+        if noise:
+            return seed
+        return seed + 10000
 
-    def _get_gauss_matrix(self, shape, typ, sim):
-        seed = self._get_seed(typ, sim)
+    def _get_gauss_matrix(self, shape, typ, sim, noise=True):
+        seed = self._get_seed(typ, sim, noise)
         np.random.seed(seed)
         mean = 0
         var = 1 / np.sqrt(2)
@@ -125,14 +149,25 @@ class Reconstruction:
     def noiseMap(self, typ, sim):
         Lmax_data = 5000
         nT, beam = self.noise.get_noise_args(self.exp)
-        n = np.sqrt(self.noise.get_cmb_gaussian_N(typ, nT, beam, Lmax_data, exp=self.exp))
-        Ls = np.arange(np.size(n))
-        n_spline = InterpolatedUnivariateSpline(Ls, n)
-        n_rfft = n_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1])
+        N = self.noise.get_cmb_gaussian_N(typ, nT, beam, Lmax_data, exp=self.exp)
+        Ls = np.arange(np.size(N))
+        N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
+        n_rfft = np.sqrt(N_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1]))
         physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
         gauss_matrix = self._get_gauss_matrix((2**self.LDres, 2**self.LDres//2+1), typ, sim)
         Tcmb = 2.7255
         return np.fft.irfft2(self._enforce_symmetries(n_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
+
+    def gauss_cmbMap(self, typ, sim):
+        Lmax_data = 5000
+        Cl = self.noise.cosmo.get_lens_ps(typ, Lmax_data)
+        Ls = np.arange(np.size(Cl))
+        Cl_spline = InterpolatedUnivariateSpline(Ls[2:], Cl[2:])
+        Cl_sqrt_rfft = np.sqrt(Cl_spline(self.maps.lib_datalm.ell_mat()[:2 ** self.LDres, :2 ** self.LDres // 2 + 1]))
+        physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
+        gauss_matrix = self._get_gauss_matrix((2 ** self.LDres, 2 ** self.LDres // 2 + 1), typ, sim, False)
+        Tcmb = 2.7255
+        return np.fft.irfft2(self._enforce_symmetries(Cl_sqrt_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
 
     def _get_iblm(self, fields, include_noise, sim, phi_idx, return_data_alms=False):
         if fields == "T":
