@@ -201,9 +201,6 @@ class Reconstruction:
             Qmap, Umap = self.QUmap(include_noise, sim, phi_idx, gaussCMB)
             Q_alm = self.isocov.lib_datalm.map2alm(Qmap)
             U_alm = self.isocov.lib_datalm.map2alm(Umap)
-            print(T_alm)
-            print(Q_alm)
-            print(U_alm)
             data_alms = np.array([T_alm, Q_alm, U_alm])
             iblm = self.isocov.get_iblms(estimator, data_alms, use_cls_len=True)[0]
             if return_data_alms:
