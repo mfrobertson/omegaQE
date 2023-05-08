@@ -113,18 +113,18 @@ class Reconstruction:
             return Emap + self.noiseMap("EE", sim), Bmap + self.noiseMap("BB", sim)
         return Emap, Bmap
 
-    def _get_seed(self, typ, sim, noise):
+    def _get_seed(self, typ, sim, cmb):
         seed = 3 * sim
         if typ == "EE":
             seed += 1
         elif typ == "BB":
             seed += 2
-        if noise:
+        if not cmb:
             return seed
         return seed + 10000
 
-    def _get_gauss_matrix(self, shape, typ, sim, noise=True):
-        seed = self._get_seed(typ, sim, noise)
+    def _get_gauss_matrix(self, shape, typ, sim, cmb=False):
+        seed = self._get_seed(typ, sim, cmb)
         np.random.seed(seed)
         mean = 0
         var = 1 / np.sqrt(2)
