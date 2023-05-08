@@ -193,7 +193,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
             world_comm.Recv([ps_tmp, MPI.DOUBLE], source=rank, tag=77)
             ps_all[start:end] = ps_tmp
 
-            if not gauss_cmb
+            if not gauss_cmb:
                 ps_tmp_dp = np.empty((end - start, np.size(ps_all[0])))
                 world_comm.Recv([ps_tmp_dp, MPI.DOUBLE], source=rank, tag=77)
                 ps_all_dp[start:end] = ps_tmp_dp
