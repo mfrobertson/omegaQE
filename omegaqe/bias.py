@@ -72,7 +72,8 @@ def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim
 
 def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
     g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True)
-    XprimsYprims = global_qe.parse_fields(fields, unique=False, includeBB=True) if gmv else [fields]  # include BB here?
+    includeBB = False
+    XprimsYprims = global_qe.parse_fields(fields, unique=False, includeBB=includeBB) if gmv else [fields]  # include BB here?
     inner_sum = np.zeros(np.shape(w_prim))
     for XprimYprim in XprimsYprims:
         XXprim = XY[0]+XprimYprim[0]
@@ -87,7 +88,8 @@ def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primp
 
 def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
     g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True)
-    XpYps = global_qe.parse_fields(fields, unique=False, includeBB=True) if gmv else [fields]     # include BB here?
+    includeBB = False
+    XpYps = global_qe.parse_fields(fields, unique=False, includeBB=includeBB) if gmv else [fields]     # include BB here?
     inner_sum = np.zeros(np.shape(w_prim))
     for XpYp in XpYps:
         g_XpYp = global_qe.weight_function(XpYp, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
@@ -181,7 +183,8 @@ def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, ver
     N_Ls = np.size(Ls)
     if N_Ls == 1: Ls = np.ones(1) * Ls
     N = np.zeros(np.shape(Ls))
-    XYs = global_qe.parse_fields(fields, unique=False, includeBB=True) if gmv else [fields]    # include BB?
+    includeBB = False
+    XYs = global_qe.parse_fields(fields, unique=False, includeBB=includeBB) if gmv else [fields]    # include BB?
     for iii, L in enumerate(Ls):
         if verbose: print(f"L = {L} ({iii}/{N_Ls-1})")
         for XY in XYs:
