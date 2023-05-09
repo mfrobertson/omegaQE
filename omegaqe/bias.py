@@ -181,7 +181,7 @@ def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, ver
     N_Ls = np.size(Ls)
     if N_Ls == 1: Ls = np.ones(1) * Ls
     N = np.zeros(np.shape(Ls))
-    XYs = global_qe.parse_fields(fields, unique=False) if gmv else [fields]
+    XYs = global_qe.parse_fields(fields, unique=False, includeBB=True) if gmv else [fields]    # include BB?
     for iii, L in enumerate(Ls):
         if verbose: print(f"L = {L} ({iii}/{N_Ls-1})")
         for XY in XYs:
