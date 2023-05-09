@@ -254,7 +254,6 @@ class QE:
         -------
 
         """
-        # TODO: if typ = BB then this is wrong - see 1906.08760 (I don't believe that BB is used though...)
         # TODO: also the curl terms (i.e. C^TP and C^PP) are not implimented
         if not curl:
             return self._response_phi(typ, L_vec, ell_vec, cl)
