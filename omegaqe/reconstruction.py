@@ -10,9 +10,10 @@ warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
 
 class Reconstruction:
 
-    def __init__(self, exp="SO", LDres=12, HDres=12, nsims=1, Lcuts=(30,3000,30,5000), resp_cls=None):
+    def __init__(self, fields, exp="SO", LDres=12, HDres=12, nsims=1, Lcuts=(30,3000,30,5000), resp_cls=None):
         if not 'LENSIT' in os.environ.keys():
             os.environ['LENSIT'] = '_tmp'
+        self.fields = fields
         self.noise = Noise()
         self.exp = exp
         self.LDres = LDres
@@ -89,93 +90,24 @@ class Reconstruction:
 
     def Tmap(self, include_noise=True, sim=0, phi_idx=None, gauss=False):
         if gauss:
-            map = self.gauss_cmbMap("TT", sim)
-            if include_noise:
-                tmp = map + self.noiseMap("TT", sim)
-                return tmp
-            return map
+            return self.fields.get_cmb_map("TT", include_noise, fft=False, muK=True)/(2*np.pi)
         map = self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim)
         if include_noise:
-            return map + self.noiseMap("TT", sim)
+            return map + self.fields.get_noise_map("TT", True)
         return map
 
     def QUmap(self, include_noise=True, sim=0, phi_idx=None, gauss=False):
         if gauss:
-            Emap = self.gauss_cmbMap("EE", sim)
-            Bmap = self.gauss_cmbMap("BB", sim)
-            if include_noise:
-                tmp = Emap + self.noiseMap("EE", sim), Bmap + self.noiseMap("BB", sim)
-                return tmp
-            return Emap, Bmap
-        Emap = self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim)
-        Bmap = self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim)
+            Qmap, Umap = self.fields.get_QU_map(include_noise, fft=False, muK=True)
+            return Qmap/(2*np.pi), Umap/(2*np.pi)
+        Qmap = self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim)
+        Umap = self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim)
         if include_noise:
-            return Emap + self.noiseMap("EE", sim), Bmap + self.noiseMap("BB", sim)
-        return Emap, Bmap
-
-    def _get_seed(self, typ, sim, cmb):
-        seed = 3 * sim
-        if typ == "EE":
-            seed += 1
-        elif typ == "BB":
-            seed += 2
-        if not cmb:
-            return seed
-        return seed + 10000
-
-    def _get_gauss_matrix(self, shape, typ, sim, cmb=False):
-        seed = self._get_seed(typ, sim, cmb)
-        np.random.seed(seed)
-        mean = 0
-        var = 1 / np.sqrt(2)
-        real = np.random.normal(mean, var, shape)
-        imag = np.random.normal(mean, var, shape)
-        return real + (1j * imag)
-
-    def _enforce_symmetries(self, fft_map):
-        # Setting divergent point to 0 (this point represents mean of real field so this is reasonable)
-        fft_map[0, 0] = 0
-
-        # Ensuring Nyquist points are real
-        fft_map[self.N_pix // 2, 0] = np.real(fft_map[self.N_pix // 2, 0]) * np.sqrt(2)
-        fft_map[0, self.N_pix // 2] = np.real(fft_map[0, self.N_pix // 2]) * np.sqrt(2)
-        fft_map[self.N_pix // 2, self.N_pix // 2] = np.real(fft_map[self.N_pix // 2, self.N_pix // 2]) * np.sqrt(2)
-
-        # +ve k_y mirrors -ve conj(k_y) at k_x = 0
-        fft_map[self.N_pix // 2 + 1:, 0] = np.conjugate(fft_map[1:self.N_pix // 2, 0][::-1])
-
-        # +ve k_y mirrors -ve conj(k_y) at k_x = N/2 (Nyquist freq)
-        fft_map[self.N_pix // 2 + 1:, -1] = np.conjugate(fft_map[1:self.N_pix // 2, -1][::-1])
-        return fft_map
-
-    def noiseMap(self, typ, sim):
-        Lmax_data = 5000
-        nT, beam = self.noise.get_noise_args(self.exp)
-        N = self.noise.get_cmb_gaussian_N(typ, nT, beam, Lmax_data, exp=self.exp)
-        Ls = np.arange(np.size(N))
-        N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
-        N_rfft = N_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1])
-        if np.any(N_rfft<0):
-            warnings.warn(f"Negative values in CMB {typ} map noise will be converted to positive values")
-        n_rfft = np.sqrt(np.abs(N_rfft))
-        physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
-        gauss_matrix = self._get_gauss_matrix((2**self.LDres, 2**self.LDres//2+1), typ, sim)
-        Tcmb = 2.7255
-        return np.fft.irfft2(self._enforce_symmetries(n_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
-
-    def gauss_cmbMap(self, typ, sim):
-        Lmax_data = 5000
-        Cl = self.noise.cosmo.get_lens_ps(typ, Lmax_data)
-        Ls = np.arange(np.size(Cl))
-        Cl_spline = InterpolatedUnivariateSpline(Ls[2:], Cl[2:])
-        Cl_rfft = Cl_spline(self.maps.lib_datalm.ell_mat()[:2 ** self.LDres, :2 ** self.LDres // 2 + 1])
-        if np.any(Cl_rfft < 0):
-            warnings.warn(f"Negative values in gaussian lensed CMB {typ} map will be converted to positive values")
-        Cl_sqrt_rfft = np.sqrt(np.abs(Cl_rfft))
-        physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
-        gauss_matrix = self._get_gauss_matrix((2 ** self.LDres, 2 ** self.LDres // 2 + 1), typ, sim, False)
-        Tcmb = 2.7255
-        return np.fft.irfft2(self._enforce_symmetries(Cl_sqrt_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
+            E_noise = self.fields.get_noise_map("EE", True)
+            B_noise = self.fields.get_noise_map("BB", True)
+            Q_noise, U_noise = self.fields.EB_to_QU(E_noise, B_noise)
+            return Qmap + Q_noise, Umap + U_noise
+        return Qmap, Umap
 
     def _get_iblm(self, fields, include_noise, sim, phi_idx, return_data_alms=False, gaussCMB=False):
         if fields == "T":
@@ -320,14 +252,3 @@ class Reconstruction:
         rfft = np.fft.rfft2(map, norm="forward")
         physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))  # Why is this needed?
         return rfft * physical_length
-
-
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    rec = Reconstruction("SO")
-    phi_rec, phi_N0 = rec.get_phi_rec("T")
-    Cl_phi = Cl = rec.isocov.lib_skyalm.alm2cl(phi_rec, phi_rec, ellmax=3000)
-    ell = np.where(Cl != 0.)[0]
-    Cl = Cl[ell]
-    plt.semilogy(ell, ell**4*Cl*1e7/(2*np.pi))
-    plt.show()

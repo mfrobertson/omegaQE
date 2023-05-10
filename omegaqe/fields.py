@@ -7,12 +7,16 @@ import omegaqe.postborn as postborn
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy import stats
 import copy
+from datetime import datetime
+import warnings
+warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
 
 
 class Fields:
 
     def __init__(self, fields, exp, N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None, Nsims=1, sim=0, resp_cls=None):
         # TODO: Lensit has ellM = int(np.around(kM - 1/2))?? So my maps disagree with lensit of small scales...
+        self.exp = exp
         self.N_pix = 2**N_pix_pow
         self.HDres = HDres
         self.kmax_map = self._get_kmax(kmax)                # If HDres is not None then HDres determines kmax_map
@@ -25,7 +29,7 @@ class Fields:
         input_kappa_map = None
         enforce_sym = True
         if setup_cmb_lens_rec:
-            self.rec = Reconstruction(exp, LDres=N_pix_pow, HDres=HDres, nsims=Nsims, resp_cls=resp_cls)
+            self.rec = Reconstruction(self, exp, LDres=N_pix_pow, HDres=HDres, nsims=Nsims, resp_cls=resp_cls)
             self._sim = sim
             input_kappa_map = self._get_lensit_kappa_map(sim=self._sim)
             enforce_sym = False
@@ -94,7 +98,22 @@ class Fields:
                 L_new[:, iii, jjj] = InterpolatedUnivariateSpline(ks_sample, L_ij)(self.k_values)
         return L_new
 
-    def _get_gauss_matrix(self, shape):
+    def _get_seed(self, typ, cmb=False):
+        if typ is None:
+            return int(datetime.now().timestamp())
+        seed = 3 * self._sim
+        if typ == "EE":
+            seed += 1
+        elif typ == "BB":
+            seed += 2
+        if not cmb:
+            return seed
+        return seed + 10000
+
+    def _get_gauss_matrix(self, shape, set_seed=False, typ=None, cmb=False):
+        seed = self._get_seed(typ, cmb)
+        if set_seed:
+            np.random.seed(seed)
         mean = 0
         var = 1 / np.sqrt(2)
         real = np.random.normal(mean, var, shape)
@@ -179,13 +198,86 @@ class Fields:
             N_cib = self.covariance.noise.get_cib_shot_N(353e9, ellmax=kmax)
             N = N_dust+N_cib
             return N
+        nT, beam = self.covariance.noise.get_noise_args(self.exp)
+        return self.covariance.noise.get_cmb_gaussian_N(field, nT, beam, kmax, exp=self.exp)
 
-    def get_noise_map(self, field):
+    def EB_to_QU(self, Emap, Bmap):
+        kx, ky = self.get_kx_ky()
+        phi_k = np.arctan2(ky[..., np.newaxis], kx[np.newaxis, ...])
+        exp_2iphi = np.exp(2j * phi_k)
+        cos = exp_2iphi.real
+        sin = exp_2iphi.imag
+        Qmap = cos * Emap - (sin * Bmap)
+        Umap = sin * Emap + (cos * Bmap)
+        return Qmap, Umap
+
+    # def noiseMap(self, typ, sim):
+    #     Lmax_data = 5000
+    #     nT, beam = self.noise.get_noise_args(self.exp)
+    #     N = self.noise.get_cmb_gaussian_N(typ, nT, beam, Lmax_data, exp=self.exp)
+    #     Ls = np.arange(np.size(N))
+    #     N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
+    #     N_rfft = N_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1])
+    #     if np.any(N_rfft<0):
+    #         warnings.warn(f"Negative values in CMB {typ} map noise will be converted to positive values")
+    #     n_rfft = np.sqrt(np.abs(N_rfft))
+    #     physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
+    #     gauss_matrix = self._get_gauss_matrix((2**self.LDres, 2**self.LDres//2+1), typ, sim)
+    #     Tcmb = 2.7255
+    #     return np.fft.irfft2(self._enforce_symmetries(n_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
+    #
+    # def gauss_cmbMap(self, typ, sim):
+    #     Lmax_data = 5000
+    #     Cl = self.noise.cosmo.get_lens_ps(typ, Lmax_data)
+    #     Ls = np.arange(np.size(Cl))
+    #     Cl_spline = InterpolatedUnivariateSpline(Ls[2:], Cl[2:])
+    #     Cl_rfft = Cl_spline(self.maps.lib_datalm.ell_mat()[:2 ** self.LDres, :2 ** self.LDres // 2 + 1])
+    #     if np.any(Cl_rfft < 0):
+    #         warnings.warn(f"Negative values in gaussian lensed CMB {typ} map will be converted to positive values")
+    #     Cl_sqrt_rfft = np.sqrt(np.abs(Cl_rfft))
+    #     physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
+    #     gauss_matrix = self._get_gauss_matrix((2 ** self.LDres, 2 ** self.LDres // 2 + 1), typ, sim, True)
+    #     Tcmb = 2.7255
+    #     return np.fft.irfft2(self._enforce_symmetries(Cl_sqrt_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
+
+    def get_noise_map(self, field, set_seed=False):
         N = self._get_N(field)
         Ls = np.arange(np.size(N))
         N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
-        gauss_matrix = self._get_gauss_matrix(np.shape(self.kM))
-        return self._enforce_symmetries(np.sqrt(N_spline(self.kM) * (2*np.pi)**2) * gauss_matrix)
+        gauss_matrix = self._get_gauss_matrix(np.shape(self.kM), set_seed=set_seed, typ=field, cmb=False)
+        N_rfft = N_spline(self.kM)
+        if np.any(N_rfft < 0):
+            warnings.warn(f"Negative values in {field} map noise will be converted to positive values")
+        n_rfft = np.sqrt(np.abs(N_rfft))
+        return self._enforce_symmetries(n_rfft * 2*np.pi * gauss_matrix)
+
+    def get_cmb_map(self, field, noise=False, fft=True, muK=False):
+        Cl = self.covariance.noise.cosmo.get_lens_ps(field, self.kmax_map_round)
+        Ls = np.arange(np.size(Cl))
+        Cl_spline = InterpolatedUnivariateSpline(Ls[2:], Cl[2:])
+        gauss_matrix = self._get_gauss_matrix(np.shape(self.kM), set_seed=True, typ=field, cmb=True)
+        Cl_rfft = Cl_spline(self.kM)
+        if np.any(Cl_rfft < 0):
+            warnings.warn(f"Negative values in {field} map will be converted to positive values")
+        Cl_sqrt_rfft = np.sqrt(np.abs(Cl_rfft))
+        cmb_map = self._enforce_symmetries(Cl_sqrt_rfft * 2 * np.pi * gauss_matrix)
+        if noise:
+            cmb_map += self.get_noise_map(field, set_seed=True)
+        if muK:
+            physical_length = np.sqrt(np.prod(self.rec.isocov.lib_skyalm.lsides))
+            Tcmb = 2.7255
+            cmb_map *= Tcmb * 1e6 / physical_length
+        if not fft:
+            return np.fft.irfft2(cmb_map, norm="forward")
+        return cmb_map
+
+    def get_QU_map(self, noise, fft=True, muK=True):
+        Emap_fft = self.get_cmb_map("EE", noise, fft=True, muK=muK)
+        Bmap_fft = self.get_cmb_map("BB", noise, fft=True, muK=muK)
+        Qmap_fft, Umap_fft = self.EB_to_QU(Emap_fft, Bmap_fft)
+        if not fft:
+            return np.fft.irfft2(Qmap_fft, norm="forward"), np.fft.irfft2(Umap_fft, norm="forward")
+        return Qmap_fft, Umap_fft
 
     def get_ps(self, rfft_map1, rfft_map2=None, kmin=1, kmax=None, kM=None):
         kM = self.kM if kM is None else kM
