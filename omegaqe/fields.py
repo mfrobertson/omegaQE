@@ -211,35 +211,6 @@ class Fields:
         Umap = sin * Emap + (cos * Bmap)
         return Qmap, Umap
 
-    # def noiseMap(self, typ, sim):
-    #     Lmax_data = 5000
-    #     nT, beam = self.noise.get_noise_args(self.exp)
-    #     N = self.noise.get_cmb_gaussian_N(typ, nT, beam, Lmax_data, exp=self.exp)
-    #     Ls = np.arange(np.size(N))
-    #     N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
-    #     N_rfft = N_spline(self.maps.lib_datalm.ell_mat()[:2**self.LDres, :2**self.LDres//2+1])
-    #     if np.any(N_rfft<0):
-    #         warnings.warn(f"Negative values in CMB {typ} map noise will be converted to positive values")
-    #     n_rfft = np.sqrt(np.abs(N_rfft))
-    #     physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
-    #     gauss_matrix = self._get_gauss_matrix((2**self.LDres, 2**self.LDres//2+1), typ, sim)
-    #     Tcmb = 2.7255
-    #     return np.fft.irfft2(self._enforce_symmetries(n_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
-    #
-    # def gauss_cmbMap(self, typ, sim):
-    #     Lmax_data = 5000
-    #     Cl = self.noise.cosmo.get_lens_ps(typ, Lmax_data)
-    #     Ls = np.arange(np.size(Cl))
-    #     Cl_spline = InterpolatedUnivariateSpline(Ls[2:], Cl[2:])
-    #     Cl_rfft = Cl_spline(self.maps.lib_datalm.ell_mat()[:2 ** self.LDres, :2 ** self.LDres // 2 + 1])
-    #     if np.any(Cl_rfft < 0):
-    #         warnings.warn(f"Negative values in gaussian lensed CMB {typ} map will be converted to positive values")
-    #     Cl_sqrt_rfft = np.sqrt(np.abs(Cl_rfft))
-    #     physical_length = np.sqrt(np.prod(self.isocov.lib_skyalm.lsides))
-    #     gauss_matrix = self._get_gauss_matrix((2 ** self.LDres, 2 ** self.LDres // 2 + 1), typ, sim, True)
-    #     Tcmb = 2.7255
-    #     return np.fft.irfft2(self._enforce_symmetries(Cl_sqrt_rfft * gauss_matrix), norm="forward") * Tcmb * 1e6 / physical_length
-
     def get_noise_map(self, field, set_seed=False):
         N = self._get_N(field)
         Ls = np.arange(np.size(N))
