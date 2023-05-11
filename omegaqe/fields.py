@@ -98,10 +98,11 @@ class Fields:
                 L_new[:, iii, jjj] = InterpolatedUnivariateSpline(ks_sample, L_ij)(self.k_values)
         return L_new
 
-    def _get_seed(self, typ, cmb=False):
+    def _get_seed(self, typ, cmb=False, sim=None):
         if typ is None:
             return int(datetime.now().timestamp())
-        seed = 3 * self._sim
+        sim = self._sim if sim is None else sim
+        seed = 3 * sim
         if typ == "EE":
             seed += 1
         elif typ == "BB":
@@ -110,8 +111,8 @@ class Fields:
             return seed
         return seed + 10000
 
-    def _get_gauss_matrix(self, shape, set_seed=False, typ=None, cmb=False):
-        seed = self._get_seed(typ, cmb)
+    def _get_gauss_matrix(self, shape, set_seed=False, typ=None, cmb=False, sim=None):
+        seed = self._get_seed(typ, cmb, sim)
         if set_seed:
             np.random.seed(seed)
         mean = 0
@@ -211,11 +212,11 @@ class Fields:
         Umap = sin * Emap + (cos * Bmap)
         return Qmap, Umap
 
-    def get_noise_map(self, field, set_seed=False, fft=True):
+    def get_noise_map(self, field, set_seed=False, fft=True, sim=None):
         N = self._get_N(field)
         Ls = np.arange(np.size(N))
         N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
-        gauss_matrix = self._get_gauss_matrix(np.shape(self.kM), set_seed=set_seed, typ=field, cmb=False)
+        gauss_matrix = self._get_gauss_matrix(np.shape(self.kM), set_seed=set_seed, typ=field, cmb=False, sim=sim)
         N_rfft = N_spline(self.kM)
         if np.any(N_rfft < 0):
             warnings.warn(f"Negative values in {field} map noise will be converted to positive values")
@@ -225,11 +226,11 @@ class Fields:
             return np.fft.irfft2(noise_map, norm="forward")
         return noise_map
 
-    def get_cmb_map(self, field, noise=False, fft=True, muK=False):
+    def get_cmb_map(self, field, noise=False, fft=True, muK=False, sim=None):
         Cl = self.covariance.noise.cosmo.get_lens_ps(field, self.kmax_map_round)
         Ls = np.arange(np.size(Cl))
         Cl_spline = InterpolatedUnivariateSpline(Ls[2:], Cl[2:])
-        gauss_matrix = self._get_gauss_matrix(np.shape(self.kM), set_seed=True, typ=field, cmb=True)
+        gauss_matrix = self._get_gauss_matrix(np.shape(self.kM), set_seed=True, typ=field, cmb=True, sim=sim)
         Cl_rfft = Cl_spline(self.kM)
         if np.any(Cl_rfft < 0):
             warnings.warn(f"Negative values in {field} map will be converted to positive values")
