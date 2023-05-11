@@ -211,7 +211,7 @@ class Fields:
         Umap = sin * Emap + (cos * Bmap)
         return Qmap, Umap
 
-    def get_noise_map(self, field, set_seed=False):
+    def get_noise_map(self, field, set_seed=False, fft=True):
         N = self._get_N(field)
         Ls = np.arange(np.size(N))
         N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
@@ -220,7 +220,10 @@ class Fields:
         if np.any(N_rfft < 0):
             warnings.warn(f"Negative values in {field} map noise will be converted to positive values")
         n_rfft = np.sqrt(np.abs(N_rfft))
-        return self._enforce_symmetries(n_rfft * 2*np.pi * gauss_matrix)
+        noise_map = self._enforce_symmetries(n_rfft * 2*np.pi * gauss_matrix)
+        if not fft:
+            return np.fft.irfft2(noise_map, norm="forward")
+        return noise_map
 
     def get_cmb_map(self, field, noise=False, fft=True, muK=False):
         Cl = self.covariance.noise.cosmo.get_lens_ps(field, self.kmax_map_round)
