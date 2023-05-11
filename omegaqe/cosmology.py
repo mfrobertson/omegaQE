@@ -1,4 +1,5 @@
 import camb
+import omegaqe
 from camb import postborn
 import numpy as np
 import os
@@ -12,13 +13,13 @@ class Cosmology:
     Container for useful cosmological functionality. All CAMB functionality is initialised with parameters from Lensit.
     """
 
-    def __init__(self):
+    def __init__(self, paramfile='Lensit_fiducial_flatsky_params.ini'):
         """
         Constructor.
         """
         dir_current = os.path.dirname(os.path.realpath(__file__))
         sep = tools.getFileSep()
-        self._pars = camb.read_ini(rf"{dir_current}{sep}data{sep}Lensit_fiducial_flatsky_params.ini")
+        self._pars = camb.read_ini(rf"{omegaqe.DATA_DIR}{sep}CAMB{sep}{paramfile}")
         # self._results = camb.get_background(self._pars)
         self._results = camb.get_results(self._pars)
         self.cib_norms = None
