@@ -2,7 +2,6 @@ import camb
 import omegaqe
 from camb import postborn
 import numpy as np
-import os
 from scipy.constants import Planck, physical_constants
 import omegaqe.tools as tools
 from omegaqe.tools import maths
@@ -17,10 +16,8 @@ class Cosmology:
         """
         Constructor.
         """
-        dir_current = os.path.dirname(os.path.realpath(__file__))
         sep = tools.getFileSep()
-        self._pars = camb.read_ini(rf"{omegaqe.DATA_DIR}{sep}CAMB{sep}{paramfile}")
-        # self._results = camb.get_background(self._pars)
+        self._pars = camb.CAMBparams() if paramfile is None else camb.read_ini(rf"{omegaqe.DATA_DIR}{sep}CAMB{sep}{paramfile}")
         self._results = camb.get_results(self._pars)
         self.cib_norms = None
 
