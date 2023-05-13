@@ -236,7 +236,7 @@ class Reconstruction:
     def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=True, diffSim_offset=1):
         # qe_func = self._QE_iter if iter_rec else self._QE
         qe_func = self._QE
-        self.phi = qe_func(fields, 0, include_noise, sim, phi_idx, gaussCMB=gaussCMB, diffSims=True, diffSim_offset=1)
+        self.phi = qe_func(fields, 0, include_noise, sim, phi_idx, gaussCMB, diffSims, diffSim_offset)
         if return_map:
             return self._get_rfft_map(self.phi)
         return self.phi
@@ -244,7 +244,7 @@ class Reconstruction:
     def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=True, diffSim_offset=1):
         # qe_func = self._QE_iter if iter_rec else self._QE
         qe_func = self._QE
-        self.curl = qe_func(fields, 1, include_noise, sim, phi_idx, gaussCMB=gaussCMB, diffSims=True, diffSim_offset=1)
+        self.curl = qe_func(fields, 1, include_noise, sim, phi_idx, gaussCMB, diffSims, diffSim_offset)
         if return_map:
             return self._get_rfft_map(self.curl)
         return self.curl
