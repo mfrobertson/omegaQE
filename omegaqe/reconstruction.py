@@ -219,26 +219,32 @@ class Reconstruction:
             return self._renorm(alm, idx, sim, phi_idx)
         return alm
 
-    def _QE(self, fields, idx, include_noise, sim, phi_idx, gaussCMB):
-        estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
-        alm_no_norm = 0.5 * self.isocov.get_qlms(estimator, iblm, self.isocov.lib_skyalm, use_cls_len=True, resp_cls=self.resp_cls)[idx]
+    def _QE(self, fields, idx, include_noise, sim, phi_idx, gaussCMB, diffSims, diffSim_offset):
+        if diffSims:
+            estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
+            estimator, iblm2 = self._get_iblm(fields, include_noise, sim + diffSim_offset, phi_idx, gaussCMB=gaussCMB)
+            alm_no_norm = 0.5 * self.isocov.get_qlms(estimator, iblm, self.isocov.lib_skyalm, use_cls_len=True, resp_cls=self.resp_cls, iblms2=iblm2)[idx]
+            alm_no_norm += 0.5 * self.isocov.get_qlms(estimator, iblm2, self.isocov.lib_skyalm, use_cls_len=True, resp_cls=self.resp_cls, iblms2=iblm)[idx]
+        else:
+            estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
+            alm_no_norm = 0.5 * self.isocov.get_qlms(estimator, iblm, self.isocov.lib_skyalm, use_cls_len=True, resp_cls=self.resp_cls)[idx]
         f = self.isocov.get_response(estimator, self.isocov.lib_skyalm, cls_weights=self.resp_cls, cls_cmb=self.resp_cls)[idx]
         f_inv = self._inverse_nonzero(f)
         alm_norm = self.isocov.lib_skyalm.almxfl(alm_no_norm, f_inv)
         return alm_norm
 
-    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False):
+    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=True, diffSim_offset=1):
         # qe_func = self._QE_iter if iter_rec else self._QE
         qe_func = self._QE
-        self.phi = qe_func(fields, 0, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
+        self.phi = qe_func(fields, 0, include_noise, sim, phi_idx, gaussCMB=gaussCMB, diffSims=True, diffSim_offset=1)
         if return_map:
             return self._get_rfft_map(self.phi)
         return self.phi
 
-    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False):
+    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=True, diffSim_offset=1):
         # qe_func = self._QE_iter if iter_rec else self._QE
         qe_func = self._QE
-        self.curl = qe_func(fields, 1, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
+        self.curl = qe_func(fields, 1, include_noise, sim, phi_idx, gaussCMB=gaussCMB, diffSims=True, diffSim_offset=1)
         if return_map:
             return self._get_rfft_map(self.curl)
         return self.curl
