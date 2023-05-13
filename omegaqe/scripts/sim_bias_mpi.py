@@ -66,7 +66,7 @@ def _qe_typ(fields, gmv):
     raise ValueError(f"fields: {fields} and gmv: {gmv} combination not yet supported.")
 
 
-def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, gauss_cmb, out_dir, _id):
+def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, gauss_cmb, diffMaps, out_dir, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -82,7 +82,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
 
     _output("-------------------------------------", my_rank, _id)
     _output(f"Node: {socket.gethostname()}", my_rank, _id, use_rank=True)
-    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}, kappa_rec: {use_kappa_rec}, include_noise: {include_noise}, gauss_cmb: {gauss_cmb}", my_rank, _id)
+    _output(f"exp:{exp}, tracers:{typ}, LDres: {LDres}, HDres: {HDres}, fields:{maps}, gmv:{gmv}, Nsims: {Nsims}, kappa_rec: {use_kappa_rec}, include_noise: {include_noise}, gauss_cmb: {gauss_cmb}, diffMaps: {diffMaps}", my_rank, _id)
     nu = 353e9
 
     _output("    Preparing grad Cls...", my_rank, _id)
@@ -148,13 +148,13 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
         _output("Starting sim bias calculation..."+ f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_rec = field_obj.get_omega_rec(qe_typ, include_noise=include_noise, gaussCMB=gauss_cmb)
+        omega_rec = field_obj.get_omega_rec(qe_typ, include_noise=include_noise, gaussCMB=gauss_cmb, diffSims=diffMaps, diffSim_offset=Nsims)
         end_time = MPI.Wtime()
         _output("Lensing reconstruction time: " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
-        if not gauss_cmb:
+        if not gauss_cmb and not diffMaps:
             start_time = MPI.Wtime()
-            omega_rec_dp = field_obj.get_omega_rec(qe_typ, include_noise=include_noise, phi_idx=int(sim + Nsims), gaussCMB=gauss_cmb)
+            omega_rec_dp = field_obj.get_omega_rec(qe_typ, include_noise=include_noise, phi_idx=int(sim + Nsims))
             end_time = MPI.Wtime()
             _output("Lensing reconstruction time (different phi): " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
@@ -166,7 +166,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
         _output(f"Calculating cross-spectrum ({sim})", my_rank, _id, use_rank=True)
         Ls, ps_tmp = field_obj.get_ps(omega_rec, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
 
-        if not gauss_cmb:
+        if not gauss_cmb and not diffMaps:
             _output(f"Calculating cross-spectrum ({sim}) (different phi)", my_rank, _id, use_rank=True)
             Ls, ps_tmp_dp = field_obj.get_ps(omega_rec_dp, omega_temp, kmin=Lmin_cut, kmax=Lmax_cut)
 
@@ -175,7 +175,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
         if ps_arr_dp is None:
             ps_arr_dp = np.zeros((my_end - my_start, np.size(ps_tmp)))
         ps_arr[iii] = ps_tmp
-        if not gauss_cmb:
+        if not gauss_cmb and not diffMaps:
             ps_arr_dp[iii] = ps_tmp_dp
 
     _output("Broadcasting results...", my_rank, _id)
@@ -221,8 +221,8 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 14:
-        raise ValueError("Arguments should be exp typ LDres HDres fields gmv Nsims Lmin_cut Lmax_cut kappa_rec include_noise gauss_cmb out_dir _id")
+    if len(args) != 15:
+        raise ValueError("Arguments should be exp typ LDres HDres fields gmv Nsims Lmin_cut Lmax_cut kappa_rec include_noise gauss_cmb diffMaps out_dir _id")
     exp = str(args[0])
     typ = str(args[1])
     LDres = int(args[2])
@@ -235,6 +235,7 @@ if __name__ == '__main__':
     use_kappa_rec = parse_boolean(args[9])
     include_noise = parse_boolean(args[10])
     gauss_cmb = parse_boolean(args[11])
-    out_dir = str(args[12])
-    _id = str(args[13])
-    _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, gauss_cmb, out_dir, _id)
+    diffMaps = parse_boolean(args[12])
+    out_dir = str(args[13])
+    _id = str(args[14])
+    _main(exp, typ, LDres, HDres, fields, gmv, Nsims, Lmin_cut, Lmax_cut, use_kappa_rec, include_noise, gauss_cmb, diffMaps, out_dir, _id)

@@ -289,16 +289,16 @@ class Fields:
         errors = stds / np.sqrt(counts)
         return means, kBins, errors
 
-    def get_omega_rec(self, cmb_fields="T", include_noise=True, phi_idx=None, iter_rec=False, gaussCMB=False):
+    def get_omega_rec(self, cmb_fields="T", include_noise=True, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=False, diffSim_offset=1):
         if self.rec is None:
             raise ValueError(f"CMB lensing reconstruction not setup for this Fields instance.")
-        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx, iter_rec=iter_rec, gaussCMB=gaussCMB)
+        curl_map = 2 * np.pi * self.rec.get_curl_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx, iter_rec=iter_rec, gaussCMB=gaussCMB, diffSims=diffSims, diffSim_offset=diffSim_offset)
         return curl_map * self.kM **2 / 2
 
-    def get_kappa_rec(self, cmb_fields="T", include_noise=True, phi_idx=None, iter_rec=False, gaussCMB=False):
+    def get_kappa_rec(self, cmb_fields="T", include_noise=True, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=False, diffSim_offset=1):
         if self.rec is None:
             raise ValueError(f"CMB lensing reconstruction not setup for this Fields instance.")
-        kappa_map = 2 * np.pi * self.rec.get_phi_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx, iter_rec=iter_rec, gaussCMB=gaussCMB)
+        kappa_map = 2 * np.pi * self.rec.get_phi_rec(cmb_fields, return_map=True, include_noise=include_noise, sim=self._sim, phi_idx=phi_idx, iter_rec=iter_rec, gaussCMB=gaussCMB, diffSims=diffSims, diffSim_offset=diffSim_offset)
         return kappa_map * self.kM **2 / 2
 
     def get_omega_fiducial(self):
