@@ -159,7 +159,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
             _output("Lensing reconstruction time (different phi): " + str(end_time - start_time) + f" ({sim})", my_rank, _id, use_rank=True)
 
         start_time = MPI.Wtime()
-        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True, use_kappa_rec=use_kappa_rec, tracer_noise=include_noise, gaussCMB=gauss_cmb)
+        omega_temp = field_obj.get_omega_template(Nchi=100, F_L_spline=F_L_spline, C_inv_spline=C_inv_splines, reinitialise=True, use_kappa_rec=use_kappa_rec, tracer_noise=include_noise, gaussCMB=gauss_cmb, diffMaps=diffMaps, diffMaps_offset=Nsims)
         end_time = MPI.Wtime()
         _output("Template construction time: " + str(end_time - start_time)+ f" ({sim})", my_rank, _id, use_rank=True)
 
@@ -184,7 +184,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
         ps_all = np.zeros((Nsims, np.size(ps_arr[0])))
         ps_all[my_start:my_end] = ps_arr
 
-        if not gauss_cmb:
+        if not gauss_cmb and not diffMaps:
             ps_all_dp = np.zeros((Nsims, np.size(ps_arr_dp[0])))
             ps_all_dp[my_start:my_end] = ps_arr_dp
         for rank in range(1, world_size):
@@ -193,7 +193,7 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
             world_comm.Recv([ps_tmp, MPI.DOUBLE], source=rank, tag=77)
             ps_all[start:end] = ps_tmp
 
-            if not gauss_cmb:
+            if not gauss_cmb and not diffMaps:
                 ps_tmp_dp = np.empty((end - start, np.size(ps_all[0])))
                 world_comm.Recv([ps_tmp_dp, MPI.DOUBLE], source=rank, tag=77)
                 ps_all_dp[start:end] = ps_tmp_dp
@@ -203,19 +203,21 @@ def _main(exp, typ, LDres, HDres, maps, gmv, Nsims, Lmin_cut, Lmax_cut, use_kapp
             kappa_rec_str += "_wN"
         if gauss_cmb:
             kappa_rec_str += "_gaussCMB"
+        if diffMaps:
+            kappa_rec_str += "_diffMaps"
         out_dir += f"/{typ}/{exp}/{gmv_str}/{maps}/{LDres}_{HDres}/{Lmin_cut}_{Lmax_cut}/{Nsims}/{kappa_rec_str}/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
         np.save(out_dir+"/Ls", Ls)
         np.save(out_dir+"/ps", ps_all)
-        if not gauss_cmb:
+        if not gauss_cmb and not diffMaps:
             np.save(out_dir + "/ps_dp", ps_all_dp)
         end_time_tot = MPI.Wtime()
         print("Total time: " + str(end_time_tot - start_time_tot))
         _output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
     else:
         world_comm.Send([ps_arr, MPI.DOUBLE], dest=0, tag=77)
-        if not gauss_cmb:
+        if not gauss_cmb and not diffMaps:
             world_comm.Send([ps_arr_dp, MPI.DOUBLE], dest=0, tag=77)
 
 
