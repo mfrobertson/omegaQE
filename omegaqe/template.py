@@ -5,7 +5,7 @@ import datetime
 
 class Template:
 
-    def __init__(self, fields, Lmin=30, Lmax=3000, F_L_spline=None, C_inv_spline=None, tracer_noise=False, use_kappa_rec=False, gaussCMB=False):
+    def __init__(self, fields, Lmin=30, Lmax=3000, F_L_spline=None, C_inv_spline=None, tracer_noise=False, use_kappa_rec=False, gaussCMB=False, diffCMBs=False, diffCMBs_offset=1):
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
@@ -20,7 +20,7 @@ class Template:
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
         self.a_bars = dict.fromkeys(self.fields.fields)
         self.use_kappa_rec = use_kappa_rec
-        self.kappa_rec = self.fields.get_kappa_rec("TEB", include_noise=tracer_noise, phi_idx=None, iter_rec=False, gaussCMB=gaussCMB) if use_kappa_rec else None
+        self.kappa_rec = self.fields.get_kappa_rec("TEB", include_noise=tracer_noise, phi_idx=None, iter_rec=False, gaussCMB=gaussCMB, diffSims=diffCMBs, diffSim_offset=diffCMBs_offset) if use_kappa_rec else None
         self._populate_a_bars(tracer_noise)
 
     def _get_fft_maps(self, field, include_noise):
