@@ -1,7 +1,6 @@
 import lenspyx
 from lenspyx.utils_hp import synalm, almxfl
 from omegaqe.powerspectra import Powerspectra
-from omegaqe.cosmology import Cosmology
 from omegaqe.tools import getFileSep
 from demnunii import Demnunii
 from scipy.interpolate import InterpolatedUnivariateSpline
@@ -11,9 +10,8 @@ import sys
 import os
 
 power = Powerspectra()
-cosmo = Cosmology("DEMNUnii_params.ini")
-power.cosmo = cosmo
 demnunii = Demnunii()
+power.cosmo = demnunii.cosmo
 sep = getFileSep()
 
 
@@ -41,7 +39,7 @@ def get_deflection_fields_lenspyx(lmax, omega_acc=4):
     Cl_phi[1:] = power.get_phi_ps(ells)
     plm = synalm(Cl_phi, lmax=lmax, mmax=lmax)
 
-    ells_omega, omega_ps = cosmo.get_postborn_omega_ps(acc=omega_acc)
+    ells_omega, omega_ps = demnunii.cosmo.get_postborn_omega_ps(acc=omega_acc)
     Cl_omega = np.zeros(np.size(ells) + 1)
     Cl_omega[1:] = InterpolatedUnivariateSpline(ells_omega, omega_ps)(ells)
     olm = synalm(Cl_omega, lmax=lmax, mmax=lmax)
@@ -57,22 +55,12 @@ def get_deflection_fields_lenspyx(lmax, omega_acc=4):
 
 def get_unlensed_cmb_ps():
     Tcmb = 2.7255
-    Cl_TT_unl = cosmo.get_unlens_ps("TT") * (Tcmb * 1e6) ** 2
-    Cl_EE_unl = cosmo.get_unlens_ps("EE") * (Tcmb * 1e6) ** 2
-    Cl_BB_unl = cosmo.get_unlens_ps("BB") * (Tcmb * 1e6) ** 2
-    return Cl_TT_unl, Cl_EE_unl, Cl_BB_unl
+    indices = ["TT", "EE", "BB"]
+    return [demnunii.cosmo.get_unlens_ps(idx) * (Tcmb * 1e6) ** 2 for idx in indices]
 
 
 def get_unlensed_alms(lmax, unl_cmb_spectra):
-    Cl_TT_unl = unl_cmb_spectra[0]
-    Cl_EE_unl = unl_cmb_spectra[1]
-    Cl_BB_unl = unl_cmb_spectra[2]
-
-    tlm_unl = synalm(Cl_TT_unl, lmax=lmax, mmax=lmax)
-    elm_unl = synalm(Cl_EE_unl, lmax=lmax, mmax=lmax)
-    blm_unl = synalm(Cl_BB_unl, lmax=lmax, mmax=lmax)
-
-    return tlm_unl, elm_unl, blm_unl
+    return [synalm(unl_cmb_spectra[iii], lmax=lmax, mmax=lmax) for iii in np.arange(np.size(unl_cmb_spectra))]
 
 
 def get_lensed_maps(dlm, unl_alms, nthreads):
@@ -80,8 +68,7 @@ def get_lensed_maps(dlm, unl_alms, nthreads):
     Elm_unl = unl_alms[1]
     Blm_unl = unl_alms[2]
     geom_info = ('healpix', {'nside': demnunii.nside})
-    Tlen, Qlen, Ulen = lenspyx.alm2lenmap([Tlm_unl, Elm_unl, Blm_unl], dlm, geometry=geom_info, verbose=1, epsilon=1e-6, nthreads=nthreads)
-    return Tlen, Qlen, Ulen
+    return lenspyx.alm2lenmap([Tlm_unl, Elm_unl, Blm_unl], dlm, geometry=geom_info, verbose=1, epsilon=1e-6, nthreads=nthreads)
 
 
 def get_unlensed_Tmap(unl_alms, lmax, nthreads):
@@ -108,8 +95,7 @@ def main(lmax, nsims, nthreads, loc):
     dlm_dem = np.array([glm, clm])
     glm, clm = get_deflection_fields_lenspyx(lmax)
     dlm_diff_alpha = np.array([glm, clm])
-    Cl_TT_unl, Cl_EE_unl, Cl_BB_unl = get_unlensed_cmb_ps()
-    unl_cmb_spectra = np.array([Cl_TT_unl, Cl_EE_unl, Cl_BB_unl])
+    unl_cmb_spectra = np.array(get_unlensed_cmb_ps())
     for sim in range(nsims):
         unl_alms = get_unlensed_alms(lmax, unl_cmb_spectra)
         len_maps_dem = get_lensed_maps(dlm_dem, unl_alms, nthreads)
