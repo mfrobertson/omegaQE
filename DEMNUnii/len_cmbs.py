@@ -4,6 +4,7 @@ from omegaqe.powerspectra import Powerspectra
 from omegaqe.tools import getFileSep
 from demnunii import Demnunii
 from scipy.interpolate import InterpolatedUnivariateSpline
+from plancklens.sims import cmbs, phas
 import healpy as hp
 import numpy as np
 import sys
@@ -13,6 +14,9 @@ power = Powerspectra()
 demnunii = Demnunii()
 power.cosmo = demnunii.cosmo
 sep = getFileSep()
+
+if not 'PLENS' in os.environ.keys():
+    os.environ['PLENS'] = '_tmp'
 
 
 def get_deflection_fields_demnunii(lmax):
@@ -55,12 +59,16 @@ def get_deflection_fields_lenspyx(lmax, omega_acc=4):
 
 def get_unlensed_cmb_ps():
     Tcmb = 2.7255
-    indices = ["TT", "EE", "BB"]
-    return [demnunii.cosmo.get_unlens_ps(idx) * (Tcmb * 1e6) ** 2 for idx in indices]
+    indices = ["TT", "EE", "BB", "TE"]
+    return {idx.lower(): demnunii.cosmo.get_unlens_ps(idx) * (Tcmb * 1e6) ** 2 for idx in indices}
 
 
 def get_unlensed_alms(lmax, unl_cmb_spectra):
-    return [synalm(unl_cmb_spectra[iii], lmax=lmax, mmax=lmax) for iii in np.arange(np.size(unl_cmb_spectra))]
+    print("new_unl_alms")
+    lib_pha = phas.lib_phas(os.path.join(os.environ['PLENS'], 'len_cmbs', 'phas'), 3, lmax)
+    print(unl_cmb_spectra.keys())
+    unl_lib = cmbs.sims_cmb_unl(unl_cmb_spectra, lib_pha)
+    return unl_lib.get_sim_tlm(0), unl_lib.get_sim_elm(0), unl_lib.get_sim_blm(0)
 
 
 def get_lensed_maps(dlm, unl_alms, nthreads):
@@ -95,7 +103,7 @@ def main(lmax, nsims, nthreads, loc):
     dlm_dem = np.array([glm, clm])
     glm, clm = get_deflection_fields_lenspyx(lmax)
     dlm_diff_alpha = np.array([glm, clm])
-    unl_cmb_spectra = np.array(get_unlensed_cmb_ps())
+    unl_cmb_spectra = get_unlensed_cmb_ps()
     for sim in range(nsims):
         unl_alms = get_unlensed_alms(lmax, unl_cmb_spectra)
         len_maps_dem = get_lensed_maps(dlm_dem, unl_alms, nthreads)
