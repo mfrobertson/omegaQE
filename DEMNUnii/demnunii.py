@@ -93,7 +93,7 @@ class Demnunii:
 
     def _window_LSST(self, z):
         z0 = 0.311
-        return 1 / (2 * z0) * (z / z0) ** 2 * np.exp(-z / z0) * self.cosmo.get_hubble(z) * self._bias(z, "LSST")
+        return 1 / (2 * z0) * (z / z0) ** 2 * np.exp(-z / z0)
 
     def _window(self, snap, typ):
         zmin = self._get_zmin(snap)
@@ -101,7 +101,7 @@ class Demnunii:
         if typ == "LSST":
             zs = np.linspace(zmin, zmax, 1000)
             dz = zs[1] - zs[0]
-            return np.sum(self._window_LSST(zs)) * dz
+            return np.sum(self._window_LSST(zs) * self._bias(zs, "LSST")) * dz
 
     def _get_Ng(self, zmin=0, zmax=1100, window="LSST"):
         zs = np.linspace(zmin, zmax, 1000)
@@ -110,16 +110,12 @@ class Demnunii:
             return np.sum(self._window_LSST(zs)) * dz
 
     def get_obs_gal_map(self, zmin=0, zmax=1100, window="LSST", chi_min=None, chi_max=None, use_chi=False):
-        pixel_area = hp.pixelfunc.nside2pixarea(self.nside)
         npix = hp.nside2npix(self.nside)
-        particle_mass = self.get_particle_mass()
         gal = np.zeros(npix)
         snaps = self.get_snaps_chi(chi_min, chi_max) if use_chi else self.get_snaps_z(zmin, zmax)
         for snap in snaps:
-            snap_map = self.get_snap(snap)
-            gal += self._get_dChi(snap) * self._window(snap, window) * snap_map/np.sum(snap_map) * particle_mass / pixel_area
-        gal_bar = np.mean(gal)
-        return gal / gal_bar - 1
+            gal += self._window(snap, window) * self.get_density_snap(snap)
+        return gal
 
     def get_density_distro(self):
         snaps = self.get_snaps_z(0, 1100)
