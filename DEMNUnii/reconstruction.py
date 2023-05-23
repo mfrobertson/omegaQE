@@ -50,17 +50,28 @@ class Reconstruction:
         def hashdict(self):
             return {'cmbs': self.maps_filename, 'noise': self.maps_filename, 'data': self.maps_filename}
 
-    def __init__(self, exp, lmin=30, lmax_T=3000):
+    def __init__(self, exp, L_cuts=(30, 3000, 30, 5000)):
         self.setup_env()
         self.temp = os.path.join(os.environ['PLENS'], 'temp', 'idealized_example')
         self.exp = exp
         self.dm = Demnunii()
         self.noise = Noise()
-        self.lmin = lmin
-        self.lmax_T = lmax_T
-        self.lmax_map = 5000
+        self.L_cuts = L_cuts
+        self.lmax_map = 6000
         self.cl_len, self.cl_grad = self.get_cmb_cls()
         self.noise_cls = self.get_noise_cls(exp)
+
+    def _get_Lmin(self, typ):
+        if typ == "t":
+            return self.L_cuts[0]
+        if typ == "e" or typ == "b":
+            return self.L_cuts[2]
+
+    def _get_Lmax(self, typ):
+        if typ == "t":
+            return self.L_cuts[1]
+        if typ == "e" or typ == "b":
+            return self.L_cuts[3]
 
     def setup_env(self):
         if not 'PLENS' in os.environ.keys():
@@ -80,15 +91,16 @@ class Reconstruction:
         fac = (Tcmb * 1e6) ** 2
         return {idx[0]: self.noise.get_cmb_gaussian_N(idx.upper(), None, None, ellmax=self.lmax_map, exp=exp) * fac for idx in indices}
 
+    def _apply_cuts(self, filts, indices):
+        for iii, filt in enumerate(filts):
+            filt[:self._get_Lmin(indices[iii])] *= 0.
+            filt[self._get_Lmax(indices[iii]) + 1:] *= 0.
+        return filts
+
     def get_filters(self, indices, noise_cls=None):
         filts = [(utils.cli(self.cl_len[idx][:self.lmax_map + 1] + noise_cls[idx[0]][:self.lmax_map + 1])) if noise_cls is not None else
                 utils.cli(self.cl_len[idx][:self.lmax_map + 1]) for idx in indices]
-        for filt in filts:
-            filt[:self.lmin] *= 0.
-        # Tmap has conservative cuts
-        filts[0][self.lmax_T + 1:] *= 0.
-        return filts
-
+        return self._apply_cuts(filts, indices)
 
     def _raise_typ_error(self, typ):
         raise ValueError(f"QE type {typ} not recognized. Recognized types included mv and t")
@@ -99,7 +111,6 @@ class Reconstruction:
         if typ == "t":
             return ['tt']
         self._raise_typ_error(typ)
-
 
     def _get_qe_key(self, typ):
         if typ == "mv":

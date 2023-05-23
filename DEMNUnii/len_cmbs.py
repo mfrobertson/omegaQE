@@ -15,6 +15,8 @@ demnunii = Demnunii()
 power.cosmo = demnunii.cosmo
 sep = getFileSep()
 
+LMAX_MAP = 6000
+
 if not 'PLENS' in os.environ.keys():
     os.environ['PLENS'] = '_tmp'
 
@@ -57,10 +59,10 @@ def get_deflection_fields_lenspyx(lmax, omega_acc=4):
     return glm, clm
 
 
-def get_unlensed_cmb_ps():
+def get_unlensed_cmb_ps(lmax):
     Tcmb = 2.7255
     indices = ["TT", "EE", "BB", "TE"]
-    return {idx.lower(): demnunii.cosmo.get_unlens_ps(idx) * (Tcmb * 1e6) ** 2 for idx in indices}
+    return {idx.lower(): demnunii.cosmo.get_unlens_ps(idx, ellmax=lmax)[:lmax + 1] * (Tcmb * 1e6) ** 2 for idx in indices}
 
 
 def get_unlensed_alms(lmax, unl_cmb_spectra):
@@ -76,7 +78,7 @@ def get_lensed_maps(dlm, unl_alms, nthreads):
     Elm_unl = unl_alms[1]
     Blm_unl = unl_alms[2]
     geom_info = ('healpix', {'nside': demnunii.nside})
-    return lenspyx.alm2lenmap([Tlm_unl, Elm_unl, Blm_unl], dlm, geometry=geom_info, verbose=1, epsilon=1e-6, nthreads=nthreads)
+    return lenspyx.alm2lenmap([Tlm_unl, Elm_unl, Blm_unl], dlm, geometry=geom_info, verbose=1, epsilon=1e-10, nthreads=nthreads)
 
 
 def get_unlensed_Tmap(unl_alms, lmax, nthreads):
@@ -98,28 +100,28 @@ def save_Tunl(loc, Tmap, sim):
     hp.fitsfunc.write_map(f"{directory}{sep}T_{sim}.fits", Tmap)
 
 
-def main(lmax, nsims, nthreads, loc):
-    glm, clm = get_deflection_fields_demnunii(lmax)
+def main(nsims, nthreads, loc):
+    lmax_map=LMAX_MAP
+    glm, clm = get_deflection_fields_demnunii(lmax_map)
     dlm_dem = np.array([glm, clm])
-    glm, clm = get_deflection_fields_lenspyx(lmax)
+    glm, clm = get_deflection_fields_lenspyx(lmax_map)
     dlm_diff_alpha = np.array([glm, clm])
-    unl_cmb_spectra = get_unlensed_cmb_ps()
+    unl_cmb_spectra = get_unlensed_cmb_ps(lmax_map)
     for sim in range(nsims):
-        unl_alms = get_unlensed_alms(lmax, unl_cmb_spectra)
+        unl_alms = get_unlensed_alms(lmax_map, unl_cmb_spectra)
         len_maps_dem = get_lensed_maps(dlm_dem, unl_alms, nthreads)
         save_lens_maps(f"{loc}{sep}demnunii", len_maps_dem, sim)
         len_maps_diff_phi = get_lensed_maps(dlm_diff_alpha, unl_alms, nthreads)
         save_lens_maps(f"{loc}{sep}diff_alpha", len_maps_diff_phi, sim)
-        save_Tunl(f"{loc}{sep}T_unl", get_unlensed_Tmap(unl_alms, lmax, nthreads), sim)
+        save_Tunl(f"{loc}{sep}T_unl", get_unlensed_Tmap(unl_alms, lmax_map, nthreads), sim)
 
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 4:
+    if len(args) !=3:
         raise ValueError(
-            "Arguments should be lmax nsims nthreads loc")
-    lmax = int(args[0])
-    nsims = int(args[1])
-    nthreads = int(args[2])
-    loc = str(args[3])
-    main(lmax, nsims, nthreads, loc)
+            "Arguments should be nsims nthreads loc")
+    nsims = int(args[0])
+    nthreads = int(args[1])
+    loc = str(args[2])
+    main(nsims, nthreads, loc)
