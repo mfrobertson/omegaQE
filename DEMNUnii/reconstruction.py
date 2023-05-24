@@ -61,16 +61,19 @@ class Reconstruction:
         self.cl_len, self.cl_grad = self.get_cmb_cls()
         self.noise_cls = self.get_noise_cls(exp)
 
+    def get_Lmax_filt(self):
+        return np.max(self.L_cuts)
+
     def _get_Lmin(self, typ):
-        if typ == "t":
+        if typ == "tt":
             return self.L_cuts[0]
-        if typ == "e" or typ == "b":
+        if typ == "ee" or typ == "bb":
             return self.L_cuts[2]
 
     def _get_Lmax(self, typ):
-        if typ == "t":
+        if typ == "tt":
             return self.L_cuts[1]
-        if typ == "e" or typ == "b":
+        if typ == "ee" or typ == "bb":
             return self.L_cuts[3]
 
     def setup_env(self):
@@ -94,23 +97,19 @@ class Reconstruction:
     def _apply_cuts(self, filts, indices):
         for iii, filt in enumerate(filts):
             filt[:self._get_Lmin(indices[iii])] *= 0.
-            filt[self._get_Lmax(indices[iii]) + 1:] *= 0.
+            Lmax = self._get_Lmax(indices[iii])
+            if np.size(filt) > Lmax:
+                filt[Lmax + 1:] *= 0.
         return filts
 
     def get_filters(self, indices, noise_cls=None):
-        filts = [(utils.cli(self.cl_len[idx][:self.lmax_map + 1] + noise_cls[idx[0]][:self.lmax_map + 1])) if noise_cls is not None else
-                utils.cli(self.cl_len[idx][:self.lmax_map + 1]) for idx in indices]
+        Lmax_filt = self.get_Lmax_filt()
+        filts = [(utils.cli(self.cl_len[idx][:Lmax_filt + 1] + noise_cls[idx[0]][:Lmax_filt + 1])) if noise_cls is not None else
+                utils.cli(self.cl_len[idx][:Lmax_filt + 1]) for idx in indices]
         return self._apply_cuts(filts, indices)
 
     def _raise_typ_error(self, typ):
         raise ValueError(f"QE type {typ} not recognized. Recognized types included mv and t")
-
-    def _get_indices(self, typ):
-        if typ == "mv":
-            return ['tt', 'ee', 'bb']
-        if typ == "t":
-            return ['tt']
-        self._raise_typ_error(typ)
 
     def _get_qe_key(self, typ):
         if typ == "mv":
