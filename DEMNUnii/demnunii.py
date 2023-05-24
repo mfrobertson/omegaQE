@@ -85,29 +85,21 @@ class Demnunii:
     def _get_dChi(self, snap):
         return np.asarray(self.snap_df["8:dx"][self.snap_df["#1:output"] == snap])[0]
 
-    def _bias(self, z, typ="unity"):
-        if typ == "unity":
-            return 1
-        if typ == "LSST":
-            return 1 + (0.84 * z)
-
     def _window_LSST(self, z):
-        z0 = 0.311
-        return 1 / (2 * z0) * (z / z0) ** 2 * np.exp(-z / z0)
+        return self.cosmo.gal_window_z(z)
+
+    def _window_Planck(self, z):
+        return self.cosmo.cib_window_z(z)
 
     def _window(self, snap, typ):
         zmin = self._get_zmin(snap)
         zmax = self._get_zmax(snap)
-        if typ == "LSST":
-            zs = np.linspace(zmin, zmax, 1000)
-            dz = zs[1] - zs[0]
-            return np.sum(self._window_LSST(zs) * self._bias(zs, "LSST")) * dz
-
-    def _get_Ng(self, zmin=0, zmax=1100, window="LSST"):
         zs = np.linspace(zmin, zmax, 1000)
         dz = zs[1] - zs[0]
-        if window == "LSST":
+        if typ == "LSST":
             return np.sum(self._window_LSST(zs)) * dz
+        if typ == "Planck":
+            return np.sum(self._window_Planck(zs)) * dz
 
     def get_obs_gal_map(self, zmin=0, zmax=1100, window="LSST", chi_min=None, chi_max=None, use_chi=False):
         npix = hp.nside2npix(self.nside)
@@ -116,6 +108,14 @@ class Demnunii:
         for snap in snaps:
             gal += self._window(snap, window) * self.get_density_snap(snap)
         return gal
+
+    def get_obs_cib_map(self, zmin=0, zmax=1100, window="Planck", chi_min=None, chi_max=None, use_chi=False):
+        npix = hp.nside2npix(self.nside)
+        cib = np.zeros(npix)
+        snaps = self.get_snaps_chi(chi_min, chi_max) if use_chi else self.get_snaps_z(zmin, zmax)
+        for snap in snaps:
+            cib += self._window(snap, window) * self.get_density_snap(snap)
+        return cib
 
     def get_density_distro(self):
         snaps = self.get_snaps_z(0, 1100)
