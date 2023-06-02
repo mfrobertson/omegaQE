@@ -3,10 +3,13 @@ import healpy as hp
 import numpy as np
 from plancklens.filt import filt_simple
 from plancklens import utils
-from plancklens import qest, qresp
+from plancklens import qest, qresp, nhl
+from plancklens.n1 import n1
 from plancklens.sims import phas, maps
 from demnunii import Demnunii
 from omegaqe.noise import Noise
+from omegaqe.powerspectra import Powerspectra
+import shutil
 
 
 class Reconstruction:
@@ -50,7 +53,8 @@ class Reconstruction:
         def hashdict(self):
             return {'cmbs': self.maps_filename, 'noise': self.maps_filename, 'data': self.maps_filename}
 
-    def __init__(self, exp, L_cuts=(30, 3000, 30, 5000)):
+    def __init__(self, exp, filename=None, L_cuts=(30, 3000, 30, 5000)):
+        self.filename = filename
         self.setup_env()
         self.temp = os.path.join(os.environ['PLENS'], 'temp', 'idealized_example')
         self.exp = exp
@@ -58,8 +62,20 @@ class Reconstruction:
         self.noise = Noise()
         self.L_cuts = L_cuts
         self.lmax_map = 6000
+        self.indices = ["tt", "ee", "bb"]
         self.cl_len, self.cl_grad = self.get_cmb_cls()
         self.noise_cls = self.get_noise_cls(exp)
+        self._initialise()
+        self.setup = False
+        if filename is not None:
+            self.setup_reconstruction(self.filename)
+
+    def _initialise(self):
+        self.transfer_dict = {idx[0]: np.ones(self.lmax_map + 1) for idx in self.indices}
+        filters = self.get_filters(self.indices, self.noise_cls)
+        self.filt_dict = {'t': filters[0], 'e': filters[1], 'b': filters[2]}
+        self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.lmax_map, self.cl_grad, self.cl_grad, self.filt_dict, self.lmax_map)
+        self.n1_lib = n1.library_n1(os.path.join(self.temp, 'n1'), self.cl_grad['tt'], self.cl_grad['ee'], self.cl_grad['bb'], lmaxphi=5000)
 
     def get_Lmax_filt(self):
         return np.max(self.L_cuts)
@@ -78,21 +94,25 @@ class Reconstruction:
 
     def setup_env(self):
         if not 'PLENS' in os.environ.keys():
-            os.environ['PLENS'] = '_tmp'
+            plancklens_cachedir = "_tmp"
+            os.environ['PLENS'] = plancklens_cachedir
+        if os.path.exists(os.environ['PLENS']) and os.path.isdir(os.environ['PLENS']):
+            print(f"Removing existing plancklens cache at {os.environ['PLENS']}")
+            shutil.rmtree(os.environ['PLENS'])
+
 
     def get_cmb_cls(self):
         Tcmb = 2.7255
         fac = (Tcmb * 1e6) ** 2
-        indices = ['tt', 'ee', 'bb', 'te']
+        indices = self.indices + ['te']
         cl_len = {idx : self.dm.cosmo.get_lens_ps(idx.upper()) * fac for idx in indices}
         cl_grad = {idx: self.dm.cosmo.get_grad_lens_ps(idx.upper()) * fac for idx in indices}
         return cl_len, cl_grad
 
     def get_noise_cls(self, exp):
-        indices = ["tt", "ee", "bb"]
         Tcmb = 2.7255
         fac = (Tcmb * 1e6) ** 2
-        return {idx[0]: self.noise.get_cmb_gaussian_N(idx.upper(), None, None, ellmax=self.lmax_map, exp=exp) * fac for idx in indices}
+        return {idx[0]: self.noise.get_cmb_gaussian_N(idx.upper(), None, None, ellmax=self.lmax_map, exp=exp) * fac for idx in self.indices}
 
     def _apply_cuts(self, filts, indices):
         for iii, filt in enumerate(filts):
@@ -104,37 +124,75 @@ class Reconstruction:
 
     def get_filters(self, indices, noise_cls=None):
         Lmax_filt = self.get_Lmax_filt()
-        filts = [(utils.cli(self.cl_len[idx][:Lmax_filt + 1] + noise_cls[idx[0]][:Lmax_filt + 1])) if noise_cls is not None else
+        filts = [utils.cli(self.cl_len[idx][:Lmax_filt + 1] + noise_cls[idx[0]][:Lmax_filt + 1]) if noise_cls is not None else
                 utils.cli(self.cl_len[idx][:Lmax_filt + 1]) for idx in indices]
         return self._apply_cuts(filts, indices)
 
     def _raise_typ_error(self, typ):
         raise ValueError(f"QE type {typ} not recognized. Recognized types included mv and t")
 
-    def _get_qe_key(self, typ):
+    def _get_qe_key(self, typ, curl=False):
+        potential = "x" if curl else "p"
         if typ == "mv":
-            return "p"
+            return potential
         if typ == "t":
-            return "ptt"
+            return potential + "tt"
+        if typ == "pol":
+            return potential + "_p"
         self._raise_typ_error(typ)
 
-    def get_phi_rec(self, typ, TQUmaps_filename):
-        indices = ['tt', 'ee', 'bb']
-        filters = self.get_filters(indices, self.noise_cls)
-        transfer_dict = {idx[0]:np.ones(self.lmax_map + 1) for idx in indices}
+    def setup_reconstruction(self, TQUmaps_filename):
         libdir_pixphas = os.path.join(self.temp, 'phas_lmax%s' % self.lmax_map)
         pix_phas = phas.lib_phas(libdir_pixphas, 3, self.lmax_map)
-        maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.lmax_map, TQUmaps_filename), transfer_dict, self.noise_cls, noise_phas=pix_phas)
+        maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.lmax_map, TQUmaps_filename), self.transfer_dict, self.noise_cls, noise_phas=pix_phas)
         self.sim_lib = self.MySimLib(maps_lib, self.dm.nside)
-        sim_lib = self.sim_lib
-        weighted_maps_lib = filt_simple.library_fullsky_sepTP(os.path.join(self.temp, 'ivfs'), sim_lib, self.dm.nside, transfer_dict, self.cl_len, filters[0], filters[1], filters[2])
-        qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.cl_len['te'], self.dm.nside, lmax_qlm=self.lmax_map)
-        filt_dict = {'t': weighted_maps_lib.get_ftl(), 'e': weighted_maps_lib.get_fel(), 'b': weighted_maps_lib.get_fbl()}
-        cl_weight = self.cl_len
-        cl_weight['bb'] *= 0.
-        qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.lmax_map, cl_weight, self.cl_grad, filt_dict, self.lmax_map)
-        qe_key = self._get_qe_key(typ)
-        qlm = qlms_lib.get_sim_qlm(qe_key, -1)
-        resp = qresp_lib.get_response(qe_key, 'p')
+        weighted_maps_lib = filt_simple.library_fullsky_sepTP(os.path.join(self.temp, 'ivfs'), self.sim_lib, self.dm.nside, self.transfer_dict, self.cl_grad, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
+        self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.cl_grad['te'], self.dm.nside, lmax_qlm=self.lmax_map)
+        self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, self.cl_grad, self.lmax_map)
+        self.setup = True
+
+    def _check_setup(self):
+        if not self.setup:
+            raise ValueError("Need to call 'setup_reconstruction' first. No qlm_lib has been istantiated.")
+
+    def get_phi_rec(self, typ):
+        self._check_setup()
+        qe_key = self._get_qe_key(typ, curl=False)
+        qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
+        resp = self.qresp_lib.get_response(qe_key, 'p')
         qnorm = utils.cli(resp)
         return hp.almxfl(qlm, qnorm)
+
+    def get_omega_rec(self, typ):
+        self._check_setup()
+        qe_key = self._get_qe_key(typ, curl=True)
+        qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
+        resp = self.qresp_lib.get_response(qe_key, 'p')
+        qnorm = utils.cli(resp)
+        return hp.almxfl(qlm, qnorm)
+
+    def get_response(self, typ, curl=False):
+        qe_key = self._get_qe_key(typ, curl=curl)
+        return self.qresp_lib.get_response(qe_key, 'p')
+
+    def get_RDN0(self, typ, curl=False):
+        self._check_setup()
+        qe_key = self._get_qe_key(typ, curl=curl)
+        N0_unnorm = self.rdn0_lib.get_sim_nhl(-1, qe_key, qe_key)
+        resp = self.get_response(typ, curl)
+        return N0_unnorm * resp[:np.size(N0_unnorm)]**2
+
+    def _get_Cl_phi(self):
+        power = Powerspectra()
+        power.cosmo = self.dm.cosmo
+        ells = np.arange(1, self.lmax_map + 1)
+        Cl_phi = np.zeros(np.size(ells) + 1)
+        Cl_phi[1:] = power.get_phi_ps(ells)
+        return Cl_phi
+
+    def get_N1(self, typ, curl=False, lmax=3000):
+        Cl_phi = self._get_Cl_phi()
+        qe_key = self._get_qe_key(typ, curl=curl)
+        N1_unnorm = self.n1_lib.get_n1(qe_key, "p", Cl_phi, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'], lmax)
+        resp = self.get_response(typ, curl)
+        return N1_unnorm * resp[:np.size(N1_unnorm)] ** 2
