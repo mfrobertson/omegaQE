@@ -65,12 +65,10 @@ def get_unlensed_cmb_ps(lmax):
     return {idx.lower(): demnunii.cosmo.get_unlens_ps(idx, ellmax=lmax)[:lmax + 1] * (Tcmb * 1e6) ** 2 for idx in indices}
 
 
-def get_unlensed_alms(lmax, unl_cmb_spectra):
-    print("new_unl_alms")
+def get_unlensed_alms(lmax, unl_cmb_spectra, sim):
     lib_pha = phas.lib_phas(os.path.join(os.environ['PLENS'], 'len_cmbs', 'phas'), 3, lmax)
-    print(unl_cmb_spectra.keys())
     unl_lib = cmbs.sims_cmb_unl(unl_cmb_spectra, lib_pha)
-    return unl_lib.get_sim_tlm(0), unl_lib.get_sim_elm(0), unl_lib.get_sim_blm(0)
+    return unl_lib.get_sim_tlm(sim), unl_lib.get_sim_elm(sim), unl_lib.get_sim_blm(sim)
 
 
 def get_lensed_maps(dlm, unl_alms, nthreads):
@@ -108,7 +106,7 @@ def main(nsims, nthreads, loc):
     dlm_diff_alpha = np.array([glm, clm])
     unl_cmb_spectra = get_unlensed_cmb_ps(lmax_map)
     for sim in range(nsims):
-        unl_alms = get_unlensed_alms(lmax_map, unl_cmb_spectra)
+        unl_alms = get_unlensed_alms(lmax_map, unl_cmb_spectra, sim)
         len_maps_dem = get_lensed_maps(dlm_dem, unl_alms, nthreads)
         save_lens_maps(f"{loc}{sep}demnunii", len_maps_dem, sim)
         len_maps_diff_phi = get_lensed_maps(dlm_diff_alpha, unl_alms, nthreads)
