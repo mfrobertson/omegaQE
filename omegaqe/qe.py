@@ -181,18 +181,17 @@ class QE:
         L3 = L3_vec.rho
         p = typ[0]
         q = typ[1]
-        XYs = self.parse_fields(fields, unique=True)
+        XYs = self.parse_fields(fields, unique=False)
         for ij in XYs:
             i = ij[0]
             j = ij[1]
-            fac = 1 if i == j else 2
             C_inv_ip = self._get_cmb_Cov_inv_spline(i + p, fields)(ell)
             C_inv_jq = self._get_cmb_Cov_inv_spline(j + q, fields)(L3)
             weight_tmp = self.response(i + j, L_vec, ell_vec, curl, resp_ps) * C_inv_ip * C_inv_jq
             if apply_Lcuts:
                 w1, w2 = self._get_L_cut_weights(typ, ell, L3)
                 weight_tmp *= w1 * w2
-            weight += fac * weight_tmp
+            weight += weight_tmp
         return weight / 2
 
 
