@@ -181,7 +181,7 @@ class QE:
         L3 = L3_vec.rho
         p = typ[0]
         q = typ[1]
-        XYs = self.parse_fields(fields, unique=False)
+        XYs = self.parse_fields(fields, unique=False, includeBB=True)
         for ij in XYs:
             i = ij[0]
             j = ij[1]

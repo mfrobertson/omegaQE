@@ -84,7 +84,14 @@ def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primp
         g_XprimYprim = global_qe.weight_function(XprimYprim, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
         resp_YYprim = global_qe.response(YYprim, L2_vec, l_prim_vec, curl=False)
         inner_sum += g_XprimYprim * C_XXprim_l * resp_YYprim
-    return 4 * dThetal * dl * np.sum(alpha * g_XY * inner_sum * ls[None, :] * w_prim)
+
+        C_YYprim_lprim = global_qe.cmb[YYprim].lenCl_spline(l_prim_vec.rho)
+        if noise:
+            C_YYprim_lprim += global_qe.cmb[YYprim].N_spline(l_prim_vec.rho)
+        g_YprimXprim = global_qe.weight_function(XprimYprim[::-1], L1_vec, l_prim_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
+        resp_XXprim = global_qe.response(XXprim, L2_vec, l_vec, curl=False)
+        inner_sum += g_YprimXprim * C_YYprim_lprim * resp_XXprim
+    return 2 * dThetal * dl * np.sum(alpha * g_XY * inner_sum * ls[None, :] * w_prim)
 
 def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
     g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True)
@@ -169,7 +176,7 @@ def _setup_norms():
 
 def _bias_prep(fields, gmv, N_L1, N_l, Ntheta12, Ntheta1l):
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
-    L1s = global_qe.get_log_sample_Ls(Lmin, Lmax, N_L1, dL_small=2)  # dL_small should be 2 if not enough L steps (which is default)
+    L1s = global_qe.get_log_sample_Ls(Lmin, Lmax, N_L1, dL_small=2)  # dL_small should be 2 if not enough L steps (N_L1 < 150)
     ls = np.linspace(Lmin, Lmax, N_l)
     dTheta1 = np.pi / Ntheta12
     thetas1 = np.linspace(0, np.pi - dTheta1, Ntheta12)
