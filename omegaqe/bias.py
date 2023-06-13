@@ -5,6 +5,7 @@ import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 import vector
 from omegaqe.tools import getFileSep, path_exists
+import matplotlib.pyplot as plt
 
 def _get_Cl_spline(typ):
     if typ == "kk":
@@ -156,7 +157,7 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
                 if np.sum(w_prim) != 0 and np.sum(w_primprim) != 0:
                     I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise)
 
-        I_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, np.pi)
+        I_L1[iii] = L1 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, 2 * np.pi)
     N = InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin, Lmax) / ((2 * np.pi) ** 4)
     return N
 
@@ -176,11 +177,10 @@ def _setup_norms():
 
 def _bias_prep(fields, gmv, N_L1, N_l, Ntheta12, Ntheta1l):
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
-    dL_small = 2 if N_L1 < 150 else 1
-    L1s = global_qe.get_log_sample_Ls(Lmin, Lmax, N_L1, dL_small=dL_small)  # dL_small should be 2 if not enough L steps (N_L1 < 150)
+    L1s = np.geomspace(Lmin, Lmax, N_L1)
     ls = np.linspace(Lmin, Lmax, N_l)
-    dTheta1 = np.pi / Ntheta12
-    thetas1 = np.linspace(0, np.pi - dTheta1, Ntheta12)
+    dTheta1 = 2*np.pi / Ntheta12
+    thetas1 = np.linspace(0, 2*np.pi - dTheta1, Ntheta12)
     dThetal = 2 * np.pi / Ntheta1l
     thetasl = np.linspace(0, 2 * np.pi - dThetal, Ntheta1l)
     return L1s, thetas1, ls, thetasl
@@ -256,15 +256,15 @@ def _alpha(typs, L1, L2, theta12, nu):
     for iii in np.arange(Ncombos):
         bi_ij = global_fish.bi.get_bispectrum(combos[iii] + "w", L1, L2, theta=theta12, M_spline=True, nu=nu)
         for q in typs:
-            # if q != "k":      # Get rid of this if not calculating N1 kk terms separately
-            kq = "k" + q
-            cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(combos[iii]+kq, typs)
-            Cl_qk_spline = _get_Cl_spline(q + "k")
-            mixed_bi_element = bi_ij * cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_qk_spline(L2)
-            if mixed_bi is None:
-                mixed_bi = mixed_bi_element
-            else:
-                mixed_bi += mixed_bi_element
+            if q != "k":      # Get rid of this if not calculating N1 kk terms separately
+                kq = "k" + q
+                cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(combos[iii]+kq, typs)
+                Cl_qk_spline = _get_Cl_spline(q + "k")
+                mixed_bi_element = bi_ij * cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_qk_spline(L2)
+                if mixed_bi is None:
+                    mixed_bi = mixed_bi_element
+                else:
+                    mixed_bi += mixed_bi_element
     A_k = _get_normalisation(curl=False, Ls=L1)
     return mixed_bi / A_k * 2/(L2**2 * F_L)
 
@@ -332,7 +332,7 @@ def _build_C_inv_splines(C_inv, bi_typ):
     return C_inv_splines
 
 
-def bias(bias_typ, Ls, bi_typ="theory", exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False, noise=True):
+def bias(bias_typ, Ls, bi_typ="theory", exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=50, Ntheta13=60, verbose=False, noise=True):
 
     global global_qe, global_fish, N0_w_spline, N0_k_spline
     global_fish = Fisher()
