@@ -224,19 +224,8 @@ class QE:
             return w1*w2*fac*self.response(typ, L_vec, ell_vec, curl, resp_ps)/(C_typ1 * C_typ2)
         return fac*self.response(typ, L_vec, ell_vec, curl, resp_ps)/(C_typ1 * C_typ2)
 
-    def _response_phi(self, typ, L_vec, ell_vec, cl="gradient"):
-        ell = ell_vec.rho
-        L3_vec = L_vec - ell_vec
-        L3 = L3_vec.rho
-        theta12 = ell_vec.deltaphi(L3_vec)
-        h1 = self._get_response_geo_fac(typ, 1, theta12=theta12)
-        h2 = self._get_response_geo_fac(typ, 2, theta12=theta12)
-        if typ == "BT" or typ == "TB" or typ == "TE" or typ == "ET":
-            typ1 = typ2 = "TE"
-        else:
-            typ1 = typ[0] + typ[0]
-            typ2 = typ[1] + typ[1]
-        return ((L_vec @ ell_vec) * h1 * self._get_cmb_cl(ell, typ1, cl)) + ((L_vec @ L3_vec) * h2 * self._get_cmb_cl(L3, typ2, cl))
+    def _response_phi(self, typ1, typ2, L_vec, ell_vec, L3_vec, h1, h2, cl="gradient"):
+        return ((L_vec @ ell_vec) * h1 * self._get_cmb_cl(ell_vec.rho, typ1, cl)) + ((L_vec @ L3_vec) * h2 * self._get_cmb_cl(L3_vec.rho, typ2, cl))
 
     def response(self, typ, L_vec, ell_vec, curl=True, cl="gradient"):
         """
@@ -254,8 +243,6 @@ class QE:
 
         """
         # TODO: also the curl terms (i.e. C^TP and C^PP) are not implimented
-        if not curl:
-            return self._response_phi(typ, L_vec, ell_vec, cl)
         L = L_vec.rho
         ell = ell_vec.rho
         L3_vec = L_vec - ell_vec
@@ -268,6 +255,8 @@ class QE:
         else:
             typ1 = typ[0] + typ[0]
             typ2 = typ[1] + typ[1]
+        if not curl:
+            return self._response_phi(typ1, typ2, L_vec, ell_vec, L3_vec, h1, h2, cl)
         return L * ell * np.sin(ell_vec.deltaphi(L_vec)) * (h1 * self._get_cmb_cl(ell, typ1, cl) - h2 * self._get_cmb_cl(L3, typ2, cl))
 
     def geo_fac(self, typ, theta12):
