@@ -291,8 +291,10 @@ class QE:
             return self._geo_fac_T(shape)
         elif typ == "EE" or typ == "BB":
             return self._geo_fac_E(theta12)
-        elif typ == "EB" or typ == "BE":
+        elif typ == "EB":
             return self._geo_fac_B(theta12)
+        elif typ == "BE":
+            return -self._geo_fac_B(theta12)
         elif typ == "TE":
             if num == 1:
                 return self._geo_fac_E(theta12)
@@ -308,7 +310,7 @@ class QE:
         elif typ == "BT":
             if num == 1:
                 return 0
-            return self._geo_fac_B(theta12)
+            return -self._geo_fac_B(theta12)
         else:
             raise ValueError(f"Type {typ} does not exist.")
 
