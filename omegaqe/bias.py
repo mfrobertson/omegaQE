@@ -5,7 +5,6 @@ import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 import vector
 from omegaqe.tools import getFileSep, path_exists
-import matplotlib.pyplot as plt
 
 def _get_Cl_spline(typ):
     if typ == "kk":
@@ -86,13 +85,13 @@ def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primp
         resp_YYprim = global_qe.response(YYprim, L2_vec, l_prim_vec, curl=False)
         inner_sum += g_XprimYprim * C_XXprim_l * resp_YYprim
 
-        C_YYprim_lprim = global_qe.cmb[YYprim].lenCl_spline(l_prim_vec.rho)
-        if noise:
-            C_YYprim_lprim += global_qe.cmb[YYprim].N_spline(l_prim_vec.rho)
-        g_YprimXprim = global_qe.weight_function(XprimYprim[::-1], L1_vec, l_prim_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
-        resp_XXprim = global_qe.response(XXprim, L2_vec, l_vec, curl=False)
-        inner_sum += g_YprimXprim * C_YYprim_lprim * resp_XXprim
-    return 2 * dThetal * dl * np.sum(alpha * g_XY * inner_sum * ls[None, :] * w_prim)
+        # C_YYprim_lprim = global_qe.cmb[YYprim].lenCl_spline(l_prim_vec.rho)
+        # if noise:
+        #     C_YYprim_lprim += global_qe.cmb[YYprim].N_spline(l_prim_vec.rho)
+        # g_YprimXprim = global_qe.weight_function(XprimYprim[::-1], L1_vec, l_prim_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
+        # resp_XXprim = global_qe.response(XXprim, L2_vec, l_vec, curl=False)
+        # inner_sum += g_YprimXprim * C_YYprim_lprim * resp_XXprim
+    return 4 * dThetal * dl * np.sum(alpha * g_XY * inner_sum * ls[None, :] * w_prim)
 
 def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
     g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True)
@@ -157,7 +156,7 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
                 if np.sum(w_prim) != 0 and np.sum(w_primprim) != 0:
                     I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise)
 
-        I_L1[iii] = L1 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, 2 * np.pi)
+        I_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, np.pi)
     N = InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin, Lmax) / ((2 * np.pi) ** 4)
     return N
 
@@ -179,8 +178,8 @@ def _bias_prep(fields, gmv, N_L1, N_l, Ntheta12, Ntheta1l):
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
     L1s = np.geomspace(Lmin, Lmax, N_L1)
     ls = np.linspace(Lmin, Lmax, N_l)
-    dTheta1 = 2*np.pi / Ntheta12
-    thetas1 = np.linspace(0, 2*np.pi - dTheta1, Ntheta12)
+    dTheta1 = np.pi / Ntheta12
+    thetas1 = np.linspace(0, np.pi - dTheta1, Ntheta12)
     dThetal = 2 * np.pi / Ntheta1l
     thetasl = np.linspace(0, 2 * np.pi - dThetal, Ntheta1l)
     return L1s, thetas1, ls, thetasl
@@ -332,7 +331,7 @@ def _build_C_inv_splines(C_inv, bi_typ):
     return C_inv_splines
 
 
-def bias(bias_typ, Ls, bi_typ="theory", exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=50, Ntheta13=60, verbose=False, noise=True):
+def bias(bias_typ, Ls, bi_typ="theory", exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False, noise=True):
 
     global global_qe, global_fish, N0_w_spline, N0_k_spline
     global_fish = Fisher()
