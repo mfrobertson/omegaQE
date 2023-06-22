@@ -199,7 +199,7 @@ def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, ver
             if gmv:
                 N_tmp = _bias_calc(bias_typ, XY, L, True, fields, bi_typ, curl, *_bias_prep(fields, True, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose, noise=noise)
             else:
-                N_tmp = _bias_calc(bias_typ, XY, L, False, XY, bias_typ, curl, *_bias_prep(XY, False, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose, noise=noise)
+                N_tmp = _bias_calc(bias_typ, XY, L, False, XY, bi_typ, curl, *_bias_prep(XY, False, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose, noise=noise)
             N[iii] += N_tmp / A[iii]
     return N
 
