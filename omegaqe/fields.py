@@ -212,7 +212,7 @@ class Fields:
         Umap = sin * Emap + (cos * Bmap)
         return Qmap, Umap
 
-    def get_noise_map(self, field, set_seed=False, fft=True, sim=None):
+    def get_noise_map(self, field, set_seed=False, fft=True, muK=False, sim=None):
         N = self._get_N(field)
         Ls = np.arange(np.size(N))
         N_spline = InterpolatedUnivariateSpline(Ls[2:], N[2:])
@@ -222,6 +222,10 @@ class Fields:
             warnings.warn(f"Negative values in {field} map noise will be converted to positive values")
         n_rfft = np.sqrt(np.abs(N_rfft))
         noise_map = self._enforce_symmetries(n_rfft * 2*np.pi * gauss_matrix)
+        if muK:
+            physical_length = np.sqrt(np.prod(self.rec.isocov.lib_skyalm.lsides))
+            Tcmb = 2.7255
+            noise_map *= Tcmb * 1e6 / physical_length
         if not fft:
             return np.fft.irfft2(noise_map, norm="forward")
         return noise_map

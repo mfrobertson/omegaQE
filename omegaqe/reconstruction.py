@@ -93,22 +93,22 @@ class Reconstruction:
             return self.fields.get_cmb_map("TT", include_noise, fft=False, muK=True, sim=sim)/(2*np.pi)
         map = self.maps.get_sim_tmap(sim, phi_idx) - self.maps.get_noise_sim_tmap(sim)
         if include_noise:
-            return map + self.fields.get_noise_map("TT", True, fft=False, sim=sim)
+            return map + self.fields.get_noise_map("TT", True, fft=False, muK=True, sim=sim)/(2*np.pi)
         return map
 
     def QUmap(self, include_noise=True, sim=0, phi_idx=None, gauss=False):
         if gauss:
-            Qmap, Umap = self.fields.get_QU_map(include_noise, fft=False, muK=True, sim=sim)
+            Qmap, Umap = self.fields.get_QU_map(include_noise, fft=False, muK=True)
             return Qmap/(2*np.pi), Umap/(2*np.pi)
         Qmap = self.maps.get_sim_qumap(sim, phi_idx)[0] - self.maps.get_noise_sim_qmap(sim)
         Umap = self.maps.get_sim_qumap(sim, phi_idx)[1] - self.maps.get_noise_sim_umap(sim)
         if include_noise:
-            Enoise_fft = self.fields.get_noise_map("EE", True, fft=True, sim=sim)
-            Bnoise_fft = self.fields.get_noise_map("BB", True, fft=True, sim=sim)
+            Enoise_fft = self.fields.get_noise_map("EE", True, fft=True, muK=True, sim=sim)
+            Bnoise_fft = self.fields.get_noise_map("BB", True, fft=True, muK=True, sim=sim)
             Qnoise_fft, Unoise_fft = self.fields.EB_to_QU(Enoise_fft, Bnoise_fft)
             Qnoise = np.fft.irfft2(Qnoise_fft, norm="forward")
             Unoise = np.fft.irfft2(Unoise_fft, norm="forward")
-            return Qmap + Qnoise, Umap + Unoise
+            return Qmap + Qnoise/(2*np.pi), Umap + Unoise/(2*np.pi)
         return Qmap, Umap
 
     def _get_iblm(self, fields, include_noise, sim, phi_idx, return_data_alms=False, gaussCMB=False):
