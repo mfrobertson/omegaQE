@@ -22,9 +22,8 @@ class Fields:
         self.kmax_map = self._get_kmax(kmax)                # If HDres is not None then HDres determines kmax_map
         self.kmax_map_round = int(np.floor(self.kmax_map))
         self.kM, self.k_values = self._get_k_values()
-        self.fish = Fisher()
+        self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=omegaqe.DATA_DIR)
         self.covariance = self.fish.covariance
-        self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, False, data_dir=omegaqe.DATA_DIR)
         self.rec = None
         self._sim = sim
         input_kappa_map = None

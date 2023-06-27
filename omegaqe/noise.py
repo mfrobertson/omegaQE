@@ -55,6 +55,7 @@ class Noise:
         return N0
 
     def _get_N0(self, exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, iter_ext, data_dir):
+        print(f"Getting cached N0 for exp: {exp}, qe: {qe}, gmv: {gmv}, ps: {ps}, L_cuts: {(T_Lmin, T_Lmax, P_Lmin, P_Lmax)}, iter: {iter}, iter_ext: {iter_ext}, data_dir: {data_dir}")
         if iter_ext:
             qe += "_iter_ext"
         elif iter:
@@ -68,6 +69,7 @@ class Noise:
         return N0_phi, N0_curl
 
     def setup_cmb_noise(self, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, iter=False, iter_ext=False, data_dir=omegaqe.DATA_DIR):
+        print(f"Setting up noise...")
         self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, iter_ext, data_dir)
 
     def get_N0(self, typ, ellmax, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, recalc_N0=False, iter=False, iter_ext=False, data_dir=omegaqe.DATA_DIR):

@@ -6,6 +6,7 @@ from scipy import signal
 import os
 import shutil
 import warnings
+import multiprocessing
 warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
 
 class Reconstruction:
@@ -21,8 +22,10 @@ class Reconstruction:
         self.Lcuts = Lcuts
         self.resp_cls = resp_cls
         exp_conf = tuple(self._get_lensit_config(self.exp, self.Lcuts))
-        self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=nsims, num_threads=4)
-        self.isocov = li.get_isocov(exp_conf, LDres, HD_res=HDres, pyFFTWthreads=4)
+        n_threads = multiprocessing.cpu_count()
+        print(f"Lensit will use {n_threads} threads.")
+        self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=nsims, num_threads=n_threads)
+        self.isocov = li.get_isocov(exp_conf, LDres, HD_res=HDres, pyFFTWthreads=n_threads)
         self.curl = None
         self.phi = None
         self.phi_iter_norm = None
@@ -220,6 +223,7 @@ class Reconstruction:
         return alm
 
     def _QE(self, fields, idx, include_noise, sim, phi_idx, gaussCMB, diffSims, diffSim_offset):
+        print(f"Quadratic estimation of type: {fields}, with noise: {include_noise}, phi_idx: {phi_idx}, gauss fields: {gaussCMB}, N1: {diffSims}, diff_offset: {diffSim_offset}")
         if diffSims:
             estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
             estimator, iblm2 = self._get_iblm(fields, include_noise, sim + diffSim_offset, phi_idx, gaussCMB=gaussCMB)
@@ -234,6 +238,7 @@ class Reconstruction:
         return alm_norm
 
     def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=True, diffSim_offset=1):
+        print(f"Performing Lensit phi reconstruction on sim {sim}...")
         # qe_func = self._QE_iter if iter_rec else self._QE
         qe_func = self._QE
         self.phi = qe_func(fields, 0, include_noise, sim, phi_idx, gaussCMB, diffSims, diffSim_offset)
@@ -242,6 +247,7 @@ class Reconstruction:
         return self.phi
 
     def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=True, diffSim_offset=1):
+        print(f"Performing Lensit curl reconstruction on sim {sim}...")
         # qe_func = self._QE_iter if iter_rec else self._QE
         qe_func = self._QE
         self.curl = qe_func(fields, 1, include_noise, sim, phi_idx, gaussCMB, diffSims, diffSim_offset)
