@@ -26,11 +26,11 @@ class Fields:
         self.covariance = self.fish.covariance
         self.covariance.setup_cmb_noise(exp, "TEB", True, "gradient", 30, 3000, 30, 5000, False, False, data_dir=omegaqe.DATA_DIR)
         self.rec = None
+        self._sim = sim
         input_kappa_map = None
         enforce_sym = True
         if setup_cmb_lens_rec:
             self.rec = Reconstruction(self, exp, LDres=N_pix_pow, HDres=HDres, nsims=Nsims, resp_cls=resp_cls)
-            self._sim = sim
             input_kappa_map = self._get_lensit_kappa_map(sim=self._sim)
             enforce_sym = False
         self._fields = self._get_rearanged_fields(fields) if setup_cmb_lens_rec else self._get_fields(fields)   # includes lensit input kappa
@@ -312,8 +312,8 @@ class Fields:
         gauss_matrix = self._get_gauss_matrix(np.shape(self.kM))
         return self._enforce_symmetries(np.sqrt(C_omega_spline(self.kM) * (2 * np.pi) ** 2) * gauss_matrix)
 
-    def get_omega_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, tracer_noise=False, reinitialise=False, use_kappa_rec=False, gaussCMB=False, diffMaps=False, diffMaps_offset=1):
+    def get_omega_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, tracer_noise=False, reinitialise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", gaussCMB=False, diffMaps=False, diffMaps_offset=1):
         if self.template is None or reinitialise:
-            self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, tracer_noise=tracer_noise, use_kappa_rec=use_kappa_rec, gaussCMB=gaussCMB, diffCMBs=diffMaps, diffCMBs_offset=diffMaps_offset)
+            self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, tracer_noise=tracer_noise, use_kappa_rec=use_kappa_rec, kappa_rec_qe_typ=kappa_rec_qe_typ, gaussCMB=gaussCMB, diffCMBs=diffMaps, diffCMBs_offset=diffMaps_offset)
         return self.template.get_omega(Nchi)
 
