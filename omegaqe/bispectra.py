@@ -136,9 +136,9 @@ class Bispectra:
         L23_cross = self._triangle_cross_product(L2, L3, L1)
         return 2 * L12_dot * (L13_cross * M1 - L23_cross * M2)/(L1**2 * L2**2)
 
-    def _bispectrum_angle(self, typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold"):
+    def _bispectrum_angle(self, typ, L1, L2, theta12, M_spline, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold"):
         M1, M2, _ = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-        return np.sin(2 * theta) * (M1 - M2)
+        return np.sin(2 * theta12) * (M1 - M2)
 
     def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
         """
