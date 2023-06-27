@@ -84,13 +84,6 @@ def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primp
         g_XprimYprim = global_qe.weight_function(XprimYprim, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
         resp_YYprim = global_qe.response(YYprim, L2_vec, l_prim_vec, curl=False)
         inner_sum += g_XprimYprim * C_XXprim_l * resp_YYprim
-
-        # C_YYprim_lprim = global_qe.cmb[YYprim].lenCl_spline(l_prim_vec.rho)
-        # if noise:
-        #     C_YYprim_lprim += global_qe.cmb[YYprim].N_spline(l_prim_vec.rho)
-        # g_YprimXprim = global_qe.weight_function(XprimYprim[::-1], L1_vec, l_prim_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
-        # resp_XXprim = global_qe.response(XXprim, L2_vec, l_vec, curl=False)
-        # inner_sum += g_YprimXprim * C_YYprim_lprim * resp_XXprim
     return 4 * dThetal * dl * np.sum(alpha * g_XY * inner_sum * ls[None, :] * w_prim)
 
 def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
