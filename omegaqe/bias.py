@@ -321,13 +321,15 @@ def mixed_bispectrum(bias_typ, bi_typ, L1, L2, theta12, nu=353e9):
             return global_fish.bi.get_bispectrum("kkw", L1, L2, theta=theta12, M_spline=True)
         return _beta(list(bi_typ), L1, L2, theta12, nu)
 
-def _build_C_inv_splines(C_inv, bi_typ):
+def _build_C_inv_splines(C_inv, bi_typ, L_min_cut=30, L_max_cut=3000):
     N_fields = np.size(list(bi_typ))
     C_inv_splines = np.empty((N_fields, N_fields), dtype=InterpolatedUnivariateSpline)
     Ls = np.arange(np.size(C_inv[0][0]))
     for iii in range(N_fields):
         for jjj in range(N_fields):
             C_inv_ij = C_inv[iii, jjj]
+            C_inv_ij[L_max_cut + 1:] = 0
+            C_inv_ij[:L_min_cut] = 0
             C_inv_splines[iii, jjj] = InterpolatedUnivariateSpline(Ls[1:], C_inv_ij[1:])
     return C_inv_splines
 
