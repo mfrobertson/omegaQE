@@ -26,13 +26,13 @@ def _setup_noise(fish, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=N
     return fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, data_dir)
 
 
-def _get_cached_F_L(F_L_path, typs):
+def _get_cached_F_L(F_L_path, typs, L_min_cut=30, L_max_cut=3000):
     sep = getFileSep()
     fields = global_fish.qe
     exp = global_fish.exp
     gmv = global_fish.gmv
     gmv_str = "gmv" if gmv else "single"
-    full_F_L_path = F_L_path+sep+typs+sep+exp+sep+gmv_str+sep+fields+sep+"30_3000"+sep+"1_2000"
+    full_F_L_path = F_L_path+sep+typs+sep+exp+sep+gmv_str+sep+fields+sep+f"{L_min_cut}_{L_max_cut}"+sep+"1_2000"
     sample_Ls = np.load(full_F_L_path+sep+"Ls.npy")
     F_L = np.load(full_F_L_path+sep+"F_L.npy")
     return sample_Ls, F_L
