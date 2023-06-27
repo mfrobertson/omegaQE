@@ -170,7 +170,7 @@ def _setup_norms():
 
 def _bias_prep(fields, gmv, N_L1, N_l, Ntheta12, Ntheta1l):
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
-    L1s = np.geomspace(Lmin, Lmax, N_L1)
+    L1s = np.linspace(Lmin, Lmax, N_L1)
     ls = np.linspace(Lmin, Lmax, N_l)
     dTheta1 = np.pi / Ntheta12
     thetas1 = np.linspace(0, np.pi - dTheta1, Ntheta12)
