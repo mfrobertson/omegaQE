@@ -130,6 +130,7 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
     dThetal = thetasl[1] - thetasl[0]
     dl = ls[1] - ls[0]
+    dTheta1 = thetas1[1] - thetas1[0]
     L_vec = vector.obj(rho=L, phi=0)
     I_L1 = np.zeros(np.size(L1s))
     for iii, L1 in enumerate(L1s):
@@ -156,7 +157,7 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
                 if np.sum(w_prim) != 0 and np.sum(w_primprim) != 0:
                     I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise)
 
-        I_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, np.pi)
+        I_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, np.pi-dTheta1)
     N = InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin, Lmax) / ((2 * np.pi) ** 4)
     return N
 
