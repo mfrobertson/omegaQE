@@ -22,7 +22,8 @@ class Reconstruction:
         self.Lcuts = Lcuts
         self.resp_cls = resp_cls
         exp_conf = tuple(self._get_lensit_config(self.exp, self.Lcuts))
-        n_threads = multiprocessing.cpu_count()
+        # n_threads = multiprocessing.cpu_count()
+        n_threads = 1
         print(f"Lensit will use {n_threads} threads.")
         self.maps = li.get_maps_lib(exp_conf, LDres, HDres=HDres, cache_lenalms=False, cache_maps=False, nsims=nsims, num_threads=n_threads)
         self.isocov = li.get_isocov(exp_conf, LDres, HD_res=HDres, pyFFTWthreads=n_threads)
