@@ -225,6 +225,7 @@ class Reconstruction:
     def _QE(self, fields, idx, include_noise, sim, phi_idx, gaussCMB, diffSims, diffSim_offset):
         print(f"Quadratic estimation of type: {fields}, with noise: {include_noise}, phi_idx: {phi_idx}, gauss fields: {gaussCMB}, N1: {diffSims}, diff_offset: {diffSim_offset}")
         if diffSims:
+            phi_idx = sim if phi_idx is None else phi_idx
             estimator, iblm = self._get_iblm(fields, include_noise, sim, phi_idx, gaussCMB=gaussCMB)
             estimator, iblm2 = self._get_iblm(fields, include_noise, sim + diffSim_offset, phi_idx, gaussCMB=gaussCMB)
             alm_no_norm = 0.5 * self.isocov.get_qlms(estimator, iblm, self.isocov.lib_skyalm, use_cls_len=True, resp_cls=self.resp_cls, iblms2=iblm2)[idx]
