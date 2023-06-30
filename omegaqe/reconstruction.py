@@ -239,7 +239,7 @@ class Reconstruction:
         alm_norm = self.isocov.lib_skyalm.almxfl(alm_no_norm, f_inv)
         return alm_norm
 
-    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=True, diffSim_offset=1):
+    def get_phi_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=False, diffSim_offset=1):
         print(f"Performing Lensit phi reconstruction on sim {sim}...")
         # qe_func = self._QE_iter if iter_rec else self._QE
         qe_func = self._QE
@@ -248,7 +248,7 @@ class Reconstruction:
             return self._get_rfft_map(self.phi)
         return self.phi
 
-    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=True, diffSim_offset=1):
+    def get_curl_rec(self, fields, return_map=False, include_noise=True, sim=0, phi_idx=None, iter_rec=False, gaussCMB=False, diffSims=False, diffSim_offset=1):
         print(f"Performing Lensit curl reconstruction on sim {sim}...")
         # qe_func = self._QE_iter if iter_rec else self._QE
         qe_func = self._QE
