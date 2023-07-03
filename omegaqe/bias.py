@@ -120,7 +120,8 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
         innerloop_func = _get_N0_innerloop
     else:
         raise ValueError(f"Bias type {bias_typ} does not match built types.")
-    Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
+    Lmin_cmb, Lmax_cmb = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
+    Lmin_lss, Lmax_lss = _get_Lmin_Lmax_lss()
     dThetal = thetasl[1] - thetasl[0]
     dl = ls[1] - ls[0]
     dTheta1 = thetas1[1] - thetas1[0]
@@ -133,25 +134,25 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
             L1_vec = vector.obj(rho=L1, phi=theta1)
             L2_vec = L_vec - L1_vec
             L2 = L2_vec.rho
-            w2 = 0 if (L2 < Lmin or L2 > Lmax) else 1
+            w2 = 0 if (L2 < Lmin_lss or L2 > Lmax_lss) else 1
             if w2 != 0:
                 bi = w2 * mixed_bispectrum(bias_typ, bi_typ, L1, L2, L1_vec.deltaphi(L2_vec))
                 l_vec = vector.obj(rho=ls[None, :], phi=thetasl[:, None])
                 l_primprim_vec = L1_vec - l_vec
                 l_primprims = l_primprim_vec.rho
                 w_primprim = np.ones(np.shape(l_primprims))
-                w_primprim[l_primprims < Lmin] = 0
-                w_primprim[l_primprims > Lmax] = 0
+                w_primprim[l_primprims < Lmin_cmb] = 0
+                w_primprim[l_primprims > Lmax_cmb] = 0
                 l_prim_vec = L_vec - l_vec
                 l_prims = l_prim_vec.rho
                 w_prim = np.ones(np.shape(l_prims))
-                w_prim[l_prims < Lmin] = 0
-                w_prim[l_prims > Lmax] = 0
+                w_prim[l_prims < Lmin_cmb] = 0
+                w_prim[l_prims > Lmax_cmb] = 0
                 if np.sum(w_prim) != 0 and np.sum(w_primprim) != 0:
                     I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise)
 
         I_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, np.pi-dTheta1)
-    N = InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin, Lmax) / ((2 * np.pi) ** 4)
+    N = InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin_lss, Lmax_lss) / ((2 * np.pi) ** 4)
     return N
 
 
@@ -168,9 +169,13 @@ def _setup_norms():
     sample_Ls_k = np.arange(np.size(N0_w))
     return InterpolatedUnivariateSpline(sample_Ls_w, N0_w), InterpolatedUnivariateSpline(sample_Ls_k, N0_k)
 
+def _get_Lmin_Lmax_lss():
+    return 30, 3000
+
 def _bias_prep(fields, gmv, N_L1, N_l, Ntheta12, Ntheta1l):
     Lmin, Lmax = global_qe.get_Lmin_Lmax(fields, gmv, strict=False)
-    L1s = np.linspace(Lmin, Lmax, N_L1)
+    Lmin_lss, Lmax_lss = _get_Lmin_Lmax_lss()
+    L1s = np.linspace(Lmin_lss, Lmax_lss, N_L1)
     ls = np.linspace(Lmin, Lmax, N_l)
     dTheta1 = np.pi / Ntheta12
     thetas1 = np.linspace(0, np.pi - dTheta1, Ntheta12)
