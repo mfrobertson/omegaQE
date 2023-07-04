@@ -111,10 +111,13 @@ def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primpr
     return 4 * dThetal * dl * np.sum(beta * g_XY * inner_sum * ls[None, :] * w_prim * w_primprim)
 
 def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, thetasl, verbose, noise):
-
+    N1_no_k = False
     if bias_typ == "N2" or bias_typ == "N32":
         innerloop_func = _get_N2_innerloop
     elif bias_typ == "N1":
+        innerloop_func = _get_N1_innerloop
+    elif bias_typ == "N1_no_k":
+        N1_no_k = True
         innerloop_func = _get_N1_innerloop
     elif bias_typ == "N0":
         innerloop_func = _get_N0_innerloop
@@ -136,7 +139,7 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
             L2 = L2_vec.rho
             w2 = 0 if (L2 < Lmin_lss or L2 > Lmax_lss) else 1
             if w2 != 0:
-                bi = w2 * mixed_bispectrum(bias_typ, bi_typ, L1, L2, L1_vec.deltaphi(L2_vec))
+                bi = w2 * mixed_bispectrum(bias_typ, bi_typ, L1, L2, L1_vec.deltaphi(L2_vec), N1_no_k=N1_no_k)
                 l_vec = vector.obj(rho=ls[None, :], phi=thetasl[:, None])
                 l_primprim_vec = L1_vec - l_vec
                 l_primprims = l_primprim_vec.rho
@@ -243,7 +246,7 @@ def _mixed_bispectrum(typs, L1, L2, theta12, nu):
         raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
     return 4 / (F_L * L1 ** 2 * L2 ** 2) * mixed_bi
 
-def _alpha(typs, L1, L2, theta12, nu):
+def _alpha(typs, L1, L2, theta12, nu, no_k=False):
     L = _get_third_L(L1, L2, theta12)
     F_L = F_L_spline(L)
     typs = np.char.array(typs)
@@ -254,7 +257,7 @@ def _alpha(typs, L1, L2, theta12, nu):
     for iii in np.arange(Ncombos):
         bi_ij = global_fish.bi.get_bispectrum(combos[iii] + "w", L1, L2, theta=theta12, M_spline=True, nu=nu)
         for q in typs:
-            if q != "k":      # Get rid of this if not calculating N1 kk terms separately
+            if q != "k" and no_k is True:      # Get rid of this if not calculating N1 kk terms separately
                 kq = "k" + q
                 cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(combos[iii]+kq, typs)
                 Cl_qk_spline = _get_Cl_spline(q + "k")
@@ -286,7 +289,7 @@ def _beta(typs, L1, L2, theta12, nu):
     A_k_L2 = _get_normalisation(curl=False, Ls=L2)
     return mixed_bi / A_k_L1 / A_k_L2 / F_L
 
-def mixed_bispectrum(bias_typ, bi_typ, L1, L2, theta12, nu=353e9):
+def mixed_bispectrum(bias_typ, bi_typ, L1, L2, theta12, nu=353e9, N1_no_k=False):
     """
 
     Parameters
@@ -312,7 +315,7 @@ def mixed_bispectrum(bias_typ, bi_typ, L1, L2, theta12, nu=353e9):
         return 4 * global_fish.bi.get_bispectrum("kkk", L1, L2, L, M_spline=True) / (L1 ** 2 * L2 ** 2)
     if bias_typ == "N1":
         if bi_typ == "theory":
-            return 2 * global_fish.bi.get_bispectrum("kkw", L1, L2, theta=theta12, M_spline=True) / (L1 ** 2)
+            return 2 * global_fish.bi.get_bispectrum("kkw", L1, L2, theta=theta12, M_spline=True, N1_no_k=N1_no_k) / (L1 ** 2)
         return _alpha(list(bi_typ), L1, L2, theta12, nu)
     if bias_typ == "N0":
         if bi_typ == "theory":
