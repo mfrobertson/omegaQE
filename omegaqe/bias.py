@@ -257,15 +257,16 @@ def _alpha(typs, L1, L2, theta12, nu, no_k=False):
     for iii in np.arange(Ncombos):
         bi_ij = global_fish.bi.get_bispectrum(combos[iii] + "w", L1, L2, theta=theta12, M_spline=True, nu=nu)
         for q in typs:
-            if q != "k" and no_k is True:      # Get rid of this if not calculating N1 kk terms separately
-                kq = "k" + q
-                cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(combos[iii]+kq, typs)
-                Cl_qk_spline = _get_Cl_spline(q + "k")
-                mixed_bi_element = bi_ij * cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_qk_spline(L2)
-                if mixed_bi is None:
-                    mixed_bi = mixed_bi_element
-                else:
-                    mixed_bi += mixed_bi_element
+            if q == "k" and no_k is True:      # Get rid of this if not calculating N1 kk terms separately
+                continue
+            kq = "k" + q
+            cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(combos[iii]+kq, typs)
+            Cl_qk_spline = _get_Cl_spline(q + "k")
+            mixed_bi_element = bi_ij * cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_qk_spline(L2)
+            if mixed_bi is None:
+                mixed_bi = mixed_bi_element
+            else:
+                mixed_bi += mixed_bi_element
     A_k = _get_normalisation(curl=False, Ls=L1)
     return mixed_bi / A_k * 2/(L2**2 * F_L)
 
