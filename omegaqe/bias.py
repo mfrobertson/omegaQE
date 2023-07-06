@@ -111,13 +111,9 @@ def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primpr
     return 4 * dThetal * dl * np.sum(beta * g_XY * inner_sum * ls[None, :] * w_prim * w_primprim)
 
 def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, thetasl, verbose, noise):
-    N1_no_k = False
     if bias_typ == "N2" or bias_typ == "N32":
         innerloop_func = _get_N2_innerloop
-    elif bias_typ == "N1":
-        innerloop_func = _get_N1_innerloop
-    elif bias_typ == "N1_no_k":
-        N1_no_k = True
+    elif bias_typ == "N1" or bias_typ == "N1_no_k":
         innerloop_func = _get_N1_innerloop
     elif bias_typ == "N0":
         innerloop_func = _get_N0_innerloop
@@ -139,7 +135,7 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
             L2 = L2_vec.rho
             w2 = 0 if (L2 < Lmin_lss or L2 > Lmax_lss) else 1
             if w2 != 0:
-                bi = w2 * mixed_bispectrum(bias_typ, bi_typ, L1, L2, L1_vec.deltaphi(L2_vec), N1_no_k=N1_no_k)
+                bi = w2 * mixed_bispectrum(bias_typ, bi_typ, L1, L2, L1_vec.deltaphi(L2_vec))
                 l_vec = vector.obj(rho=ls[None, :], phi=thetasl[:, None])
                 l_primprim_vec = L1_vec - l_vec
                 l_primprims = l_primprim_vec.rho
@@ -290,7 +286,7 @@ def _beta(typs, L1, L2, theta12, nu):
     A_k_L2 = _get_normalisation(curl=False, Ls=L2)
     return mixed_bi / A_k_L1 / A_k_L2 / F_L
 
-def mixed_bispectrum(bias_typ, bi_typ, L1, L2, theta12, nu=353e9, N1_no_k=False):
+def mixed_bispectrum(bias_typ, bi_typ, L1, L2, theta12, nu=353e9):
     """
 
     Parameters
@@ -316,8 +312,10 @@ def mixed_bispectrum(bias_typ, bi_typ, L1, L2, theta12, nu=353e9, N1_no_k=False)
         return 4 * global_fish.bi.get_bispectrum("kkk", L1, L2, L, M_spline=True) / (L1 ** 2 * L2 ** 2)
     if bias_typ == "N1":
         if bi_typ == "theory":
-            return 2 * global_fish.bi.get_bispectrum("kkw", L1, L2, theta=theta12, M_spline=True, N1_no_k=N1_no_k) / (L1 ** 2)
+            return 2 * global_fish.bi.get_bispectrum("kkw", L1, L2, theta=theta12, M_spline=True) / (L1 ** 2)
         return _alpha(list(bi_typ), L1, L2, theta12, nu)
+    if bias_typ == "N1_no_k":
+        return _alpha(list(bi_typ), L1, L2, theta12, nu, no_k=True)
     if bias_typ == "N0":
         if bi_typ == "theory":
             return global_fish.bi.get_bispectrum("kkw", L1, L2, theta=theta12, M_spline=True)
