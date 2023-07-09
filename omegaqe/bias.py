@@ -337,9 +337,9 @@ def _build_C_inv_splines(C_inv, bi_typ, L_min_cut=30, L_max_cut=3000):
 def bias(bias_typ, Ls, bi_typ="theory", exp=None, qe_fields=None, gmv=None, ps=None, L_cuts=None, iter=None, data_dir=None, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False, noise=True):
 
     global global_qe, global_fish, N0_w_spline, N0_k_spline
-    global_fish = Fisher()
-    global_fish.setup_noise(exp, qe_fields, gmv, ps, L_cuts, iter, data_dir)
-    global_fish.setup_bispectra()
+    global_fish = Fisher(exp, qe_fields, gmv, ps, L_cuts, iter, False, data_dir, setup_bispectra=True)
+    # global_fish.setup_noise(exp, qe_fields, gmv, ps, L_cuts, iter, data_dir)
+    # global_fish.setup_bispectra()
     if qe_setup_path is None:
         global_qe = QE(exp=global_fish.exp, init=True, L_cuts=global_fish.L_cuts)
     else:
