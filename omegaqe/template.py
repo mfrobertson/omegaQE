@@ -108,6 +108,14 @@ class Template:
             h_g += Cls[field_i] * self.a_bars[field_i]
         return L_fac_f * h_f * matter_ps, L_fac_g * h_g
 
+    def _get_Egamma_Elambda(self, Cls, windows, matter_ps):
+        h_gamma = 0
+        h_lambda = 0
+        for iii, field_i in enumerate(self.fields.fields):
+            h_gamma += windows[field_i] * self.a_bars[field_i]
+            h_lambda += Cls[field_i] * self.a_bars[field_i]
+        return h_gamma * matter_ps, h_lambda
+
     def _get_matter_ps(self, Chi):
         z = self._cosmo.Chi_to_z(Chi)
         ks = self.L_map / Chi
@@ -142,6 +150,38 @@ class Template:
                 I_tmp += (F_i * G_j) - (F_j * G_i)
             window_k = self._get_window_k(Chi)
             I += 2 * np.fft.rfft2(I_tmp, norm=norm) / (Chi ** 2) * window_k
+            print('\r', end='')
+            print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i+1)/Nchi * 100)}%", end='')
+        print("")
+        return I * dChi * dL / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
+
+    def get_omega_Pmethod(self, Nchi=200):
+        norm = "forward"
+        Lx, Ly = self.fields.get_kx_ky()
+        dL = Lx[1] - Lx[0]
+        Chis = np.linspace(0, self._cosmo.get_chi_star(), Nchi + 1)[1:]
+        dChi = Chis[1] - Chis[0]
+        I = np.zeros((np.shape(self.L_map)), dtype="complex128")
+        t0 = datetime.datetime.now()
+        print(f"[00:00] {0}%", end='')
+        for Chi_i, Chi in enumerate(Chis):
+            Cls = dict.fromkeys(self.fields.fields)
+            windows = dict.fromkeys(self.fields.fields)
+            matter_ps = self._get_matter_ps(Chi)
+            for field in self.fields.fields:
+                Cls[field], windows[field] = self._get_Cl_and_window(Chi, field)
+            I_tmp = np.zeros((np.shape(self.L_map)[0], np.shape(self.L_map)[0]), dtype="complex128")
+            E_gamma, E_lambda = self._get_Egamma_Elambda(Cls, windows, matter_ps)
+            B_gamma = np.zeros(np.shape(E_gamma))
+            B_lambda = np.zeros(np.shape(E_lambda))
+            Q_gamma, U_gamma = self.fields.EB_to_QU(E_gamma, B_gamma)
+            Q_gamma, U_gamma = np.fft.irfft2(Q_gamma, norm=norm), np.fft.irfft2(U_gamma, norm=norm)
+            Q_lambda, U_lambda = self.fields.EB_to_QU(E_lambda, B_lambda)
+            Q_lambda, U_lambda = np.fft.irfft2(Q_lambda, norm=norm), np.fft.irfft2(U_lambda, norm=norm)
+            I_tmp += (Q_gamma * U_lambda) - (Q_lambda * U_gamma)
+
+            window_k = self._get_window_k(Chi)
+            I += np.fft.rfft2(I_tmp, norm=norm) / (Chi ** 2) * window_k
             print('\r', end='')
             print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i+1)/Nchi * 100)}%", end='')
         print("")
