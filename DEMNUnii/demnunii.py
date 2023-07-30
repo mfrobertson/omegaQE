@@ -5,10 +5,10 @@ from astropy.io import fits
 import healpy as hp
 from configparser import ConfigParser
 import pandas as pd
+import datetime
 
 
 DATA_DIR = "/mnt/lustre/users/astro/mr671/DEMNUnii/LCDM/"
-
 
 class Demnunii:
 
@@ -16,6 +16,7 @@ class Demnunii:
         self.data_dir = DATA_DIR
         self.config = self.setup_config()
         self.nside = 4096
+        self.Lmax_map = 5000
         self.snap_df = self.get_snap_info()
         self.cosmo = Cosmology("DEMNUnii_params.ini")
 
@@ -62,14 +63,19 @@ class Demnunii:
         snaps = np.asarray(self.snap_df["#1:output"])
         return snaps[np.where(np.logical_and(chis >= chi_min, chis <= chi_max))]
 
-    def get_density_map(self, zmin=0, zmax=1100, chi_min=None, chi_max=None, use_chi=False):
+    def get_density_map(self, zmin=0, zmax=1100, chi_min=None, chi_max=None, use_chi=False, verbose=False):
+        if verbose: print(f"DEMNUnii: Constructing density map for zmin={zmin}, zmax={zmax}, chi_min={chi_min}, chi_max={chi_max}, use_chi={use_chi}")
         pixel_area = hp.pixelfunc.nside2pixarea(self.nside)
         npix = hp.nside2npix(self.nside)
         particle_mass = self.get_particle_mass()
         rho = np.zeros(npix)
         snaps = self.get_snaps_chi(chi_min, chi_max) if use_chi else self.get_snaps_z(zmin, zmax)
-        for snap in snaps:
+        t0 = datetime.datetime.now()
+        for iii, snap in enumerate(snaps):
+            if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
             rho += self.get_snap(snap) * particle_mass / pixel_area
+            if verbose: print('\r', end='')
+        if verbose: print("")
         rho_bar = np.mean(rho)
         return rho / rho_bar - 1
 
@@ -101,20 +107,30 @@ class Demnunii:
         if typ == "Planck":
             return np.sum(self._window_Planck(zs)) * dz
 
-    def get_obs_gal_map(self, zmin=0, zmax=1100, window="LSST", chi_min=None, chi_max=None, use_chi=False):
+    def get_obs_gal_map(self, zmin=0, zmax=1100, window="LSST", chi_min=None, chi_max=None, use_chi=False, verbose=False):
+        if verbose: print(f"DEMNUnii: Constructing gal map for zmin={zmin}, zmax={zmax}, window={window}, chi_min={chi_min}, chi_max={chi_max}, use_chi={use_chi}")
         npix = hp.nside2npix(self.nside)
         gal = np.zeros(npix)
         snaps = self.get_snaps_chi(chi_min, chi_max) if use_chi else self.get_snaps_z(zmin, zmax)
-        for snap in snaps:
+        t0 = datetime.datetime.now()
+        for iii, snap in enumerate(snaps):
+            if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
             gal += self._window(snap, window) * self.get_density_snap(snap)
+            if verbose: print('\r', end='')
+        if verbose: print("")
         return gal
 
-    def get_obs_cib_map(self, zmin=0, zmax=1100, window="Planck", chi_min=None, chi_max=None, use_chi=False):
+    def get_obs_cib_map(self, zmin=0, zmax=1100, window="Planck", chi_min=None, chi_max=None, use_chi=False, verbose=False):
+        if verbose: print(f"DEMNUnii: Constructing CIB map for zmin={zmin}, zmax={zmax}, window={window}, chi_min={chi_min}, chi_max={chi_max}, use_chi={use_chi}")
         npix = hp.nside2npix(self.nside)
         cib = np.zeros(npix)
         snaps = self.get_snaps_chi(chi_min, chi_max) if use_chi else self.get_snaps_z(zmin, zmax)
-        for snap in snaps:
+        t0 = datetime.datetime.now()
+        for iii, snap in enumerate(snaps):
+            if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
             cib += self._window(snap, window) * self.get_density_snap(snap)
+            if verbose: print('\r', end='')
+        if verbose: print("")
         return cib
 
     def get_density_distro(self):
