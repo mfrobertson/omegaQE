@@ -61,7 +61,7 @@ class Reconstruction:
         self.dm = Demnunii()
         self.noise = Noise()
         self.L_cuts = L_cuts
-        self.lmax_map = 6000
+        self.Lmax_map = self.dm.Lmax_map
         self.indices = ["tt", "ee", "bb"]
         self.cl_len, self.cl_grad = self.get_cmb_cls()
         self.noise_cls = self.get_noise_cls(exp)
@@ -71,10 +71,10 @@ class Reconstruction:
             self.setup_reconstruction(self.filename)
 
     def _initialise(self):
-        self.transfer_dict = {idx[0]: np.ones(self.lmax_map + 1) for idx in self.indices}
+        self.transfer_dict = {idx[0]: np.ones(self.Lmax_map + 1) for idx in self.indices}
         filters = self.get_filters(self.indices, self.noise_cls)
         self.filt_dict = {'t': filters[0], 'e': filters[1], 'b': filters[2]}
-        self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.lmax_map, self.cl_grad, self.cl_grad, self.filt_dict, self.lmax_map)
+        self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, self.cl_grad, self.cl_grad, self.filt_dict, self.Lmax_map)
         self.n1_lib = n1.library_n1(os.path.join(self.temp, 'n1'), self.cl_grad['tt'], self.cl_grad['ee'], self.cl_grad['bb'], lmaxphi=5000)
 
     def get_Lmax_filt(self):
@@ -112,7 +112,7 @@ class Reconstruction:
     def get_noise_cls(self, exp):
         Tcmb = 2.7255
         fac = (Tcmb * 1e6) ** 2
-        return {idx[0]: self.noise.get_cmb_gaussian_N(idx.upper(), None, None, ellmax=self.lmax_map, exp=exp) * fac for idx in self.indices}
+        return {idx[0]: self.noise.get_cmb_gaussian_N(idx.upper(), None, None, ellmax=self.Lmax_map, exp=exp) * fac for idx in self.indices}
 
     def _apply_cuts(self, filts, indices):
         for iii, filt in enumerate(filts):
@@ -124,31 +124,33 @@ class Reconstruction:
 
     def get_filters(self, indices, noise_cls=None):
         Lmax_filt = self.get_Lmax_filt()
+        if Lmax_filt >= self.Lmax_map:
+            Lmax_filt = self.Lmax_map - 1
         filts = [utils.cli(self.cl_len[idx][:Lmax_filt + 1] + noise_cls[idx[0]][:Lmax_filt + 1]) if noise_cls is not None else
                 utils.cli(self.cl_len[idx][:Lmax_filt + 1]) for idx in indices]
         return self._apply_cuts(filts, indices)
 
     def _raise_typ_error(self, typ):
-        raise ValueError(f"QE type {typ} not recognized. Recognized types included mv and t")
+        raise ValueError(f"QE type {typ} not recognized. Recognized types included TEB (for mv), EB (for pol only), or TT.")
 
     def _get_qe_key(self, typ, curl=False):
         potential = "x" if curl else "p"
-        if typ == "mv":
+        if typ == "TEB":
             return potential
-        if typ == "t":
+        if typ == "T":
             return potential + "tt"
-        if typ == "pol":
+        if typ == "EB":
             return potential + "_p"
         self._raise_typ_error(typ)
 
     def setup_reconstruction(self, TQUmaps_filename):
-        libdir_pixphas = os.path.join(self.temp, 'phas_lmax%s' % self.lmax_map)
-        pix_phas = phas.lib_phas(libdir_pixphas, 3, self.lmax_map)
-        maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.lmax_map, TQUmaps_filename), self.transfer_dict, self.noise_cls, noise_phas=pix_phas)
+        libdir_pixphas = os.path.join(self.temp, 'phas_lmax%s' % self.Lmax_map)
+        pix_phas = phas.lib_phas(libdir_pixphas, 3, self.Lmax_map)
+        maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.Lmax_map, TQUmaps_filename), self.transfer_dict, self.noise_cls, noise_phas=pix_phas)
         self.sim_lib = self.MySimLib(maps_lib, self.dm.nside)
         weighted_maps_lib = filt_simple.library_fullsky_sepTP(os.path.join(self.temp, 'ivfs'), self.sim_lib, self.dm.nside, self.transfer_dict, self.cl_grad, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
-        self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.cl_grad['te'], self.dm.nside, lmax_qlm=self.lmax_map)
-        self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, self.cl_grad, self.lmax_map)
+        self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.cl_grad['te'], self.dm.nside, lmax_qlm=self.Lmax_map)
+        self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, self.cl_grad, self.Lmax_map)
         self.setup = True
 
     def _check_setup(self):
@@ -185,7 +187,7 @@ class Reconstruction:
     def _get_Cl_phi(self):
         power = Powerspectra()
         power.cosmo = self.dm.cosmo
-        ells = np.arange(1, self.lmax_map + 1)
+        ells = np.arange(1, self.Lmax_map + 1)
         Cl_phi = np.zeros(np.size(ells) + 1)
         Cl_phi[1:] = power.get_phi_ps(ells)
         return Cl_phi
