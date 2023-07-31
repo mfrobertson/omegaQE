@@ -10,23 +10,24 @@ import omegaqe
 
 class Template:
 
-    def __init__(self, fields: Fields, Lmin=30, Lmax=3000, F_L_spline=None, C_inv_splines=None, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="T", gaussCMB=False, diffCMBs=False, diffCMBs_offset=1):
+    def __init__(self, fields: Fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="T", gaussCMB=False, diffCMBs=False, diffCMBs_offset=1):
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
-        self.Lmax_map = fields.Lmax_map
-        self.N_pix = fields.N_pix
+        self.Lmax_map = self.fields.Lmax_map
+        self.nside = self.fields.nside
         self._fish = self.fields.fish
         self._power = self._fish.power
         self._cosmo = self._power.cosmo
-        self.F_L, self.C_inv = self._get_F_L_and_C_inv(F_L_spline, C_inv_splines)
+        self.F_L, self.C_inv = self._get_F_L_and_C_inv()
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
         self.a_bars = dict.fromkeys(self.fields.fields)
         self.use_kappa_rec = use_kappa_rec
-        self.kappa_rec = self.fields.get_kappa_rec(kappa_rec_qe_typ)
+        if self.use_kappa_rec:
+            self.kappa_rec = self.fields.get_kappa_rec(kappa_rec_qe_typ)
         self._populate_a_bars(tracer_noise)
 
-    def _get_F_L_and_C_inv(self, F_L_spline, C_inv_splines):
+    def _get_F_L_and_C_inv(self):
         Ls = np.load(f"{omegaqe.RESULTS_DIR}/F_L_results/{self.fields.fields}/{self.fields.exp}/gmv/TEB/30_3000/1_2000/Ls.npy")
         F_L = np.load(f"{omegaqe.RESULTS_DIR}/F_L_results/{self.fields.fields}/{self.fields.exp}/gmv/TEB/30_3000/1_2000/F_L.npy")
         C_inv = self.fields.fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)
@@ -43,20 +44,18 @@ class Template:
                 C_invs[iii, jjj] = C_inv_ij
         return F_L, C_invs
 
-    def _get_fft_maps(self, field):
+    def _get_fft_maps(self, field, include_noise):
         if field == "k" and self.use_kappa_rec:
             return self.kappa_rec
-        # if include_noise:
-            # return self.fields.fft_maps[field] + self.fields.fft_noise_maps[field]
-            pass
+        if include_noise:
+            return self.fields.fft_maps[field] + self.fields.fft_noise_maps[field]
         return self.fields.fft_maps[field]
 
     def _populate_a_bars(self, tracer_noise):
         for iii, field_i in enumerate(self.fields.fields):
-            a_bar_i = np.zeros(np.shape(self._get_fft_maps('k')), dtype="complex128")
+            a_bar_i = np.zeros(np.shape(self._get_fft_maps('k', tracer_noise)), dtype="complex128")
             for jjj, field_j in enumerate(self.fields.fields):
-                # a_j = self._get_fft_maps(field_j, tracer_noise)
-                a_j = self._get_fft_maps(field_j)
+                a_j = self._get_fft_maps(field_j, tracer_noise)
                 a_bar_i += hp.sphtfunc.almxfl(a_j, self.C_inv[iii, jjj])
             self.a_bars[field_i] = a_bar_i
 
@@ -114,8 +113,8 @@ class Template:
             E_gamma, E_lambda = self._get_Egamma_Elambda(Cls, windows, matter_ps)
             B_gamma = np.zeros(np.shape(E_gamma))
             B_lambda = np.zeros(np.shape(E_lambda))
-            Q_gamma, U_gamma = hp.sphtfunc.alm2map_spin(np.array([E_gamma, B_gamma]), self.fields.dm.nside, 2, self.Lmax_map, self.Lmax_map)
-            Q_lambda, U_lambda = hp.sphtfunc.alm2map_spin(np.array([E_lambda, B_lambda]), self.fields.dm.nside, 2, self.Lmax_map, self.Lmax_map)
+            Q_gamma, U_gamma = hp.sphtfunc.alm2map_spin(np.array([E_gamma, B_gamma]), self.nside, 2, self.Lmax_map, self.Lmax_map)
+            Q_lambda, U_lambda = hp.sphtfunc.alm2map_spin(np.array([E_lambda, B_lambda]), self.nside, 2, self.Lmax_map, self.Lmax_map)
             I_map = (Q_gamma * U_lambda) - (Q_lambda * U_gamma)
 
             window_k = self._get_window_k(Chi)
@@ -127,4 +126,4 @@ class Template:
             print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i+1)/Nchi * 100)}%", end='')
         print("")
         I_alm = hp.sphtfunc.map2alm(I_map_tot, lmax=self.Lmax_map, mmax=self.Lmax_map, use_pixel_weights=False)
-        return hp.sphtfunc.almxfl(I_alm, 2/self.F_L) * dChi
+        return hp.sphtfunc.almxfl(I_alm, 1/self.F_L) * dChi
