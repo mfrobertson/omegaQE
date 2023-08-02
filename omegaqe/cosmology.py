@@ -6,21 +6,37 @@ from scipy.constants import Planck, physical_constants
 import omegaqe.tools as tools
 from omegaqe.tools import maths
 from pathlib import Path
+import os
 
 class Cosmology:
     """
     Container for useful cosmological functionality. All CAMB functionality is initialised with parameters from Lensit.
     """
 
-    def __init__(self, paramfile='Lensit_fiducial_flatsky_params.ini'):
+    def __init__(self, paramfile=omegaqe.CAMB_FILE):
         """
         Constructor.
         """
-        sep = tools.getFileSep()
-        self._pars = camb.CAMBparams() if paramfile is None else camb.read_ini(rf"{omegaqe.DATA_DIR}{sep}CAMB{sep}{paramfile}")
+
+        self._pars = self._get_pars(self._get_param_file(paramfile))
         self._results = camb.get_results(self._pars)
         self.cib_norms = None
 
+    def _get_param_file(self, name):
+        if name.lower() == "lensit":
+            return "Lensit_fiducial_flatsky_params.ini"
+        if name.lower() == "demnunii":
+            return "DEMNUnii_params.ini"
+        return name
+
+    def _get_pars(self, filename):
+        if filename is None:
+            return camb.CAMBparams()
+        sep = tools.getFileSep()
+        path = rf"{omegaqe.DATA_DIR}{sep}CAMB{sep}{filename}"
+        if os.path.isfile(path):
+            return camb.read_ini(path)
+        raise ValueError(f"CAMB parameter input file {path} does not exist.")
 
     def cmb_lens_window(self, Chi1, Chi2, heaviside=True):
         """
