@@ -50,10 +50,8 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
     nu = 353e9
 
     _output("Initialising Fisher object...", my_rank, _id)
-    fish = Fisher()
+    fish = Fisher(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=iter, iter_ext=False, data_dir="data")
 
-    _output("Setting up noise...", my_rank, _id)
-    fish.setup_noise(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=iter, iter_ext=False, data_dir="data")
 
     _output("Setting up bispectra splines...", my_rank, _id)
     fish.setup_bispectra(Nell=200)
