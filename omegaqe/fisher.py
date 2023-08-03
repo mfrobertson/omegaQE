@@ -34,7 +34,7 @@ class Fisher:
         """
         self.covariance = Covariance()
         self.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)
-        self.bi = Bispectra()
+        self.bi = Bispectra(powerspectra=self.covariance.power)
         if setup_bispectra:
             self.setup_bispectra()
         self.power = self.covariance.power

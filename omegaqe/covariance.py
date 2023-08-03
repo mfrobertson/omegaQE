@@ -11,7 +11,7 @@ class Covariance:
 
     def __init__(self):
         self.noise = Noise()
-        self.power = Powerspectra()
+        self.power = Powerspectra(cosmology=self.noise.cosmo)
         self.binned_gal_types = list("abcdef")
         self.test_types = list("xyz")
 

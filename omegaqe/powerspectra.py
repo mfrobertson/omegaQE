@@ -13,12 +13,12 @@ class Powerspectra:
         CAMB RectBivariateSpline PK object as the interpolator for the Weyl potential power spectrum.
     """
 
-    def __init__(self):
+    def __init__(self, cosmology=None):
         """
         Constructor.
 
         """
-        self.cosmo = Cosmology()
+        self.cosmo = Cosmology() if cosmology is None else cosmology
         self.weyl_PK = None
         self.matter_weyl_PK = None
         self.matter_PK = None

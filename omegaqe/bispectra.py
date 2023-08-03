@@ -17,7 +17,7 @@ class Bispectra:
             self.gal_bins = gal_bins
             self.gal_distro = gal_distro
 
-    def __init__(self):
+    def __init__(self, powerspectra=None):
         """
         Constructor.
 
@@ -30,7 +30,7 @@ class Bispectra:
         M_matrix : ndarray
             2D array of the modecoupling matrix at calculated at the positions given by ells_sample.
         """
-        self._mode = Modecoupling()
+        self._mode = Modecoupling(powerspectra=powerspectra)
         self._M_splines = dict.fromkeys(self._mode.get_M_types())
 
     def _triangle_dot_product(self, mag1, mag2, mag3):

@@ -13,12 +13,12 @@ class Modecoupling:
         CAMB RectBivariateSpline PK object as the interpolator for the Weyl potential power spectrum.
     """
 
-    def __init__(self):
+    def __init__(self, powerspectra=None):
         """
         Constructor
 
         """
-        self._powerspectra = Powerspectra()
+        self._powerspectra = Powerspectra() if powerspectra is None else powerspectra
         self._cosmo = self._powerspectra.cosmo
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
         self.binned_gal_types = list("abcdef")

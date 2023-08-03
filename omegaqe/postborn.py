@@ -1,15 +1,13 @@
 import numpy as np
-
 import omegaqe
 from omegaqe.modecoupling import Modecoupling
 from omegaqe.tools import getFileSep
 from scipy.interpolate import InterpolatedUnivariateSpline
 import vector
 
-mode = Modecoupling()
-
 
 def _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax):
+    mode = Modecoupling()
     if (zmin == 0 and zmax) is None:
         sep = getFileSep()
         mode_typ = "ww" if cmb else "rr"
