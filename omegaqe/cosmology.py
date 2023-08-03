@@ -31,10 +31,12 @@ class Cosmology:
 
     def _get_pars(self, filename):
         if filename is None:
+            print("Setting up cosmology with CAMB default parameters")
             return camb.CAMBparams()
         sep = tools.getFileSep()
         path = rf"{omegaqe.DATA_DIR}{sep}CAMB{sep}{filename}"
         if os.path.isfile(path):
+            print(f"Setting up cosmology with CAMB ini file at {path}")
             return camb.read_ini(path)
         raise ValueError(f"CAMB parameter input file {path} does not exist.")
 
