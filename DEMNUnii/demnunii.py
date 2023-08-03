@@ -6,19 +6,21 @@ import healpy as hp
 from configparser import ConfigParser
 import pandas as pd
 import datetime
+import re
 
 
 DATA_DIR = "/mnt/lustre/users/astro/mr671/DEMNUnii/LCDM/"
+LMAX_MAP = 5000
 
 class Demnunii:
 
     def __init__(self):
         self.data_dir = DATA_DIR
         self.config = self.setup_config()
-        self.nside = 4096
-        self.Lmax_map = 5000
+        self.nside = int(self.parse_config(self.get_config("HealpixNside")))
+        self.Lmax_map = LMAX_MAP
         self.snap_df = self.get_snap_info()
-        self.cosmo = Cosmology("DEMNUnii_params.ini")
+        self.cosmo = Cosmology("DEMNUnii")
 
     def setup_config(self):
         sep = getFileSep()
@@ -36,6 +38,10 @@ class Demnunii:
 
     def get_config(self, name):
         return self.config.get("header", name)
+
+    def parse_config(self, config):
+        config = re.sub(r'(#.*)?\n?', '', str(config))
+        return re.sub(r'(%.*)?\n?', '', config)
 
     def get_particle_mass(self):
         return float(self.get_config("UnitMass_in_g"))
