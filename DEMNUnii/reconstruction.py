@@ -6,7 +6,7 @@ from plancklens import utils
 from plancklens import qest, qresp, nhl
 from plancklens.n1 import n1
 from plancklens.sims import phas, maps
-from demnunii import Demnunii
+from DEMNUnii.demnunii import Demnunii
 from omegaqe.noise import Noise
 from omegaqe.powerspectra import Powerspectra
 import shutil
@@ -53,10 +53,10 @@ class Reconstruction:
         def hashdict(self):
             return {'cmbs': self.maps_filename, 'noise': self.maps_filename, 'data': self.maps_filename}
 
-    def __init__(self, exp, filename=None, L_cuts=(30, 3000, 30, 5000)):
+    def __init__(self, exp, filename=None, L_cuts=(30, 3000, 30, 5000), sim=None):
         self.filename = filename
         self.setup_env()
-        self.temp = os.path.join(os.environ['PLENS'], 'temp', 'idealized_example')
+        self.temp = os.path.join(os.environ['PLENS'], 'demnunii', str(sim))
         self.exp = exp
         self.dm = Demnunii()
         self.noise = Noise()
@@ -71,6 +71,7 @@ class Reconstruction:
             self.setup_reconstruction(self.filename)
 
     def _initialise(self):
+        print("Initialising filters and librarys for Plancklens")
         self.transfer_dict = {idx[0]: np.ones(self.Lmax_map + 1) for idx in self.indices}
         filters = self.get_filters(self.indices, self.noise_cls)
         self.filt_dict = {'t': filters[0], 'e': filters[1], 'b': filters[2]}
@@ -96,6 +97,7 @@ class Reconstruction:
         if not 'PLENS' in os.environ.keys():
             plancklens_cachedir = "_tmp"
             os.environ['PLENS'] = plancklens_cachedir
+            print(f"Setting up Plancklens ache at {plancklens_cachedir}")
         if os.path.exists(os.environ['PLENS']) and os.path.isdir(os.environ['PLENS']):
             print(f"Removing existing plancklens cache at {os.environ['PLENS']}")
             shutil.rmtree(os.environ['PLENS'])
@@ -144,6 +146,7 @@ class Reconstruction:
         self._raise_typ_error(typ)
 
     def setup_reconstruction(self, TQUmaps_filename):
+        print(f"Setting up reconstruction for file: {TQUmaps_filename}")
         libdir_pixphas = os.path.join(self.temp, 'phas_lmax%s' % self.Lmax_map)
         pix_phas = phas.lib_phas(libdir_pixphas, 3, self.Lmax_map)
         maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.Lmax_map, TQUmaps_filename), self.transfer_dict, self.noise_cls, noise_phas=pix_phas)
@@ -155,7 +158,7 @@ class Reconstruction:
 
     def _check_setup(self):
         if not self.setup:
-            raise ValueError("Need to call 'setup_reconstruction' first. No qlm_lib has been istantiated.")
+            raise ValueError("Need to call 'setup_reconstruction' first. No qlm_lib has been instantiated.")
 
     def get_phi_rec(self, typ):
         self._check_setup()
@@ -165,7 +168,7 @@ class Reconstruction:
         qnorm = utils.cli(resp)
         return hp.almxfl(qlm, qnorm)
 
-    def get_omega_rec(self, typ):
+    def get_curl_rec(self, typ):
         self._check_setup()
         qe_key = self._get_qe_key(typ, curl=True)
         qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
