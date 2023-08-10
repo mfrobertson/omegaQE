@@ -2,7 +2,7 @@ import lenspyx
 from lenspyx.utils_hp import synalm, almxfl
 from omegaqe.powerspectra import Powerspectra
 from omegaqe.tools import getFileSep
-from demnunii import Demnunii
+from DEMNUnii.demnunii import Demnunii
 from scipy.interpolate import InterpolatedUnivariateSpline
 from plancklens.sims import cmbs, phas
 import healpy as hp
@@ -42,7 +42,7 @@ def get_deflection_fields_demnunii(lmax):
 def get_deflection_fields_lenspyx(lmax, omega_acc=4):
     ells = np.arange(1, lmax + 1)
     Cl_phi = np.zeros(np.size(ells) + 1)
-    Cl_phi[1:] = power.get_phi_ps(ells)
+    Cl_phi[1:] = power.get_phi_ps(ells, extended=True)
     plm = synalm(Cl_phi, lmax=lmax, mmax=lmax)
 
     ells_omega, omega_ps = demnunii.cosmo.get_postborn_omega_ps(acc=omega_acc)
