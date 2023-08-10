@@ -7,18 +7,19 @@ from configparser import ConfigParser
 import pandas as pd
 import datetime
 import re
+import DEMNUnii
 
 
-DATA_DIR = "/mnt/lustre/users/astro/mr671/DEMNUnii/LCDM/"
-LMAX_MAP = 5000
 
 class Demnunii:
 
     def __init__(self):
-        self.data_dir = DATA_DIR
+        self.data_dir = DEMNUnii.DATA_DIR
+        self.cache_dir = DEMNUnii.CACHE_DIR
+        self.sims_dir = DEMNUnii.SIMS_DIR
         self.config = self.setup_config()
         self.nside = int(self.parse_config(self.get_config("HealpixNside")))
-        self.Lmax_map = LMAX_MAP
+        self.Lmax_map = DEMNUnii.LMAX_MAP
         self.snap_df = self.get_snap_info()
         self.cosmo = Cosmology("DEMNUnii")
 
