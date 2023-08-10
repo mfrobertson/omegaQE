@@ -1,16 +1,12 @@
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 import datetime
-from fields import Fields
 import healpy as hp
-import omegaqe
-
-
 
 
 class Template:
 
-    def __init__(self, fields: Fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="T", gaussCMB=False, diffCMBs=False, diffCMBs_offset=1):
+    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB"):
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
@@ -19,17 +15,26 @@ class Template:
         self._fish = self.fields.fish
         self._power = self._fish.power
         self._cosmo = self._power.cosmo
-        self.F_L, self.C_inv = self._get_F_L_and_C_inv()
+        self.F_L, self.C_inv = self._get_F_L_and_C_inv(cmb_lens_qe_typ)
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
         self.a_bars = dict.fromkeys(self.fields.fields)
         self.use_kappa_rec = use_kappa_rec
         if self.use_kappa_rec:
-            self.kappa_rec = self.fields.get_kappa_rec(kappa_rec_qe_typ)
+            print(f"Using reconstructed kappa (QE: {cmb_lens_qe_typ}) in template.")
+            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True)
         self._populate_a_bars(tracer_noise)
 
-    def _get_F_L_and_C_inv(self):
-        Ls = np.load(f"{omegaqe.RESULTS_DIR}/F_L_results/{self.fields.fields}/{self.fields.exp}/gmv/TEB/30_3000/1_2000/Ls.npy")
-        F_L = np.load(f"{omegaqe.RESULTS_DIR}/F_L_results/{self.fields.fields}/{self.fields.exp}/gmv/TEB/30_3000/1_2000/F_L.npy")
+    def _get_F_L_and_C_inv(self, cmb_lens_qe_typ):
+        if cmb_lens_qe_typ == "T":
+            qe_typ = "single"
+            fields = "T"
+        elif cmb_lens_qe_typ == "TEB":
+            qe_typ = "gmv"
+            fields = "TEB"
+        else:
+            raise ValueError(f"Supplied cmb_lens_qe_typ {cmb_lens_qe_typ} not of supported typs; T or TEB")
+        Ls = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
+        F_L = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
         C_inv = self.fields.fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)
         F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
         Ls_sample = np.arange(self.Lmax_map+1)
@@ -52,6 +57,7 @@ class Template:
         return self.fields.fft_maps[field]
 
     def _populate_a_bars(self, tracer_noise):
+        print(f"Creating filtered maps for template. Noise included: {tracer_noise}.")
         for iii, field_i in enumerate(self.fields.fields):
             a_bar_i = np.zeros(np.shape(self._get_fft_maps('k', tracer_noise)), dtype="complex128")
             for jjj, field_j in enumerate(self.fields.fields):

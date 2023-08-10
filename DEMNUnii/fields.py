@@ -1,41 +1,82 @@
 import numpy as np
 import omegaqe
+import DEMNUnii
 from omegaqe.fisher import Fisher
-from demnunii import Demnunii
-from reconstruction import Reconstruction
+from DEMNUnii.demnunii import Demnunii
+from DEMNUnii.reconstruction import Reconstruction
+from DEMNUnii.template import Template
 import healpy as hp
 
 
 class Fields:
 
-    def __init__(self, exp, use_cache=False):
+    def __init__(self, exp, use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="demnunii"):
         self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=omegaqe.DATA_DIR)
         self.exp = exp
         self.dm = Demnunii()
-        self.rec = Reconstruction(self.exp, filename="/mnt/lustre/users/astro/mr671/len_cmbs/sims/demnunii/TQU_0.fits")
+        self.sim = cmb_sim
+        self.deflect_typ = deflect_typ
         self.nside = self.dm.nside
         self.Lmax_map = self.dm.Lmax_map
         self.fields = "kgI"
         self.ells = np.arange(self.Lmax_map)
-        self._initialise(use_cache)
+        self._initialise(use_lss_cache, use_cmb_cache)
 
-    def _initialise(self, use_cache):
+    def _initialise(self, use_lss_cache, use_cmb_cache):
         self.fft_maps = dict.fromkeys(self.fields)
         self.fft_noise_maps = dict.fromkeys(self.fields)
         for field in self.fields:
-            self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_cache)
+            self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache)
             self.fft_noise_maps[field] = self.get_noise_map(field, fft=True)
+        if use_cmb_cache:
+            self.rec = None
+        else:
+            self.setup_rec(self.sim, self.deflect_typ)
+
+    def setup_rec(self, sim, deflect_typ):
+        self.sim = sim
+        self.deflect_typ = deflect_typ
+        print(f"Creating Reconstruction instance with exp: {self.exp}, and file: {self.dm.sims_dir}/{self.deflect_typ}/TQU_{self.sim}.fits")
+        self.rec = Reconstruction(self.exp, filename=f"{self.dm.sims_dir}/{self.deflect_typ}/TQU_{self.sim}.fits")
 
     def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, iter_ext=None, data_dir=None):
         return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)
 
-    def get_kappa_rec(self, cmb_fields="T"):
-        kappa_map = 2 * np.pi * self.rec.get_phi_rec(cmb_fields)
-        return hp.almxfl(kappa_map, self.ells*(self.ells + 1)/2)
+    def get_cached_cmb_lens(self, typ, cmb_fields, sim=None):
+        sim = self.sim if sim is None else sim
+        return hp.fitsfunc.read_map(f"{self.dm.sims_dir}/demnunii/{self.exp}/{typ}/{cmb_fields}_{sim}.fits")
+
+    def get_cached_lss(self, field):
+        return hp.fitsfunc.read_map(f"{DEMNUnii.CACHE_DIR}_maps/{field}.fits")
+
+    def get_kappa_rec(self, cmb_fields="T", fft=False):
+        if self.rec is None:
+            kappa_map = self.get_cached_cmb_lens("kappa", cmb_fields)
+            if fft:
+                return hp.sphtfunc.map2alm(kappa_map, self.Lmax_map, self.Lmax_map)
+            return kappa_map
+        phi_alm = self.rec.get_phi_rec(cmb_fields)
+        kappa_alm = hp.sphtfunc.almxfl(phi_alm, self.ells*(self.ells + 1)/2, None, False)
+        if fft:
+            return kappa_alm
+        return hp.sphtfunc.alm2map(kappa_alm, self.nside, lmax=self.Lmax_map, mmax=self.Lmax_map)
+
+    def get_omega_rec(self, cmb_fields="T", fft=False):
+        if self.rec is None:
+            omega_map = self.get_cached_cmb_lens("omega", cmb_fields)
+            if fft:
+                return hp.sphtfunc.map2alm(omega_map, self.nside, self.Lmax_map, self.Lmax_map)
+            return omega_map
+        curl_alm = self.rec.get_curl_rec(cmb_fields)
+        omega_alm = hp.sphtfunc.almxfl(curl_alm, self.ells*(self.ells + 1)/2)
+        if fft:
+            return omega_alm
+        return hp.sphtfunc.alm2map(omega_alm, self.nside, lmax=self.Lmax_map, mmax=self.Lmax_map)
 
     def get_map(self, field, fft=False, use_cache=False):
         if use_cache:
-            map = hp.fitsfunc.read_map(f"_maps/{field}.fits")
+            print(f"Using cache for map: {field}")
+            map = self.get_cached_lss(field)
         elif field == "k":
             map = self.dm.get_kappa_map()
         elif field == "g":
@@ -71,5 +112,9 @@ class Fields:
         if fft:
             return hp.map2alm(map, lmax=self.Lmax_map, mmax=self.Lmax_map, use_pixel_weights=True)
         return map
+
+    def omega_template(self, Nchi, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB"):
+        self.tem = Template(self, Lmin, Lmax, tracer_noise, use_kappa_rec, kappa_rec_qe_typ)
+        return self.tem.get_omega(Nchi)
 
 
