@@ -1,15 +1,12 @@
 from omegaqe.tools import getFileSep
 from omegaqe.cosmology import Cosmology
 import numpy as np
-from astropy.io import fits
-import healpy as hp
 from configparser import ConfigParser
 import pandas as pd
 import datetime
 import re
+from DEMNUnii.spherical import Spherical
 import DEMNUnii
-
-
 
 class Demnunii:
 
@@ -20,6 +17,7 @@ class Demnunii:
         self.config = self.setup_config()
         self.nside = int(self.parse_config(self.get_config("HealpixNside")))
         self.Lmax_map = DEMNUnii.LMAX_MAP
+        self.sht = Spherical(self.nside, self.Lmax_map)
         self.snap_df = self.get_snap_info()
         self.cosmo = Cosmology("DEMNUnii")
 
@@ -50,11 +48,11 @@ class Demnunii:
     def get_snap(self, snap):
         sep = getFileSep()
         snap_num_app = "0" if len(str(snap)) == 2 else "00"
-        hdul = fits.open(f'{self.data_dir}{sep}SurfaceMassDensities{sep}SurfDensMap_snap_{snap_num_app}{snap}.0.fits')
-        return np.asarray(hdul[1].data.base, dtype=float)
+        filename = f'{self.data_dir}{sep}SurfaceMassDensities{sep}SurfDensMap_snap_{snap_num_app}{snap}.0.fits'
+        return self.sht.read_map(filename)
 
     def get_density_snap(self, snap):
-        pixel_area = hp.pixelfunc.nside2pixarea(self.nside)
+        pixel_area = self.sht.nside2pixarea()
         particle_mass = self.get_particle_mass()
         rho = self.get_snap(snap) * particle_mass / pixel_area
         rho_bar = np.mean(rho)
@@ -72,8 +70,8 @@ class Demnunii:
 
     def get_density_map(self, zmin=0, zmax=1100, chi_min=None, chi_max=None, use_chi=False, verbose=False):
         if verbose: print(f"DEMNUnii: Constructing density map for zmin={zmin}, zmax={zmax}, chi_min={chi_min}, chi_max={chi_max}, use_chi={use_chi}")
-        pixel_area = hp.pixelfunc.nside2pixarea(self.nside)
-        npix = hp.nside2npix(self.nside)
+        pixel_area = self.sht.nside2pixarea()
+        npix = self.sht.nside2npix()
         particle_mass = self.get_particle_mass()
         rho = np.zeros(npix)
         snaps = self.get_snaps_chi(chi_min, chi_max) if use_chi else self.get_snaps_z(zmin, zmax)
@@ -116,7 +114,7 @@ class Demnunii:
 
     def get_obs_gal_map(self, zmin=0, zmax=1100, window="LSST", chi_min=None, chi_max=None, use_chi=False, verbose=False):
         if verbose: print(f"DEMNUnii: Constructing gal map for zmin={zmin}, zmax={zmax}, window={window}, chi_min={chi_min}, chi_max={chi_max}, use_chi={use_chi}")
-        npix = hp.nside2npix(self.nside)
+        npix = self.sht.nside2npix()
         gal = np.zeros(npix)
         snaps = self.get_snaps_chi(chi_min, chi_max) if use_chi else self.get_snaps_z(zmin, zmax)
         t0 = datetime.datetime.now()
@@ -129,7 +127,7 @@ class Demnunii:
 
     def get_obs_cib_map(self, zmin=0, zmax=1100, window="Planck", chi_min=None, chi_max=None, use_chi=False, verbose=False):
         if verbose: print(f"DEMNUnii: Constructing CIB map for zmin={zmin}, zmax={zmax}, window={window}, chi_min={chi_min}, chi_max={chi_max}, use_chi={use_chi}")
-        npix = hp.nside2npix(self.nside)
+        npix = self.sht.nside2npix()
         cib = np.zeros(npix)
         snaps = self.get_snaps_chi(chi_min, chi_max) if use_chi else self.get_snaps_z(zmin, zmax)
         t0 = datetime.datetime.now()
@@ -147,29 +145,15 @@ class Demnunii:
             distro[iii] = np.sum(self.get_snap(snap))
         return distro
 
-    def get_ps(self, map, lmax=4000):
-        return hp.sphtfunc.anafast(map, lmax=lmax, use_pixel_weights=True)
-
-    def _get_map_from_split_fits(self, filename):
-        hdul = fits.open(filename)
-        data = np.asarray(hdul[1].data.base)
-        npix = hp.nside2npix(self.nside)
-        map = np.zeros(npix)
-        for iii in np.arange(np.size(data)):
-            map[iii * 1024:(iii + 1) * 1024] = data[iii][0]
-        return map
 
     def get_kappa_map(self, pb=False):
         sep = getFileSep()
         kappa_file = "map0_kappa_ecp262_dmn2_lmax8000.fits" if pb else "map0_kappa_ecp262_dmn2_lmax8000_first.fits"
-        return self._get_map_from_split_fits(self.data_dir+sep+"nbody"+sep+kappa_file)
+        filename = self.data_dir+sep+"nbody"+sep+kappa_file
+        return self.sht.read_map(filename)
 
     def get_omega_map(self):
         sep = getFileSep()
         omega_file = "map0_rotation_ecp262_dmn2_lmax8000.fits"
-        return self._get_map_from_split_fits(self.data_dir + sep + "nbody" + sep + omega_file)
-
-
-
-
-
+        filename = self.data_dir + sep + "nbody" + sep + omega_file
+        return self.sht.read_map(filename)
