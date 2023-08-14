@@ -61,8 +61,6 @@ class Template:
             a_bar_i = np.zeros(np.shape(self._get_fft_maps('k', tracer_noise)), dtype="complex128")
             for jjj, field_j in enumerate(self.fields.fields):
                 a_j = self._get_fft_maps(field_j, tracer_noise)
-                # a_bar_i += hp.sphtfunc.almxfl(a_j, self.C_inv[iii, jjj])
-                # a_bar_i += almxfl(a_j, self.C_inv[iii, jjj], None, False)
                 a_bar_i += self.sht.almxfl(a_j, self.C_inv[iii, jjj])
             self.a_bars[field_i] = a_bar_i
 
@@ -98,16 +96,10 @@ class Template:
         for iii, field_i in enumerate(self.fields.fields):
             if h_gamma is None:
                 h_gamma = self.a_bars[field_i] * windows[field_i]
-                # h_lambda = hp.sphtfunc.almxfl(self.a_bars[field_i], Cls[field_i])
-                # h_lambda = almxfl(self.a_bars[field_i], Cls[field_i], None, False)
                 h_lambda = self.sht.almxfl(self.a_bars[field_i], Cls[field_i])
             else:
                 h_gamma += self.a_bars[field_i] * windows[field_i]
-                # h_lambda += hp.sphtfunc.almxfl(self.a_bars[field_i], Cls[field_i])
-                # h_lambda += almxfl(self.a_bars[field_i], Cls[field_i], None, False)
                 h_lambda += self.sht.almxfl(self.a_bars[field_i], Cls[field_i])
-        # return hp.sphtfunc.almxfl(h_gamma, matter_ps), h_lambda
-        # return almxfl(h_gamma, matter_ps, None, False), h_lambda
         return self.sht.almxfl(h_gamma, matter_ps), h_lambda
 
     def get_omega(self, Nchi=20):
@@ -126,12 +118,8 @@ class Template:
             E_gamma, E_lambda = self._get_Egamma_Elambda(Cls, windows, matter_ps)
             B_gamma = np.zeros(np.shape(E_gamma))
             B_lambda = np.zeros(np.shape(E_lambda))
-            # Q_gamma, U_gamma = hp.sphtfunc.alm2map_spin(np.array([E_gamma, B_gamma]), self.nside, 2, self.Lmax_map, self.Lmax_map)
-            # Q_lambda, U_lambda = hp.sphtfunc.alm2map_spin(np.array([E_lambda, B_lambda]), self.nside, 2, self.Lmax_map, self.Lmax_map)
-            # Q_gamma, U_gamma = self.fields.geom.alm2map_spin(np.array([E_gamma, B_gamma]), 2, self.Lmax_map, self.Lmax_map, nthreads=self.fields.nthreads)
-            # Q_lambda, U_lambda = self.fields.geom.alm2map_spin(np.array([E_lambda, B_lambda]), 2, self.Lmax_map, self.Lmax_map, nthreads=self.fields.nthreads)
-            Q_gamma, U_gamma = self.sht.alm2map_spin(np.array([E_gamma, B_gamma]), 2, nthreads=self.fields.nthreads)
-            Q_lambda, U_lambda = self.sht.alm2map_spin(np.array([E_lambda, B_lambda]), 2, nthreads=self.fields.nthreads)
+            Q_gamma, U_gamma = self.sht.alm2map_spin(np.array([E_gamma, B_gamma]), 2)
+            Q_lambda, U_lambda = self.sht.alm2map_spin(np.array([E_lambda, B_lambda]), 2)
             I_map = (Q_gamma * U_lambda) - (Q_lambda * U_gamma)
 
             window_k = self._get_window_k(Chi)
@@ -142,9 +130,5 @@ class Template:
             print('\r', end='')
             print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i+1)/Nchi * 100)}%", end='')
         print("")
-        # I_alm = hp.sphtfunc.map2alm(I_map_tot, lmax=self.Lmax_map, mmax=self.Lmax_map, use_pixel_weights=False)
-        # return hp.sphtfunc.almxfl(I_alm, 1/self.F_L) * dChi
-        # I_alm = self.fields.geom.map2alm(I_map_tot, lmax=self.Lmax_map, mmax=self.Lmax_map, nthreads=self.fields.nthreads)
-        I_alm = self.sht.map2alm(I_map_tot, nthreads=self.fields.nthreads)
-        # return almxfl(I_alm, 1 / self.F_L, None, False) * dChi
+        I_alm = self.sht.map2alm(I_map_tot)
         return self.sht.almxfl(I_alm, 1 / self.F_L) * dChi

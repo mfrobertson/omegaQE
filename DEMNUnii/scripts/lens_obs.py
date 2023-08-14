@@ -1,5 +1,4 @@
 from DEMNUnii.fields import Fields
-# import healpy as hp
 import sys
 import os
 from omegaqe.tools import mpi
@@ -26,11 +25,9 @@ def main(exp, qe_typ, nsims, sims_dir, nthreads, _id):
         for deflect_typ in deflect_typs:
             fields.setup_rec(sim, deflect_typ)
             kappa_rec = fields.get_kappa_rec(qe_typ, fft=False)
-            # hp.write_map(f"{sims_dir}/{deflect_typ}/{exp}/kappa/{qe_typ}_{sim}.fits", kappa_rec, dtype=float, overwrite=True)
             fields.dm.sht.write_map(f"{sims_dir}/{deflect_typ}/{exp}/kappa/{qe_typ}_{sim}.fits", kappa_rec)
             mpi.output(f"   {deflect_typ} kappa done.", 0, _id)
             omega_rec = fields.get_omega_rec(qe_typ, fft=False)
-            # hp.write_map(f"{sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{sim}.fits", omega_rec, dtype=float, overwrite=True)
             fields.dm.sht.write_map(f"{sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{sim}.fits", omega_rec)
             mpi.output(f"   {deflect_typ} omega done.", 0, _id)
 

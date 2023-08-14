@@ -10,14 +10,14 @@ import DEMNUnii
 
 class Demnunii:
 
-    def __init__(self):
+    def __init__(self, nthreads=1):
         self.data_dir = DEMNUnii.DATA_DIR
         self.cache_dir = DEMNUnii.CACHE_DIR
         self.sims_dir = DEMNUnii.SIMS_DIR
         self.config = self.setup_config()
         self.nside = int(self.parse_config(self.get_config("HealpixNside")))
         self.Lmax_map = DEMNUnii.LMAX_MAP
-        self.sht = Spherical(self.nside, self.Lmax_map)
+        self.sht = Spherical(self.nside, self.Lmax_map, nthreads=nthreads)
         self.snap_df = self.get_snap_info()
         self.cosmo = Cosmology("DEMNUnii")
 

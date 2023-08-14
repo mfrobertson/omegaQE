@@ -15,48 +15,34 @@ class Reconstruction:
 
     class MySimLib:
 
-        def __init__(self, plancklens_mapslib, nthreads, sht):
+        def __init__(self, plancklens_mapslib, sht):
             self.plancklens_mapslib = plancklens_mapslib
-            # self.lmax = lmax
-            # self.geom = geom
-            self.nthreads = nthreads
             self.sht = sht
             self._shuffle = {idx: -1 for idx in range(-1, 300)}
 
         def get_sim_tmap(self, idx):
-            # return hp.sphtfunc.alm2map(self.plancklens_mapslib.get_sim_tmap(int(self._shuffle[-1])), self.nside)
-            # return self.geom.alm2map(self.plancklens_mapslib.get_sim_tmap(int(self._shuffle[-1])), lmax=self.lmax, mmax=self.lmax, nthreads=self.nthreads)
-            return self.sht.alm2map(self.plancklens_mapslib.get_sim_tmap(int(self._shuffle[-1])), nthreads=self.nthreads)
+            return self.sht.alm2map(self.plancklens_mapslib.get_sim_tmap(int(self._shuffle[-1])))
 
         def get_sim_pmap(self, idx):
             elm, blm = self.plancklens_mapslib.get_sim_pmap(int(self._shuffle[-1]))
-            # return hp.alm2map_spin([elm, blm], self.nside, 2, hp.Alm.getlmax(elm.size))
-            # return self.geom.alm2map_spin([elm, blm], 2, lmax=self.lmax, mmax=self.lmax, nthreads=self.nthreads)
-            return self.sht.alm2map_spin([elm, blm], 2, nthreads=self.nthreads)
+            return self.sht.alm2map_spin([elm, blm], 2)
 
         def hashdict(self):
             return {'sim_lib': self.plancklens_mapslib.hashdict(), 'shuffle': self.plancklens_mapslib.hashdict()}
 
     class MyMapLib:
 
-        def __init__(self, lmax_map, maps_filename, nthreads, sht):
+        def __init__(self, lmax_map, maps_filename, sht):
             self.lmax = lmax_map
             self.sht = sht
             self.maps_filename = maps_filename
-            # self.maps = hp.fitsfunc.read_map(f"{self.maps_filename}", (0, 1, 2), dtype=float)
             self.maps = self.sht.read_map(maps_filename)
-            # self.geom = geom
-            self.nthreads = nthreads
 
         def get_sim_tlm(self, idx):
-            # return hp.sphtfunc.map2alm(self.maps[0], lmax=self.lmax, mmax=self.lmax, use_pixel_weights=True)
-            # return self.geom.map2alm(self.maps[0], self.lmax, self.lmax, nthreads=self.nthreads)
-            return self.sht.map2alm(self.maps[0], self.lmax, self.nthreads)
+            return self.sht.map2alm(self.maps[0], self.lmax)
 
         def _get_map_eblm(self, idx):
-            # return hp.sphtfunc.map2alm_spin(self.maps[1:], 2, lmax=self.lmax, mmax=self.lmax)
-            # return self.geom.map2alm_spin(self.maps[1:], 2, self.lmax, self.lmax, nthreads=self.nthreads)
-            return self.sht.map2alm_spin(self.maps[1:], 2, self.lmax, self.nthreads)
+            return self.sht.map2alm_spin(self.maps[1:], 2, self.lmax)
 
         def get_sim_elm(self, idx):
             return self._get_map_eblm(idx)[0]
@@ -73,9 +59,8 @@ class Reconstruction:
         self.setup_env()
         self.temp = os.path.join(os.environ['PLENS'], 'demnunii', str(sim))
         self.exp = exp
-        self.dm = Demnunii()
+        self.dm = Demnunii(nthreads)
         self.sht = self.dm.sht
-        # self.geom = lenspyx.get_geom(('healpix', {'nside': self.dm.nside}))
         self.noise = Noise()
         self.L_cuts = L_cuts
         self.Lmax_map = self.dm.Lmax_map
@@ -166,8 +151,8 @@ class Reconstruction:
         print(f"Setting up reconstruction for file: {TQUmaps_filename}")
         libdir_pixphas = os.path.join(self.temp, 'phas_lmax%s' % self.Lmax_map)
         pix_phas = phas.lib_phas(libdir_pixphas, 3, self.Lmax_map)
-        maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.Lmax_map, TQUmaps_filename, self.nthreads, self.sht), self.transfer_dict, self.noise_cls, noise_phas=pix_phas)
-        self.sim_lib = self.MySimLib(maps_lib, self.nthreads, self.sht)
+        maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.Lmax_map, TQUmaps_filename, self.sht), self.transfer_dict, self.noise_cls, noise_phas=pix_phas)
+        self.sim_lib = self.MySimLib(maps_lib, self.sht)
         weighted_maps_lib = filt_simple.library_fullsky_sepTP(os.path.join(self.temp, 'ivfs'), self.sim_lib, self.dm.nside, self.transfer_dict, self.cl_grad, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
         self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.cl_grad['te'], self.dm.nside, lmax_qlm=self.Lmax_map)
         self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, self.cl_grad, self.Lmax_map)
@@ -183,8 +168,6 @@ class Reconstruction:
         qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
         resp = self.qresp_lib.get_response(qe_key, 'p')
         qnorm = utils.cli(resp)
-        # return hp.almxfl(qlm, qnorm)
-        # return almxfl(qlm, qnorm, None, False)
         return self.sht.almxfl(qlm, qnorm)
 
     def get_curl_rec(self, typ):
@@ -193,8 +176,6 @@ class Reconstruction:
         qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
         resp = self.qresp_lib.get_response(qe_key, 'p')
         qnorm = utils.cli(resp)
-        # return hp.almxfl(qlm, qnorm)
-        # return almxfl(qlm, qnorm, None, False)
         return self.sht.almxfl(qlm, qnorm)
 
     def get_response(self, typ, curl=False):

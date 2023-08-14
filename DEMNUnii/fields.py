@@ -13,8 +13,7 @@ class Fields:
         self.nthreads = nthreads
         self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=omegaqe.DATA_DIR)
         self.exp = exp
-        self.dm = Demnunii()
-        # self.geom = lenspyx.get_geom(('healpix', {'nside': self.dm.nside}))
+        self.dm = Demnunii(nthreads)
         self.sim = cmb_sim
         self.deflect_typ = deflect_typ
         self.nside = self.dm.nside
@@ -45,11 +44,9 @@ class Fields:
 
     def get_cached_cmb_lens(self, typ, cmb_fields, sim=None):
         sim = self.sim if sim is None else sim
-        # return hp.fitsfunc.read_map(f"{self.dm.sims_dir}/demnunii/{self.exp}/{typ}/{cmb_fields}_{sim}.fits", dtype=float)
         return self.dm.sht.read_map(f"{self.dm.sims_dir}/demnunii/{self.exp}/{typ}/{cmb_fields}_{sim}.fits")
 
     def get_cached_lss(self, field):
-        # return hp.fitsfunc.read_map(f"{DEMNUnii.CACHE_DIR}_maps/{field}.fits", dtype=float)
         return self.dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}_maps/{field}.fits")
 
     def _lensing_fac(self):
@@ -59,36 +56,24 @@ class Fields:
         if self.rec is None:
             kappa_map = self.get_cached_cmb_lens("kappa", cmb_fields)
             if fft:
-                # return hp.sphtfunc.map2alm(kappa_map, self.Lmax_map, self.Lmax_map)
-                # return self.geom.map2alm(kappa_map, self.Lmax_map, self.Lmax_map, nthreads=self.nthreads)
                 return self.dm.sht.map2alm(kappa_map, nthreads=self.nthreads)
             return kappa_map
         phi_alm = self.rec.get_phi_rec(cmb_fields)
-        # kappa_alm = hp.sphtfunc.almxfl(phi_alm, self._lensing_fac(), None, False)
-        # kappa_alm = almxfl(phi_alm, self._lensing_fac(), None, False)
         kappa_alm = self.dm.sht.almxfl(phi_alm, self._lensing_fac())
         if fft:
             return kappa_alm
-        # return hp.sphtfunc.alm2map(kappa_alm, self.nside, lmax=self.Lmax_map, mmax=self.Lmax_map)
-        # return self.geom.alm2map(kappa_alm, self.Lmax_map, self.Lmax_map, nthreads=self.nthreads)
         return self.dm.sht.alm2map(kappa_alm, nthreads=self.nthreads)
 
     def get_omega_rec(self, cmb_fields="T", fft=False):
         if self.rec is None:
             omega_map = self.get_cached_cmb_lens("omega", cmb_fields)
             if fft:
-                # return hp.sphtfunc.map2alm(omega_map, self.Lmax_map, self.Lmax_map)
-                # return self.geom.map2alm(omega_map, self.Lmax_map, self.Lmax_map, nthreads=self.nthreads)
                 return self.dm.sht.map2alm(omega_map, nthreads=self.nthreads)
             return omega_map
         curl_alm = self.rec.get_curl_rec(cmb_fields)
-        # omega_alm = hp.sphtfunc.almxfl(curl_alm, self._lensing_fac(), None, False)
-        # omega_alm = almxfl(curl_alm, self._lensing_fac(), None, False)
         omega_alm = self.dm.sht.almxfl(curl_alm, self._lensing_fac())
         if fft:
             return omega_alm
-        # return hp.sphtfunc.alm2map(omega_alm, self.nside, lmax=self.Lmax_map, mmax=self.Lmax_map)
-        # return self.geom.alm2map(omega_alm, self.Lmax_map, self.Lmax_map, nthreads=self.nthreads)
         return self.dm.sht.alm2map(omega_alm, nthreads=self.nthreads)
 
     def get_map(self, field, fft=False, use_cache=False):
@@ -104,8 +89,6 @@ class Fields:
         else:
             raise ValueError(f"Field typ {field} not expected.")
         if fft:
-            # return hp.map2alm(map, lmax=self.Lmax_map, mmax=self.Lmax_map, use_pixel_weights=True)
-            # return self.geom.map2alm(map, self.Lmax_map, self.Lmax_map, nthreads=self.nthreads)
             return self.dm.sht.map2alm(map, nthreads=self.nthreads)
         return map
 
@@ -128,12 +111,8 @@ class Fields:
         N = self._get_N(field)
         if set_seed:
             np.random.seed(99)
-        # map = hp.sphtfunc.synfast(N, self.nside, self.Lmax_map, self.Lmax_map)
-        # map = lenspyx.synfast(N, self.Lmax_map, self.Lmax_map, geometry=self.geom)
         map = self.dm.sht.synfast(N)
         if fft:
-            # return hp.map2alm(map, lmax=self.Lmax_map, mmax=self.Lmax_map, use_pixel_weights=True)
-            # return self.geom.map2alm(map, self.Lmax_map, self.Lmax_map, nthreads=self.nthreads)
             return self.dm.sht.map2alm(map, nthreads=self.nthreads)
         return map
 

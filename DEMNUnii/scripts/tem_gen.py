@@ -13,7 +13,6 @@ def save_tem_map(tem_map, tem_dir, sim, tracer_noise, kappa_rec, kappa_qe_typ, s
         extension += f"_{kappa_qe_typ}"
     full_path = f"{tem_dir}/{filename}{extension}.fits"
     mpi.output(f"Saving template to {full_path}", 0, _id)
-    # hp.write_map(f"{full_path}", tem_map, dtype=float, overwrite=True)
     sht.write_map(f"{full_path}", tem_map)
 
 
@@ -28,7 +27,6 @@ def main(exp, Nchi, tracer_noise, nsims, kappa_rec, kappa_qe_typ, nthreads, _id)
                 continue
             fields = Fields(exp, use_lss_cache=True, use_cmb_cache=True, cmb_sim=sim, deflect_typ=deflect_typ, nthreads=nthreads)
             omega_tem = fields.omega_template(Nchi, tracer_noise=tracer_noise, use_kappa_rec=kappa_rec, kappa_rec_qe_typ=kappa_qe_typ)
-            # tem_map = hp.sphtfunc.alm2map(omega_tem, fields.nside, lmax=fields.Lmax_map, mmax=fields.Lmax_map)
             tem_map = fields.dm.sht.alm2map(omega_tem, nthreads=fields.nthreads)
             tem_dir = f"{fields.dm.cache_dir}/_tems/{deflect_typ}/{exp}"
             save_tem_map(tem_map, tem_dir, sim, tracer_noise, kappa_rec, kappa_qe_typ, fields.dm.sht)
