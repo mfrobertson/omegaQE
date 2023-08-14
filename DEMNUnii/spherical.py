@@ -7,7 +7,8 @@ class Spherical:
 
     def __init__(self, nside, lmax, nthreads=1):
         self.nside = nside
-        self.geom = lenspyx.get_geom(('healpix', {'nside': nside}))
+        self.geom_info = ('healpix', {'nside': nside})
+        self.geom = lenspyx.get_geom(self.geom_info)
         self.lmax = lmax
         self.nthreads = nthreads
 
@@ -24,7 +25,7 @@ class Spherical:
 
     def alm2lenmap(self, alms, dlm, nthreads=None):
         nthreads = self.nthreads if nthreads is None else nthreads
-        return lenspyx.alm2lenmap(alms, dlm, geometry=self.geom, verbose=1, epsilon=1e-10, nthreads=nthreads)
+        return lenspyx.alm2lenmap(alms, dlm, geometry=self.geom_info, verbose=1, epsilon=1e-10, nthreads=nthreads)
 
     def alm2map(self, alm, lmax=None, nthreads=None):
         lmax, nthreads = self._get_lmax_and_nthreads(lmax, nthreads)
