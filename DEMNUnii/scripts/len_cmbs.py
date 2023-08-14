@@ -17,54 +17,66 @@ if not 'PLENS' in os.environ.keys():
     os.environ['PLENS'] = '_tmp'
 
 
+def _check_deflect_typ(deflect_typ, curl):
+    if curl:
+        if deflect_typ not in ["dem", "diff"]:
+            _raise_deflection_error(deflect_typ)
+    if deflect_typ not in ["dem","diff","pb"]:
+        _raise_deflection_error(deflect_typ)
+
+
 def _raise_deflection_error(deflect_typ):
-    raise ValueError(f"Deflection type {deflect_typ} not of demnunii, diff_alpha or diff_omega.")
+    raise ValueError(f"Deflection type {deflect_typ} not of dem, diff (or pb for gradient only).")
 
 
-def _lensing_fac(ells):
-    fac = np.zeros(np.size(ells) + 1)
-    fac[1:] = -2 / ells / (ells + 1)
+def _lensing_fac():
+    ells = np.arange(LMAX_MAP+1)[1:]
+    fac = np.zeros(LMAX_MAP+1)
+    fac[1:] = -2 / np.sqrt(ells * (ells + 1))
     return fac
 
 
-def _get_plm(nthreads, deflect_typ):
-    ells = np.arange(1, LMAX_MAP + 1)
-    lensing_fac = _lensing_fac(ells)
-    if deflect_typ == "demnunii" or deflect_typ == "diff_omega":
+def _inv_lensing_fac():
+    inv_fac = np.zeros(LMAX_MAP+1)
+    inv_fac[1:] = 1/_lensing_fac()[1:]
+    return inv_fac
+
+
+def get_glm(nthreads, deflect_typ):
+    _check_deflect_typ(deflect_typ, curl=False)
+    lensing_fac = _lensing_fac()
+    klm = None
+    if deflect_typ == "dem":
         kappa_map = dm.get_kappa_map()
-        klm = dm.sht.map2alm(kappa_map, lmax=LMAX_MAP, nthread=nthreads)
+        klm = dm.sht.map2alm(kappa_map, lmax=LMAX_MAP, nthreads=nthreads)
         return dm.sht.almxfl(klm, lensing_fac)
-    if deflect_typ == "diff_alpha":
-        Cl_phi = np.zeros(np.size(ells) + 1)
-        Cl_phi[1:] = power.get_phi_ps(ells, extended=True)
-        return dm.sht.synalm(Cl_phi, lmax=LMAX_MAP)
-    _raise_deflection_error(deflect_typ)
+    if deflect_typ == "pb":
+        kappa_map = dm.get_kappa_map(pb=True)
+        klm = dm.sht.map2alm(kappa_map, lmax=LMAX_MAP, nthreads=nthreads)
+        return dm.sht.almxfl(klm, lensing_fac)
+    if deflect_typ == "diff":
+        ells = np.arange(LMAX_MAP+1)[1:]
+        Cl_kappa = np.zeros(LMAX_MAP+1)
+        Cl_kappa[1:] = power.get_kappa_ps(ells, extended=True)
+        klm = dm.sht.synalm(Cl_kappa, lmax=LMAX_MAP)
+    return dm.sht.almxfl(klm, lensing_fac)
 
 
-def _get_Olm(nthreads, deflect_typ, camb_acc):
-    ells = np.arange(1, LMAX_MAP + 1)
-    lensing_fac = _lensing_fac(ells)
-    if deflect_typ == "demnunii":
+
+def get_clm(nthreads, deflect_typ, camb_acc=4):
+    _check_deflect_typ(deflect_typ, curl=True)
+    lensing_fac = _lensing_fac()
+    olm = None
+    if deflect_typ == "dem":
         omega_map = dm.get_omega_map()
         olm = dm.sht.map2alm(omega_map, lmax=LMAX_MAP, nthreads=nthreads)
-        return dm.sht.almxfl(olm, lensing_fac)
-    if deflect_typ == "diff_omega" or "diff_alpha":
+    if deflect_typ == "diff":
+        ells = np.arange(LMAX_MAP+1)[1:]
         ells_omega, omega_ps = dm.cosmo.get_postborn_omega_ps(acc=camb_acc)
-        Cl_omega = np.zeros(np.size(ells) + 1)
+        Cl_omega = np.zeros(LMAX_MAP+1)
         Cl_omega[1:] = InterpolatedUnivariateSpline(ells_omega, omega_ps)(ells)
         olm = dm.sht.synalm(Cl_omega, lmax=LMAX_MAP)
-        return dm.sht.almxfl(olm, lensing_fac)
-    _raise_deflection_error(deflect_typ)
-
-
-def get_deflection_fields(nthreads, deflect_typ="demnunii", camb_acc=4):
-    plm = _get_plm(nthreads, deflect_typ)
-    Olm = _get_Olm(nthreads, deflect_typ, camb_acc)
-    ells = np.arange(1, LMAX_MAP + 1)
-    lensing_fac = _lensing_fac(ells)
-    glm = dm.sht.almxfl(plm, np.sqrt(lensing_fac))
-    clm = dm.sht.almxfl(Olm, np.sqrt(lensing_fac))
-    return glm, clm
+    return dm.sht.almxfl(olm, lensing_fac)
 
 
 def get_unlensed_cmb_ps():
@@ -97,26 +109,22 @@ def save_lens_maps(loc, len_maps, sim):
     dm.sht.write_map(f"{directory}{sep}TQU_{sim}.fits", len_maps)
 
 
-def save_omega(loc, clm, nthreads):
+def _save_omega_diff(loc, clm, nthreads):
     directory = f"{loc}"
     if not os.path.isdir(directory):
         os.makedirs(directory)
-    ells = np.arange(np.size(clm))
-    olm = dm.sht.almxfl(clm, -np.sqrt(ells * (ells + 1)) / 2)
+    olm = dm.sht.almxfl(clm, _inv_lensing_fac())
     omega_map = dm.sht.alm2map(olm, lmax=LMAX_MAP, nthreads=nthreads)
-    dm.sht.write_map(f"{directory}{sep}omega_true.fits", omega_map)
+    dm.sht.write_map(f"{directory}{sep}omega_diff.fits", omega_map)
 
 
-def save_omega_kappa(loc, dlm, nthreads):
+def _save_kappa_diff(loc, glm, nthreads):
     directory = f"{loc}"
     if not os.path.isdir(directory):
         os.makedirs(directory)
-    alm = dlm[0]
-    ells = np.arange(np.size(alm))
-    klm = dm.sht.almxfl(alm, -np.sqrt(ells * (ells + 1)) / 2)
+    klm = dm.sht.almxfl(glm, _inv_lensing_fac())
     kappa_map = dm.sht.alm2map(klm, lmax=LMAX_MAP, nthreads=nthreads)
-    dm.sht.write_map(f"{directory}{sep}kappa_true.fits", kappa_map)
-    save_omega(loc, dlm[1], nthreads)
+    dm.sht.write_map(f"{directory}{sep}kappa_diff.fits", kappa_map)
 
 
 def save_Tunl(loc, Tmap, sim):
@@ -125,39 +133,38 @@ def save_Tunl(loc, Tmap, sim):
         os.makedirs(directory)
     dm.sht.write_map(f"{directory}{sep}T_{sim}.fits", Tmap)
 
+
 def main(nsims, nthreads, loc):
-    glm, clm = get_deflection_fields(nthreads, deflect_typ="demnunii")
-    demnunii_dir = f"{loc}{sep}demnunii"
-    dlm_dem = np.array([glm, clm])
-
-    glm, clm = get_deflection_fields(nthreads, deflect_typ="diff_alpha", camb_acc=4)
-    diff_alpha_dir = f"{loc}{sep}diff_alpha"
-    dlm_diff_alpha = np.array([glm, clm])
-    save_omega_kappa(diff_alpha_dir, dlm_diff_alpha, nthreads)
-
-    glm, clm = get_deflection_fields(nthreads, deflect_typ="diff_omega", camb_acc=4)
-    diff_omega_dir = f"{loc}{sep}diff_omega"
-    save_omega(diff_omega_dir, clm, nthreads)
-    dlm_diff_omega = np.array([glm, clm])
-
+    glm_pb = get_glm(nthreads, "pb")
+    glm_dem = get_glm(nthreads, "dem")
+    glm_diff = get_glm(nthreads, "diff")
+    clm_dem = get_clm(nthreads, "dem")
+    clm_diff = get_clm(nthreads, "diff")
+    deflect_configs = {"pbdem_dem":(glm_pb, clm_dem),
+                       "dem_dem":(glm_dem, clm_dem),
+                       "pbdem_diff":(glm_pb, clm_dem),
+                       "dem_diff":(glm_dem, clm_diff),
+                       "diff_dem":(glm_diff, clm_dem),
+                       "diff_diff":(glm_diff, clm_diff)
+                       }
     unl_cmb_spectra = get_unlensed_cmb_ps()
     for sim in range(nsims):
         unl_alms = get_unlensed_alms(unl_cmb_spectra, sim)
-        len_maps_dem = get_lensed_maps(dlm_dem, unl_alms, nthreads)
-        save_lens_maps(demnunii_dir, len_maps_dem, sim)
+        for iii, deflect_typ in enumerate(deflect_configs):
+            glm, clm = deflect_configs[deflect_typ]
+            dlm = np.array([glm, clm])
+            outdir = f"{loc}{sep}{deflect_typ}"
 
-        len_maps_diff_alpha = get_lensed_maps(dlm_diff_alpha, unl_alms, nthreads)
-        save_lens_maps(diff_alpha_dir, len_maps_diff_alpha, sim)
+            len_maps = get_lensed_maps(dlm, unl_alms, nthreads)
+            save_lens_maps(outdir, len_maps, sim)
 
-        len_maps_diff_omega = get_lensed_maps(dlm_diff_omega, unl_alms, nthreads)
-        save_lens_maps(diff_omega_dir, len_maps_diff_omega, sim)
-
-        save_Tunl(f"{loc}{sep}T_unl", get_unlensed_Tmap(unl_alms, nthreads), sim)
+    _save_kappa_diff(loc, glm_diff, nthreads)
+    _save_omega_diff(loc, clm_diff, nthreads)
 
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) !=3:
+    if len(args) != 3:
         raise ValueError(
             "Arguments should be nsims nthreads loc")
     nsims = int(args[0])
