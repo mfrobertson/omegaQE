@@ -41,7 +41,7 @@ class Spherical:
 
     def map2alm_spin(self, maps, spin, lmax=None, nthreads=None):
         lmax, nthreads = self._get_lmax_and_nthreads(lmax, nthreads)
-        return self.geom.map2alm(maps, spin, lmax=lmax, mmax=lmax, nthreads=nthreads)
+        return self.geom.map2alm_spin(maps, spin, lmax=lmax, mmax=lmax, nthreads=nthreads)
 
     @staticmethod
     def almxfl(alm, fl):
@@ -49,7 +49,7 @@ class Spherical:
 
     @staticmethod
     def read_map(filename):
-        return hp.fitsfunc.read_map(filename, dtype=float)
+        return hp.fitsfunc.read_map(filename, dtype=float, field=None)
 
     @staticmethod
     def write_map(filename, map):
