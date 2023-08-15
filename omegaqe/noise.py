@@ -18,7 +18,7 @@ class Noise:
         Essentially the value of ellmin of the N0 array.
     """
 
-    def __init__(self):
+    def __init__(self, cosmology=None):
         """
         Constructor
 
@@ -31,7 +31,7 @@ class Noise:
         """
         self.N0 = None
         self.cmb_offset = 2
-        self.cosmo = Cosmology()
+        self.cosmo = Cosmology() if cosmology is None else cosmology
 
     def _get_N0_phi(self, ellmax):
         return np.concatenate((np.zeros(self.cmb_offset), self.N0[0][:ellmax + 1 - self.cmb_offset]))
