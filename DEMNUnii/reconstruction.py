@@ -61,7 +61,8 @@ class Reconstruction:
         self.exp = exp
         self.dm = Demnunii(nthreads)
         self.sht = self.dm.sht
-        self.noise = Noise()
+        self.noise = Noise(cosmology=self.dm.cosmo)
+        self.power = Powerspectra(cosmology=self.dm.cosmo)
         self.L_cuts = L_cuts
         self.Lmax_map = self.dm.Lmax_map
         self.indices = ["tt", "ee", "bb"]
@@ -135,7 +136,7 @@ class Reconstruction:
         return self._apply_cuts(filts, indices)
 
     def _raise_typ_error(self, typ):
-        raise ValueError(f"QE type {typ} not recognized. Recognized types included TEB (for mv), EB (for pol only), or TT.")
+        raise ValueError(f"QE type {typ} not recognized. Recognized types included TEB (for mv), EB (for pol only), or T.")
 
     def _get_qe_key(self, typ, curl=False):
         potential = "x" if curl else "p"
@@ -190,11 +191,9 @@ class Reconstruction:
         return N0_unnorm * resp[:np.size(N0_unnorm)]**2
 
     def _get_Cl_phi(self):
-        power = Powerspectra()
-        power.cosmo = self.dm.cosmo
         ells = np.arange(1, self.Lmax_map + 1)
         Cl_phi = np.zeros(np.size(ells) + 1)
-        Cl_phi[1:] = power.get_phi_ps(ells)
+        Cl_phi[1:] = self.power.get_phi_ps(ells)
         return Cl_phi
 
     def get_N1(self, typ, curl=False, lmax=3000):

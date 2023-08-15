@@ -49,12 +49,10 @@ def get_glm(nthreads, deflect_typ):
     if deflect_typ == "dem":
         kappa_map = dm.get_kappa_map()
         klm = dm.sht.map2alm(kappa_map, lmax=LMAX_MAP, nthreads=nthreads)
-        return dm.sht.almxfl(klm, lensing_fac)
-    if deflect_typ == "pb":
+    elif deflect_typ == "pb":
         kappa_map = dm.get_kappa_map(pb=True)
         klm = dm.sht.map2alm(kappa_map, lmax=LMAX_MAP, nthreads=nthreads)
-        return dm.sht.almxfl(klm, lensing_fac)
-    if deflect_typ == "diff":
+    elif deflect_typ == "diff":
         ells = np.arange(LMAX_MAP+1)[1:]
         Cl_kappa = np.zeros(LMAX_MAP+1)
         Cl_kappa[1:] = power.get_kappa_ps(ells, extended=True)
@@ -70,7 +68,7 @@ def get_clm(nthreads, deflect_typ, camb_acc=4):
     if deflect_typ == "dem":
         omega_map = dm.get_omega_map()
         olm = dm.sht.map2alm(omega_map, lmax=LMAX_MAP, nthreads=nthreads)
-    if deflect_typ == "diff":
+    elif deflect_typ == "diff":
         ells = np.arange(LMAX_MAP+1)[1:]
         ells_omega, omega_ps = dm.cosmo.get_postborn_omega_ps(acc=camb_acc)
         Cl_omega = np.zeros(LMAX_MAP+1)

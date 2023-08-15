@@ -22,7 +22,9 @@ def main(exp, Nchi, tracer_noise, nsims, kappa_rec, kappa_qe_typ, deflect_typ, n
 
     deflect_typs = ["pbdem_dem", "dem_dem", "diff_dem", "pbdem_diff", "dem_diff", "diff_diff"] if deflect_typ is None else [deflect_typ]
     for sim in range(nsims):
+        mpi.output(f"Sim: {sim}", 0, _id)
         for deflect_typ in deflect_typs:
+            mpi.output(f"  type: {deflect_typ}", 0, _id)
             fields = Fields(exp, use_lss_cache=True, use_cmb_cache=True, cmb_sim=sim, deflect_typ=deflect_typ, nthreads=nthreads)
             omega_tem = fields.omega_template(Nchi, tracer_noise=tracer_noise, use_kappa_rec=kappa_rec, kappa_rec_qe_typ=kappa_qe_typ)
             tem_map = fields.dm.sht.alm2map(omega_tem, nthreads=fields.nthreads)
