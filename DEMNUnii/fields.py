@@ -44,7 +44,7 @@ class Fields:
 
     def get_cached_cmb_lens(self, typ, cmb_fields, sim=None):
         sim = self.sim if sim is None else sim
-        return self.dm.sht.read_map(f"{self.dm.sims_dir}/demnunii/{self.exp}/{typ}/{cmb_fields}_{sim}.fits")
+        return self.dm.sht.read_map(f"{self.dm.sims_dir}/{self.deflect_typ}/{self.exp}/{typ}/{cmb_fields}_{sim}.fits")
 
     def get_cached_lss(self, field):
         return self.dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}_maps/{field}.fits")
