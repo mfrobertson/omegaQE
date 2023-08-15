@@ -1,6 +1,7 @@
 import lenspyx
 from lenspyx.utils_hp import almxfl, alm2cl, synalm
 import healpy as hp
+import copy
 
 
 class Spherical:
@@ -36,12 +37,14 @@ class Spherical:
         return self.geom.alm2map_spin(alms, spin, lmax=lmax, mmax=lmax, nthreads=nthreads)
 
     def map2alm(self, map, lmax=None, nthreads=None):
+        map_copy = copy.deepcopy(map)
         lmax, nthreads = self._get_lmax_and_nthreads(lmax, nthreads)
-        return self.geom.map2alm(map, lmax=lmax, mmax=lmax, nthreads=nthreads)
+        return self.geom.map2alm(map_copy, lmax=lmax, mmax=lmax, nthreads=nthreads)
 
     def map2alm_spin(self, maps, spin, lmax=None, nthreads=None):
+        maps_copy = copy.deepcopy(maps)
         lmax, nthreads = self._get_lmax_and_nthreads(lmax, nthreads)
-        return self.geom.map2alm_spin(maps, spin, lmax=lmax, mmax=lmax, nthreads=nthreads)
+        return self.geom.map2alm_spin(maps_copy, spin, lmax=lmax, mmax=lmax, nthreads=nthreads)
 
     @staticmethod
     def almxfl(alm, fl):
@@ -63,7 +66,7 @@ class Spherical:
 
     def map2cl(self, map1, map2=None, lmax_out=None, lmax=None, nthreads=None):
         alm1 = self.map2alm(map1, lmax, nthreads)
-        alm2 = self.map2alm(map2, lmax, nthreads) if map2 is not None else map2
+        alm2 = self.map2alm(map2, lmax, nthreads) if map2 is not None else alm1
         return self.alm2cl(alm1, alm2, lmax_out, lmax)
 
     def synfast(self, Cl, lmax=None):
