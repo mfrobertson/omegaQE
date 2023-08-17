@@ -83,4 +83,4 @@ class Spherical:
 
     def nside2pixarea(self, nside=None):
         nside = self._get_nside(nside)
-        return hp.pixelfunc.nside2pixarea(nside)
+        return hp.nside2pixarea(nside)
