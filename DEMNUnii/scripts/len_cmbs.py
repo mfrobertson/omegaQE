@@ -131,6 +131,14 @@ def save_Tunl(loc, Tmap, sim):
         os.makedirs(directory)
     dm.sht.write_map(f"{directory}{sep}T_{sim}.fits", Tmap)
 
+def _save_unl_cmbs(loc, alms, sim, nthreads):
+    directory = f"{loc}{sep}unlensed"
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+    Tmap = dm.sht.alm2map(alms[0], lmax=LMAX_MAP, nthreads=nthreads)
+    QUmaps = dm.sht.alm2map_spin(alms[1:], 2, lmax=LMAX_MAP, nthreads=nthreads)
+    dm.sht.write_map(f"{directory}{sep}TQU_{sim}.fits", np.array([Tmap, QUmaps[0], QUmaps[1]]))
+
 
 def main(nsims, nthreads, loc):
     glm_pb = get_glm(nthreads, "pb")
@@ -140,7 +148,7 @@ def main(nsims, nthreads, loc):
     clm_diff = get_clm(nthreads, "diff")
     deflect_configs = {"pbdem_dem":(glm_pb, clm_dem),
                        "dem_dem":(glm_dem, clm_dem),
-                       "pbdem_diff":(glm_pb, clm_dem),
+                       "pbdem_diff":(glm_pb, clm_diff),
                        "dem_diff":(glm_dem, clm_diff),
                        "diff_dem":(glm_diff, clm_dem),
                        "diff_diff":(glm_diff, clm_diff)
@@ -148,6 +156,7 @@ def main(nsims, nthreads, loc):
     unl_cmb_spectra = get_unlensed_cmb_ps()
     for sim in range(nsims):
         unl_alms = get_unlensed_alms(unl_cmb_spectra, sim)
+        _save_unl_cmbs(loc, unl_alms, sim, nthreads)
         for iii, deflect_typ in enumerate(deflect_configs):
             glm, clm = deflect_configs[deflect_typ]
             dlm = np.array([glm, clm])
