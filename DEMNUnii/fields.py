@@ -9,7 +9,7 @@ from DEMNUnii.template import Template
 
 class Fields:
 
-    def __init__(self, exp, use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="demnunii", nthreads=1):
+    def __init__(self, exp, use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1):
         self.nthreads = nthreads
         self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=omegaqe.DATA_DIR)
         self.exp = exp
