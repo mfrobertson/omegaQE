@@ -5,7 +5,7 @@ from omegaqe.fisher import Fisher
 from DEMNUnii.demnunii import Demnunii
 from DEMNUnii.reconstruction import Reconstruction
 from DEMNUnii.template import Template
-
+from datetime import datetime
 
 class Fields:
 
@@ -27,7 +27,7 @@ class Fields:
         self.fft_noise_maps = dict.fromkeys(self.fields)
         for field in self.fields:
             self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache)
-            self.fft_noise_maps[field] = self.get_noise_map(field, fft=True)
+            self.fft_noise_maps[field] = self.get_noise_map(field, set_seed=True, fft=True)
         if use_cmb_cache:
             self.rec = None
         else:
@@ -107,10 +107,21 @@ class Fields:
         nT, beam = self.fish.covariance.noise.get_noise_args(self.exp)
         return self.fish.covariance.noise.get_cmb_gaussian_N(field, nT, beam, kmax, exp=self.exp)
 
+    def _get_seed(self, field=None, sim=None):
+        if field is None:
+            return int(datetime.now().timestamp())
+        sim = self.sim if sim is None else sim
+        seed = 3 * sim
+        if field == "g":
+            seed += 1
+        elif field == "I":
+            seed += 2
+        return seed
+
     def get_noise_map(self, field, set_seed=False, fft=False):
         N = self._get_N(field)
         if set_seed:
-            np.random.seed(99)
+            np.random.seed(self._get_seed(field))
         map = self.dm.sht.synfast(N)
         if fft:
             return self.dm.sht.map2alm(map, nthreads=self.nthreads)
