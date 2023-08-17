@@ -1,3 +1,4 @@
+import numpy as np
 from DEMNUnii.fields import Fields
 import sys
 import os
@@ -24,8 +25,16 @@ def main(exp, qe_typ, nsims, nthreads, _id):
     setup_dirs(sims_dir, exp, deflect_typs)
     for sim in range(nsims):
         mpi.output(f"Sim: {sim}", 0, _id)
+        noise_maps = None
         for deflect_typ in deflect_typs:
             fields.setup_rec(sim, deflect_typ)
+            if deflect_typ == deflect_typs[0]:
+                tnoise = fields.rec.sim_lib.plancklens_mapslib.get_sim_tnoise(0)
+                enoise = fields.rec.sim_lib.plancklens_mapslib.get_sim_enoise(0)
+                bnoise = fields.rec.sim_lib.plancklens_mapslib.get_sim_bnoise(0)
+                noise_maps = np.array([tnoise, enoise, bnoise])
+            else:
+                fields.rec.sim_lib.plancklens_mapslib.noise_maps = noise_maps
             kappa_rec = fields.get_kappa_rec(qe_typ, fft=False)
             fields.dm.sht.write_map(f"{sims_dir}/{deflect_typ}/{exp}/kappa/{qe_typ}_{sim}.fits", kappa_rec)
             mpi.output(f"   {deflect_typ} kappa done.", 0, _id)
