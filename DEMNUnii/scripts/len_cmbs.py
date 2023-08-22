@@ -1,7 +1,6 @@
 from omegaqe.powerspectra import Powerspectra
 from omegaqe.tools import getFileSep
 from DEMNUnii.demnunii import Demnunii
-from scipy.interpolate import InterpolatedUnivariateSpline
 from plancklens.sims import cmbs, phas
 import numpy as np
 import sys
@@ -53,26 +52,22 @@ def get_glm(nthreads, deflect_typ):
         kappa_map = dm.get_kappa_map(pb=True)
         klm = dm.sht.map2alm(kappa_map, lmax=LMAX_MAP, nthreads=nthreads)
     elif deflect_typ == "diff":
-        ells = np.arange(LMAX_MAP+1)[1:]
-        Cl_kappa = np.zeros(LMAX_MAP+1)
-        Cl_kappa[1:] = power.get_kappa_ps(ells, extended=True)
+        kappa_map = dm.get_kappa_map(pb=True)
+        Cl_kappa = dm.sht.map2cl(kappa_map, lmax=LMAX_MAP, lmax_out=LMAX_MAP, nthreads=nthreads)
         klm = dm.sht.synalm(Cl_kappa, lmax=LMAX_MAP)
     return dm.sht.almxfl(klm, lensing_fac)
 
 
 
-def get_clm(nthreads, deflect_typ, camb_acc=4):
+def get_clm(nthreads, deflect_typ):
     _check_deflect_typ(deflect_typ, curl=True)
     lensing_fac = _lensing_fac()
     olm = None
+    omega_map = dm.get_omega_map()
     if deflect_typ == "dem":
-        omega_map = dm.get_omega_map()
         olm = dm.sht.map2alm(omega_map, lmax=LMAX_MAP, nthreads=nthreads)
     elif deflect_typ == "diff":
-        ells = np.arange(LMAX_MAP+1)[1:]
-        ells_omega, omega_ps = dm.cosmo.get_postborn_omega_ps(acc=camb_acc)
-        Cl_omega = np.zeros(LMAX_MAP+1)
-        Cl_omega[1:] = InterpolatedUnivariateSpline(ells_omega, omega_ps)(ells)
+        Cl_omega = dm.sht.map2cl(omega_map, lmax=LMAX_MAP, lmax_out=LMAX_MAP, nthreads=nthreads)
         olm = dm.sht.synalm(Cl_omega, lmax=LMAX_MAP)
     return dm.sht.almxfl(olm, lensing_fac)
 
@@ -147,9 +142,8 @@ def main(nsims, nthreads, loc):
     clm_dem = get_clm(nthreads, "dem")
     clm_diff = get_clm(nthreads, "diff")
     deflect_configs = {"pbdem_dem":(glm_pb, clm_dem),
-                       "dem_dem":(glm_dem, clm_dem),
-                       "pbdem_diff":(glm_pb, clm_diff),
-                       "dem_diff":(glm_dem, clm_diff),
+                       "pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb))),
+                       "npbdem_dem": (-glm_pb, clm_dem),
                        "diff_dem":(glm_diff, clm_dem),
                        "diff_diff":(glm_diff, clm_diff)
                        }

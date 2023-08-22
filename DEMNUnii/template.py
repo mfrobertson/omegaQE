@@ -4,7 +4,7 @@ import datetime
 
 class Template:
 
-    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB"):
+    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False):
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
@@ -21,7 +21,7 @@ class Template:
         if self.use_kappa_rec:
             print(f"Using reconstructed kappa (QE: {cmb_lens_qe_typ}) in template.")
             self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True)
-        self._populate_a_bars(tracer_noise)
+        self._populate_a_bars(tracer_noise, neg_tracers)
 
     def _get_F_L_and_C_inv(self, cmb_lens_qe_typ):
         if cmb_lens_qe_typ == "T":
@@ -48,19 +48,20 @@ class Template:
                 C_invs[iii, jjj] = C_inv_ij
         return F_L, C_invs
 
-    def _get_fft_maps(self, field, include_noise):
+    def _get_fft_maps(self, field, include_noise, neg_tracers):
         if field == "k" and self.use_kappa_rec:
             return self.kappa_rec
+        factor = -1 if neg_tracers else 1
         if include_noise:
-            return self.fields.fft_maps[field] + self.fields.fft_noise_maps[field]
-        return self.fields.fft_maps[field]
+            return (factor * self.fields.fft_maps[field]) + self.fields.fft_noise_maps[field]
+        return factor * self.fields.fft_maps[field]
 
-    def _populate_a_bars(self, tracer_noise):
+    def _populate_a_bars(self, tracer_noise, neg_tracers):
         print(f"Creating filtered maps for template. Noise included: {tracer_noise}.")
         for iii, field_i in enumerate(self.fields.fields):
-            a_bar_i = np.zeros(np.shape(self._get_fft_maps('k', tracer_noise)), dtype="complex128")
+            a_bar_i = np.zeros(np.shape(self._get_fft_maps('k', tracer_noise, neg_tracers)), dtype="complex128")
             for jjj, field_j in enumerate(self.fields.fields):
-                a_j = self._get_fft_maps(field_j, tracer_noise)
+                a_j = self._get_fft_maps(field_j, tracer_noise, neg_tracers)
                 a_bar_i += self.sht.almxfl(a_j, self.C_inv[iii, jjj])
             self.a_bars[field_i] = a_bar_i
 
@@ -90,7 +91,6 @@ class Template:
         return P_m
 
     def _get_Egamma_Elambda(self, Cls, windows, matter_ps):
-        # TODO: should I ensure that these are real_alms???? Or is this already achieved by a_bar?
         h_gamma = None
         h_lambda = None
         for iii, field_i in enumerate(self.fields.fields):

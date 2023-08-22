@@ -20,14 +20,15 @@ def main(exp, Nchi, tracer_noise, nsims, kappa_rec, kappa_qe_typ, deflect_typ, n
     mpi.output("-------------------------------------", 0, _id)
     mpi.output(f"exp: {exp}, Nchi: {Nchi}, nsim: {nsims}, tracer_noise: {tracer_noise}, kappa_rec: {kappa_rec}, kappa_qe_typ: {kappa_qe_typ},nthreads: {nthreads}", 0, _id)
 
-    deflect_typs = ["pbdem_dem", "dem_dem", "diff_dem", "pbdem_diff", "dem_diff", "diff_diff"] if deflect_typ is None else [deflect_typ]
+    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff"] if deflect_typ is None else [deflect_typ]
     for sim in range(nsims):
         mpi.output(f"Sim: {sim}", 0, _id)
         fields = Fields(exp, use_lss_cache=True, use_cmb_cache=True, cmb_sim=sim, deflect_typ=deflect_typ, nthreads=nthreads)
         for deflect_typ in deflect_typs:
             fields.deflect_typ = deflect_typ
             mpi.output(f"  type: {deflect_typ}", 0, _id)
-            omega_tem = fields.omega_template(Nchi, tracer_noise=tracer_noise, use_kappa_rec=kappa_rec, kappa_rec_qe_typ=kappa_qe_typ)
+            neg_tracers = True if deflect_typ=="npbdem_dem" else False
+            omega_tem = fields.omega_template(Nchi, tracer_noise=tracer_noise, use_kappa_rec=kappa_rec, kappa_rec_qe_typ=kappa_qe_typ, neg_tracers=neg_tracers)
             tem_map = fields.dm.sht.alm2map(omega_tem, nthreads=fields.nthreads)
             tem_dir = f"{fields.dm.cache_dir}/_tems/{deflect_typ}/{exp}"
             save_tem_map(tem_map, tem_dir, sim, tracer_noise, kappa_rec, kappa_qe_typ, fields.dm.sht)

@@ -42,8 +42,9 @@ class Fields:
     def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, iter_ext=None, data_dir=None):
         return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)
 
-    def get_cached_cmb_lens(self, typ, cmb_fields, sim=None):
+    def get_cached_cmb_lens_rec(self, typ, cmb_fields, sim=None):
         sim = self.sim if sim is None else sim
+        print(f"Getting cached {typ} reconstruction for sim: {sim}, deflection type: {self.deflect_typ}, and exp: {self.exp}.")
         return self.dm.sht.read_map(f"{self.dm.sims_dir}/{self.deflect_typ}/{self.exp}/{typ}/{cmb_fields}_{sim}.fits")
 
     def get_cached_lss(self, field):
@@ -54,7 +55,7 @@ class Fields:
 
     def get_kappa_rec(self, cmb_fields="T", fft=False):
         if self.rec is None:
-            kappa_map = self.get_cached_cmb_lens("kappa", cmb_fields)
+            kappa_map = self.get_cached_cmb_lens_rec("kappa", cmb_fields)
             if fft:
                 return self.dm.sht.map2alm(kappa_map, nthreads=self.nthreads)
             return kappa_map
@@ -66,7 +67,7 @@ class Fields:
 
     def get_omega_rec(self, cmb_fields="T", fft=False):
         if self.rec is None:
-            omega_map = self.get_cached_cmb_lens("omega", cmb_fields)
+            omega_map = self.get_cached_cmb_lens_rec("omega", cmb_fields)
             if fft:
                 return self.dm.sht.map2alm(omega_map, nthreads=self.nthreads)
             return omega_map
@@ -127,8 +128,8 @@ class Fields:
             return self.dm.sht.map2alm(map, nthreads=self.nthreads)
         return map
 
-    def omega_template(self, Nchi, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB"):
-        self.tem = Template(self, Lmin, Lmax, tracer_noise, use_kappa_rec, kappa_rec_qe_typ)
+    def omega_template(self, Nchi, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", neg_tracers=False):
+        self.tem = Template(self, Lmin, Lmax, tracer_noise, use_kappa_rec, kappa_rec_qe_typ, neg_tracers=neg_tracers)
         return self.tem.get_omega(Nchi)
 
 
