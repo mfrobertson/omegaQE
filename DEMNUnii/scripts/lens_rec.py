@@ -20,7 +20,7 @@ def main(exp, qe_typ, nsims, nthreads, _id):
     mpi.output(f"exp: {exp}, qe_typ: {qe_typ}, nsims: {nsims}, nthreads: {nthreads}", 0, _id)
 
     fields = Fields(exp, use_lss_cache=True, use_cmb_cache=True, nthreads=nthreads)
-    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_dem", "diff_diff"]
+    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff"]
     sims_dir = DEMNUnii.SIMS_DIR
     setup_dirs(sims_dir, exp, deflect_typs)
     for sim in range(nsims):
