@@ -2,39 +2,9 @@ from mpi4py import MPI
 import numpy as np
 import omegaqe
 from omegaqe.bias import bias
-from omegaqe.tools import parse_boolean
+from omegaqe.tools import parse_boolean, mpi
 import os
 import sys
-import datetime
-
-
-def _get_workloads(N, world_size):
-    workloads = [N // world_size for iii in range(world_size)]
-    for iii in range(N % world_size):
-        workloads[iii] += 1
-    return workloads
-
-
-def _get_start_end(my_rank, workloads):
-    my_start = 0
-    for iii in range(my_rank):
-        my_start += workloads[iii]
-    my_end = my_start + workloads[my_rank]
-    return my_start, my_end
-
-
-def _get_log_sample_Ls(Lmin, Lmax, Nells=500, dL_small=1):
-    floaty = Lmax / 1000
-    samp1 = np.arange(Lmin, floaty * 10, dL_small)
-    samp2 = np.logspace(1, 3, Nells - np.size(samp1)) * floaty
-    return np.concatenate((samp1, samp2))
-
-
-def _output(message, my_rank, _id):
-    if my_rank == 0:
-        f = open(f"_outlogs/_bias_run_{_id}.out", "a")
-        f.write("[" + str(datetime.datetime.now()) + "] " + message + "\n")
-        f.close()
 
 
 def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_typ, gmv, fields, _id):
@@ -45,32 +15,33 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_ty
 
     start_time_tot = MPI.Wtime()
 
-    _output("-------------------------------------", my_rank, _id)
-    _output(f"bias_typ: {bias_typ}, exp: {exp}, N_Ls: {N_Ls}, N_L1: {N_L1}, N_L3: {N_L3}, Ntheta12: {Ntheta12}, Ntheta13: {Ntheta13}, noise: {noise}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
-    _output("Setting up parallisation of workload.", my_rank, _id)
+    mpi.output("-------------------------------------", my_rank, _id)
+    mpi.output(f"bias_typ: {bias_typ}, exp: {exp}, N_Ls: {N_Ls}, N_L1: {N_L1}, N_L3: {N_L3}, Ntheta12: {Ntheta12}, Ntheta13: {Ntheta13}, noise: {noise}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
+    mpi.output("Setting up parallisation of workload.", my_rank, _id)
 
-    Ls = _get_log_sample_Ls(30, 3000, N_Ls)
+    Ls = np.geomspace(30, 3000, N_Ls)
 
-    workloads = _get_workloads(N_Ls, world_size)
-    my_start, my_end = _get_start_end(my_rank, workloads)
+    workloads = mpi.get_workloads(N_Ls, world_size)
+    my_start, my_end = mpi.get_start_end(my_rank, workloads)
 
-    _output("Initialisation finished.", my_rank, _id)
+    mpi.output("Initialisation finished.", my_rank, _id)
 
     verbose = True if my_rank == 0 else False
 
     start_time = MPI.Wtime()
-    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=fields, gmv=gmv, N_L1=N_L1, N_L3=N_L3, Ntheta12=Ntheta12, Ntheta13=Ntheta13, F_L_path=f"{omegaqe.RESULTS_DIR}/F_L_results", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose, noise=noise)
+    # TODO: be careful of F_L directory location
+    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=fields, gmv=gmv, N_L1=N_L1, N_L3=N_L3, Ntheta12=Ntheta12, Ntheta13=Ntheta13, F_L_path=f"{omegaqe.CACHE_DIR}/_F_L", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose, noise=noise)
     end_time = MPI.Wtime()
 
-    _output("Bias calculation finished.", my_rank, _id)
+    mpi.output("Bias calculation finished.", my_rank, _id)
 
     if my_rank == 0:
         print("Bias time: " + str(end_time - start_time))
-        _output("Bias time: " + str(end_time - start_time), my_rank, _id)
+        mpi.output("Bias time: " + str(end_time - start_time), my_rank, _id)
         N_arr = np.ones(N_Ls)
         N_arr[my_start: my_end] = N
         for rank in range(1, world_size):
-            start, end = _get_start_end(rank, workloads)
+            start, end = mpi.get_start_end(rank, workloads)
             N = np.empty(end - start)
             world_comm.Recv([N, MPI.DOUBLE], source=rank, tag=77)
             N_arr[start: end] = N
@@ -83,7 +54,7 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_ty
         np.save(dir+"/N", N_arr)
         end_time_tot = MPI.Wtime()
         print("Total time: " + str(end_time_tot - start_time_tot))
-        _output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
+        mpi.output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
     else:
         world_comm.Send([N, MPI.DOUBLE], dest=0, tag=77)
 
