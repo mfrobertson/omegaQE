@@ -54,6 +54,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
     Ls_samp = fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=Lmax, Nells=N_Ls, dL_small=1)
 
     workloads = mpi.get_workloads(N_Ls, world_size)
+    my_start, my_end = mpi.get_start_end(my_rank, workloads)
 
     mpi.output("Starting F_L calculation...", my_rank, _id)
 
