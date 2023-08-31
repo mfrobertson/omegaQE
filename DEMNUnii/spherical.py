@@ -84,3 +84,7 @@ class Spherical:
     def nside2pixarea(self, nside=None):
         nside = self._get_nside(nside)
         return hp.nside2pixarea(nside)
+
+    def get_alm_size(self, lmax=None):
+        lmax = self._get_lmax(lmax)
+        return hp.Alm.getsize(lmax)
