@@ -57,15 +57,17 @@ def _get_mean_ps(exp, deflect_typ, tem_ext, nsims, nbins, nthreads):
     return ps, bins, err
 
 
-def main(exp, tracer_noise, kappa_rec, qe_typ, nbins, nsims, deflect_typ, nthreads, _id):
+def main(exp, tracer_noise, kappa_rec, qe_typ, nbins, nsims, deflect_typ, gauss_lss, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"exp: {exp}, nbins: {nbins}, nsims: {nsims}, deflect_typ: {deflect_typ}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f"exp: {exp}, nbins: {nbins}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, nthreads: {nthreads}", 0, _id)
 
     deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff"] if deflect_typ is None else [deflect_typ]
 
     ext = "_wN" if tracer_noise else ""
     if kappa_rec:
         ext += f"_{qe_typ}"
+    if gauss_lss:
+        ext += "_gauss"
     for deflect_typ in deflect_typs:
         mpi.output(f"Type: {deflect_typ}", 0, _id)
         ps, bins, err = _get_mean_ps(exp, deflect_typ, ext, nsims, nbins, nthreads)
@@ -74,9 +76,9 @@ def main(exp, tracer_noise, kappa_rec, qe_typ, nbins, nsims, deflect_typ, nthrea
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 9:
+    if len(args) != 10:
         raise ValueError(
-            "Must supply arguments: exp tracer_noise kappa_rec qe_typ nbins nsims deflect_typ nthreads _id")
+            "Must supply arguments: exp tracer_noise kappa_rec qe_typ nbins nsims deflect_typ gauss_lss nthreads _id")
     exp = str(args[0])
     tracer_noise = parse_boolean(args[1])
     kappa_rec = parse_boolean(args[2])
@@ -84,6 +86,7 @@ if __name__ == '__main__':
     nbins = int(args[4])
     nsims = int(args[5])
     deflect_typ = none_or_str(args[6])
-    nthreads = int(args[7])
-    _id = str(args[8])
-    main(exp, tracer_noise, kappa_rec, qe_typ, nbins, nsims, deflect_typ, nthreads, _id)
+    gauss_lss = parse_boolean(args[7])
+    nthreads = int(args[8])
+    _id = str(args[9])
+    main(exp, tracer_noise, kappa_rec, qe_typ, nbins, nsims, deflect_typ, gauss_lss, nthreads, _id)

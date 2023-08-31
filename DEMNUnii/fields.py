@@ -6,32 +6,91 @@ from DEMNUnii.demnunii import Demnunii
 from DEMNUnii.reconstruction import Reconstruction
 from DEMNUnii.template import Template
 from datetime import datetime
+import copy
+
 
 class Fields:
 
-    def __init__(self, exp, use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1):
+    def __init__(self, exp, use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1, gauss_lss=False):
         self.nthreads = nthreads
-        self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=omegaqe.DATA_DIR)
-        self.exp = exp
         self.dm = Demnunii(nthreads)
+        self.exp = exp
+        self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=omegaqe.DATA_DIR, cosmology=self.dm.cosmo)
         self.sim = cmb_sim
         self.deflect_typ = deflect_typ
         self.nside = self.dm.nside
         self.Lmax_map = self.dm.Lmax_map
         self.fields = "kgI"
         self.ells = np.arange(self.Lmax_map+1)
-        self._initialise(use_lss_cache, use_cmb_cache)
+        self._initialise(use_lss_cache, use_cmb_cache, gauss_lss)
 
-    def _initialise(self, use_lss_cache, use_cmb_cache):
+    def _initialise(self, use_lss_cache, use_cmb_cache, gauss_lss):
         self.fft_maps = dict.fromkeys(self.fields)
         self.fft_noise_maps = dict.fromkeys(self.fields)
         for field in self.fields:
             self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache)
             self.fft_noise_maps[field] = self.get_noise_map(field, set_seed=True, fft=True)
+        if gauss_lss:
+            print("Using Cls of previous maps to generate new gaussian realisations.")
+            self.y = self._get_y(input_kappa_map=self.dm.sht.read_map(f"{DEMNUnii.SIMS_DIR}/kappa_diff.fits"))
+            for field in self.fields:
+                self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache, gaussian=gauss_lss)
         if use_cmb_cache:
             self.rec = None
         else:
             self.setup_rec(self.sim, self.deflect_typ)
+
+    def get_Cl(self, typ):
+        alm1 = self.fft_maps[typ[0]]
+        alm2 = self.fft_maps[typ[1]]
+        return self.dm.sht.alm2cl(alm1, alm2)
+
+    def _get_cov(self, N_fields):
+        C = np.empty((self.Lmax_map, N_fields, N_fields))
+        for iii, field_i in enumerate(self.fields):
+            for jjj, field_j in enumerate(self.fields):
+                C[:, iii, jjj] = self.get_Cl(field_i + field_j)[1:]
+        return C
+
+    def _get_gauss_alm(self):
+        return self.dm.sht.synalm(np.ones(self.Lmax_map + 1), self.Lmax_map)
+
+    def _get_gauss_alms(self, Nfields):
+        alms = np.empty((self.dm.sht.get_alm_size(), Nfields, 1), dtype="complex128")
+        for iii in np.arange(Nfields):
+            alms[:, iii, 0] = self._get_gauss_alm()
+        return alms
+
+    def _get_L(self, Cov, N_fields):
+        L = np.linalg.cholesky(Cov)
+        new_L = np.empty((self.Lmax_map + 1, N_fields, N_fields))
+        new_L[1:, :, :] = L
+        new_L[0, :, :] = 0.0
+        return new_L
+
+    def _matmul(self, L, v):
+        rows = np.shape(L)[1]
+        cols = np.shape(v)[2]
+        res = np.empty((np.shape(v)[0], rows, cols), dtype="complex128")
+        for row in np.arange(rows):
+            for col in np.arange(cols):
+                for iii in np.arange(np.shape(v)[1]):
+                    res[:, row, col] += self.dm.sht.almxfl(v[:, iii, col], L[:, row, iii])
+        return res
+
+    def _get_y(self, input_kappa_map):
+        N_fields = np.size(list(self.fields))
+        C = self._get_cov(N_fields)
+        L = self._get_L(C, N_fields)
+        v = self._get_gauss_alms(N_fields)
+        if input_kappa_map is not None:
+            # TODO: this only works if k is the fist field listed
+            C_kappa_sqrt = L[:, 0, 0]
+            C_kappa_sqrt_inv = np.zeros(np.size(C_kappa_sqrt))
+            C_kappa_sqrt_inv[1:] = 1/C_kappa_sqrt[1:]
+            v[:, 0, 0] = self.dm.sht.almxfl(self.dm.sht.map2alm(input_kappa_map), C_kappa_sqrt_inv)
+        y = self._matmul(L, v)
+        return y
 
     def setup_rec(self, sim, deflect_typ):
         self.sim = sim
@@ -42,12 +101,16 @@ class Fields:
     def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, iter_ext=None, data_dir=None):
         return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)
 
-    def get_cached_cmb_lens_rec(self, typ, cmb_fields, sim=None):
+    def get_cached_cmb_lens_rec(self, typ, cmb_fields, sim=None, deflect_typ=None):
         sim = self.sim if sim is None else sim
-        print(f"Getting cached {typ} reconstruction for sim: {sim}, deflection type: {self.deflect_typ}, and exp: {self.exp}.")
-        return self.dm.sht.read_map(f"{self.dm.sims_dir}/{self.deflect_typ}/{self.exp}/{typ}/{cmb_fields}_{sim}.fits")
+        deflect_typ = self.deflect_typ if deflect_typ is None else deflect_typ
+        print(f"Getting cached {typ} reconstruction for sim: {sim}, deflection type: {deflect_typ}, and exp: {self.exp}.")
+        return self.dm.sht.read_map(f"{self.dm.sims_dir}/{deflect_typ}/{self.exp}/{typ}/{cmb_fields}_{sim}.fits")
 
-    def get_cached_lss(self, field):
+    def get_cached_lss(self, field, gaussian):
+        if gaussian:
+            print(f"  Using cached Gaussian {field} map.")
+            return self.dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}_maps/{field}_gaussian.fits")
         return self.dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}_maps/{field}.fits")
 
     def _lensing_fac(self):
@@ -77,10 +140,21 @@ class Fields:
             return omega_alm
         return self.dm.sht.alm2map(omega_alm, nthreads=self.nthreads)
 
-    def get_map(self, field, fft=False, use_cache=False):
-        if use_cache:
+    def _get_index(self, field):
+        return np.where(np.char.array(list(self.fields)) == field)[0][0]
+
+    def get_gaussian_map(self, field):
+        index = self._get_index(field)
+        alm = copy.deepcopy(self.y[:, index, 0])
+        return self.dm.sht.alm2map(alm)
+
+    def get_map(self, field, fft=False, use_cache=False, gaussian=False):
+        if gaussian:
+            print(f"Replacing {field} map with new gaussian realisation.")
+            map = self.get_gaussian_map(field)
+        elif use_cache:
             print(f"Using cache for map: {field}")
-            map = self.get_cached_lss(field)
+            map = self.get_cached_lss(field, gaussian)
         elif field == "k":
             map = self.dm.get_kappa_map()
         elif field == "g":
@@ -131,5 +205,3 @@ class Fields:
     def omega_template(self, Nchi, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", neg_tracers=False):
         self.tem = Template(self, Lmin, Lmax, tracer_noise, use_kappa_rec, kappa_rec_qe_typ, neg_tracers=neg_tracers)
         return self.tem.get_omega(Nchi)
-
-
