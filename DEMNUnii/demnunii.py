@@ -61,12 +61,16 @@ class Demnunii:
     def get_snaps_z(self, zmin, zmax):
         zs = np.asarray(self.snap_df["6:zstart"])
         snaps = np.asarray(self.snap_df["#1:output"])
-        return snaps[np.where(np.logical_and(zs >= zmin, zs <= zmax))]
+        indices = np.where(np.logical_and(zs >= zmin, zs <= zmax))
+        print(f"Using particles between redshifts zmin: {zs[indices[0]][0]} and zmax: {zs[indices[-1]+1][0]}")
+        return snaps[indices]
 
     def get_snaps_chi(self, chi_min, chi_max):
         chis = np.asarray(self.snap_df["4:xstart"])
         snaps = np.asarray(self.snap_df["#1:output"])
-        return snaps[np.where(np.logical_and(chis >= chi_min, chis <= chi_max))]
+        indices = np.where(np.logical_and(chis >= chi_min, chis <= chi_max))
+        print(f"Using particles between conformal distances Xmin: {chis[indices[0]][0]} and Xmax: {chis[indices[-1]+1][0]}")
+        return snaps[indices]
 
     def get_density_map(self, zmin=0, zmax=1100, chi_min=None, chi_max=None, use_chi=False, verbose=False):
         if verbose: print(f"DEMNUnii: Constructing density map for zmin={zmin}, zmax={zmax}, chi_min={chi_min}, chi_max={chi_max}, use_chi={use_chi}")
