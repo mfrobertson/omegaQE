@@ -8,15 +8,10 @@ def main():
     gal_map = dm.get_obs_gal_map(verbose=True)
     cib_map = dm.get_obs_cib_map(verbose=True)
 
-    # hp.write_map(f"{dm.cache_dir}/_maps/k.fits", kappa_map, dtype=float, overwrite=True)
-    # hp.write_map(f"{dm.cache_dir}/_maps/w.fits", omega_map, dtype=float, overwrite=True)
-    # hp.write_map(f"{dm.cache_dir}/_maps/g.fits", gal_map, dtype=float, overwrite=True)
-    # hp.write_map(f"{dm.cache_dir}/_maps/I.fits", cib_map, dtype=float, overwrite=True)
-
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/k.fits", kappa_map)
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/w.fits", omega_map)
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/g.fits", gal_map)
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/I.fits", cib_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/k2.fits", kappa_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/w2.fits", omega_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/g2.fits", gal_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/I2.fits", cib_map)
 
 
 if __name__ == '__main__':
