@@ -22,7 +22,7 @@ def main(exp, Nchi, tracer_noise, nsims, kappa_rec, kappa_qe_typ, deflect_typ, g
     mpi.output("-------------------------------------", 0, _id)
     mpi.output(f"exp: {exp}, Nchi: {Nchi}, nsim: {nsims}, tracer_noise: {tracer_noise}, kappa_rec: {kappa_rec}, kappa_qe_typ: {kappa_qe_typ}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, nthreads: {nthreads}", 0, _id)
 
-    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff"] if deflect_typ is None else [deflect_typ]
+    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff", "dem_dem"] if deflect_typ is None else [deflect_typ]
     for sim in range(nsims):
         mpi.output(f"Sim: {sim}", 0, _id)
         fields = Fields(exp, use_lss_cache=True, use_cmb_cache=True, cmb_sim=sim, deflect_typ=deflect_typ, gauss_lss=gauss_lss, nthreads=nthreads)

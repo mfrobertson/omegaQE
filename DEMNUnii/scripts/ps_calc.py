@@ -61,7 +61,7 @@ def main(exp, tracer_noise, kappa_rec, qe_typ, nbins, nsims, deflect_typ, gauss_
     mpi.output("-------------------------------------", 0, _id)
     mpi.output(f"exp: {exp}, nbins: {nbins}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, nthreads: {nthreads}", 0, _id)
 
-    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff"] if deflect_typ is None else [deflect_typ]
+    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff", "dem_dem"] if deflect_typ is None else [deflect_typ]
 
     ext = "_wN" if tracer_noise else ""
     if kappa_rec:

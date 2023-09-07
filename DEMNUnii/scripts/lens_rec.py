@@ -2,7 +2,7 @@ import numpy as np
 from DEMNUnii.fields import Fields
 import sys
 import os
-from omegaqe.tools import mpi
+from omegaqe.tools import mpi, none_or_str
 import DEMNUnii
 
 
@@ -15,12 +15,12 @@ def setup_dirs(sims_dir, exp, deflect_typs):
                 os.makedirs(full_dir)
 
 
-def main(exp, qe_typ, nsims, nthreads, _id):
+def main(exp, qe_typ, nsims, deflect_typ, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"exp: {exp}, qe_typ: {qe_typ}, nsims: {nsims}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f"exp: {exp}, qe_typ: {qe_typ}, nsims: {nsims}, deflect_typ: {deflect_typ}, nthreads: {nthreads}", 0, _id)
 
     fields = Fields(exp, use_lss_cache=True, use_cmb_cache=True, nthreads=nthreads)
-    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff"]
+    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff", "dem_dem"] if deflect_typ is None else [deflect_typ]
     sims_dir = DEMNUnii.SIMS_DIR
     setup_dirs(sims_dir, exp, deflect_typs)
     for sim in range(nsims):
@@ -45,12 +45,13 @@ def main(exp, qe_typ, nsims, nthreads, _id):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 5:
+    if len(args) != 6:
         raise ValueError(
-            "Must supply arguments: exp qe_typ nsims nthraeds _id")
+            "Must supply arguments: exp qe_typ nsims deflect_typ nthreads _id")
     exp = str(args[0])
     qe_typ = str(args[1])
     nsims = int(args[2])
-    nthreads  = int(args[3])
-    _id = str(args[4])
-    main(exp, qe_typ, nsims, nthreads, _id)
+    deflect_typ = none_or_str(args[3])
+    nthreads  = int(args[4])
+    _id = str(args[5])
+    main(exp, qe_typ, nsims, deflect_typ, nthreads, _id)
