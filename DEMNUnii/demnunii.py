@@ -60,16 +60,18 @@ class Demnunii:
 
     def get_snaps_z(self, zmin, zmax):
         zs = np.asarray(self.snap_df["6:zstart"])
+        z_ends = np.asarray(self.snap_df["7:z_end"])
         snaps = np.asarray(self.snap_df["#1:output"])
-        indices = np.where(np.logical_and(zs >= zmin, zs <= zmax))
-        print(f"Using particles between redshifts zmin: {zs[indices[0]][0]} and zmax: {zs[indices[-1]+1][0]}")
+        indices = np.where(np.logical_and(zs >= zmin, zs <= zmax))[0]
+        print(f"Using particles between redshifts zmin: {zs[indices][0]} and zmax: {z_ends[indices][-1]}")
         return snaps[indices]
 
     def get_snaps_chi(self, chi_min, chi_max):
         chis = np.asarray(self.snap_df["4:xstart"])
+        chi_ends = np.asarray(self.snap_df["4:xend"])
         snaps = np.asarray(self.snap_df["#1:output"])
-        indices = np.where(np.logical_and(chis >= chi_min, chis <= chi_max))
-        print(f"Using particles between conformal distances Xmin: {chis[indices[0]][0]} and Xmax: {chis[indices[-1]+1][0]}")
+        indices = np.where(np.logical_and(chis >= chi_min, chis <= chi_max))[0]
+        print(f"Using particles between conformal distances Xmin: {chis[indices][0]} and Xmax: {chi_ends[indices][0]}")
         return snaps[indices]
 
     def get_density_map(self, zmin=0, zmax=1100, chi_min=None, chi_max=None, use_chi=False, verbose=False):
@@ -115,8 +117,13 @@ class Demnunii:
             return np.sum(self._window_LSST(zs)) * dz
         if typ == "Planck":
             return np.sum(self._window_Planck(zs)) * dz
+        
+    def _apply_pixel_correction(self, map):
+        alm = self.sht.map2alm(map)
+        alm_corr = self.sht.almxfl(alm, 1/self.sht.pixwin)
+        return self.sht.alm2map(alm_corr)
 
-    def get_obs_gal_map(self, zmin=0, zmax=1100, window="LSST", chi_min=None, chi_max=None, use_chi=False, verbose=False):
+    def get_obs_gal_map(self, zmin=0, zmax=1100, window="LSST", chi_min=None, chi_max=None, use_chi=False, verbose=False, pixel_corr=True):
         if verbose: print(f"DEMNUnii: Constructing gal map for zmin={zmin}, zmax={zmax}, window={window}, chi_min={chi_min}, chi_max={chi_max}, use_chi={use_chi}")
         npix = self.sht.nside2npix()
         gal = np.zeros(npix)
@@ -127,9 +134,10 @@ class Demnunii:
             gal += self._window(snap, window) * self.get_density_snap(snap)
             if verbose: print('\r', end='')
         if verbose: print("")
+        if pixel_corr: gal = self._apply_pixel_correction(gal)
         return gal
 
-    def get_obs_cib_map(self, zmin=0, zmax=1100, window="Planck", chi_min=None, chi_max=None, use_chi=False, verbose=False):
+    def get_obs_cib_map(self, zmin=0, zmax=1100, window="Planck", chi_min=None, chi_max=None, use_chi=False, verbose=False, pixel_corr=True):
         if verbose: print(f"DEMNUnii: Constructing CIB map for zmin={zmin}, zmax={zmax}, window={window}, chi_min={chi_min}, chi_max={chi_max}, use_chi={use_chi}")
         npix = self.sht.nside2npix()
         cib = np.zeros(npix)
@@ -140,6 +148,7 @@ class Demnunii:
             cib += self._window(snap, window) * self.get_density_snap(snap)
             if verbose: print('\r', end='')
         if verbose: print("")
+        if pixel_corr: cib = self._apply_pixel_correction(cib)
         return cib
 
     def get_density_distro(self):
