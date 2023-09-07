@@ -78,10 +78,15 @@ def get_unlensed_cmb_ps():
     return {idx.lower(): dm.cosmo.get_unlens_ps(idx, ellmax=LMAX_MAP)[:LMAX_MAP + 1] * (Tcmb * 1e6) ** 2 for idx in indices}
 
 
-def get_unlensed_alms(unl_cmb_spectra, sim):
-    lib_pha = phas.lib_phas(os.path.join(os.environ['PLENS'], 'len_cmbs', 'phas'), 3, LMAX_MAP)
-    unl_lib = cmbs.sims_cmb_unl(unl_cmb_spectra, lib_pha)
-    return unl_lib.get_sim_tlm(sim), unl_lib.get_sim_elm(sim), unl_lib.get_sim_blm(sim)
+def get_unlensed_alms(unl_cmb_spectra, sim, unl_loc):
+    if unl_loc is None:
+        lib_pha = phas.lib_phas(os.path.join(os.environ['PLENS'], 'len_cmbs', 'phas'), 3, LMAX_MAP)
+        unl_lib = cmbs.sims_cmb_unl(unl_cmb_spectra, lib_pha)
+        return unl_lib.get_sim_tlm(sim), unl_lib.get_sim_elm(sim), unl_lib.get_sim_blm(sim)
+    TQU = dm.sht.read_map(f"unl_loc{sep}TQU_{sim}.fits")
+    T_unl = dm.sht.map2alm(TQU[0])
+    E_unl, B_unl = dm.sht.map2alm_spin(TQU[1:], 2)
+    return T_unl, E_unl, B_unl
 
 
 def get_lensed_maps(dlm, unl_alms, nthreads):
@@ -135,7 +140,7 @@ def _save_unl_cmbs(loc, alms, sim, nthreads):
     dm.sht.write_map(f"{directory}{sep}TQU_{sim}.fits", np.array([Tmap, QUmaps[0], QUmaps[1]]))
 
 
-def main(nsims, nthreads, loc):
+def main(nsims, nthreads, loc, unl_loc):
     glm_pb = get_glm(nthreads, "pb")
     glm_dem = get_glm(nthreads, "dem")
     glm_diff = get_glm(nthreads, "diff")
@@ -144,12 +149,12 @@ def main(nsims, nthreads, loc):
     deflect_configs = {"pbdem_dem":(glm_pb, clm_dem),
                        "pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb))),
                        "npbdem_dem": (-glm_pb, clm_dem),
-                       "diff_dem":(glm_diff, clm_dem),
-                       "diff_diff":(glm_diff, clm_diff)
+                       "diff_diff":(glm_diff, clm_diff),
+                       "dem_dem":(glm_dem, clm_dem)
                        }
     unl_cmb_spectra = get_unlensed_cmb_ps()
     for sim in range(nsims):
-        unl_alms = get_unlensed_alms(unl_cmb_spectra, sim)
+        unl_alms = get_unlensed_alms(unl_cmb_spectra, sim, unl_loc)
         _save_unl_cmbs(loc, unl_alms, sim, nthreads)
         for iii, deflect_typ in enumerate(deflect_configs):
             glm, clm = deflect_configs[deflect_typ]
@@ -165,10 +170,11 @@ def main(nsims, nthreads, loc):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 3:
+    if len(args) != 3 and len(args) != 4:
         raise ValueError(
-            "Arguments should be nsims nthreads loc")
+            "Arguments should be nsims nthreads loc unl_loc")
     nsims = int(args[0])
     nthreads = int(args[1])
     loc = str(args[2])
-    main(nsims, nthreads, loc)
+    unl_loc = str(args[3]) if len(args)==4 else None
+    main(nsims, nthreads, loc, unl_loc)
