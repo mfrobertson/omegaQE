@@ -3,11 +3,13 @@ from lenspyx.utils_hp import almxfl, alm2cl, synalm
 import healpy as hp
 import copy
 import numpy as np
+import scipy.stats as stats
+from scipy.interpolate import InterpolatedUnivariateSpline
 
 
 class Spherical:
 
-    def __init__(self, nside, lmax, nthreads=1):
+    def __init__(self, nside=4096, lmax=5000, nthreads=1):
         self.nside = nside
         self.geom_info = ('healpix', {'nside': nside})
         self.geom = lenspyx.get_geom(self.geom_info)
@@ -60,7 +62,7 @@ class Spherical:
     def write_map(filename, map):
         return hp.fitsfunc.write_map(filename, map, dtype=float, overwrite=True)
     
-    def _pixel_correction(self, typ, lmax):
+    def pixel_correction(self, typ, lmax):
         if typ is None:
             return np.ones(lmax + 1)
         if typ == "one":
@@ -69,17 +71,36 @@ class Spherical:
             return 1 / self.pixwin[:lmax + 1] ** 2
         raise ValueError("Pixel correction is not one of {None, 'one', 'both'}.")
     
+    @staticmethod
+    def bin_cl(cl, nbins):
+        Ls = np.arange(np.size(cl))
+        means, bin_edges, binnumber = stats.binned_statistic(Ls, cl, 'mean', bins=nbins)
+        binSeperation = bin_edges[1] - bin_edges[0]
+        kBins = np.asarray([bin_edges[i] - binSeperation / 2 for i in range(1, len(bin_edges))])
+        counts, *others = stats.binned_statistic(Ls, cl, 'count', bins=nbins)
+        stds, *others = stats.binned_statistic(Ls, cl, 'std', bins=nbins)
+        errors = stds / np.sqrt(counts)
+        return means, kBins, errors
+    
+    @staticmethod
+    def smoothed_cl(cl, nbins):
+        cl_binned, bins, _ = Spherical().bin_cl(cl, nbins)
+        return InterpolatedUnivariateSpline(bins, cl_binned)(np.arange(np.size(cl)))
 
-    def alm2cl(self, alm1, alm2=None, lmax_out=None, lmax=None, pix_corr=None):
+
+    def alm2cl(self, alm1, alm2=None, lmax_out=None, lmax=None, pix_corr=None, smoothing_nbins=None):
         alm2 = alm1 if alm2 is None else alm2
         lmax = self._get_lmax(lmax)
         lmax_out = lmax if lmax_out is None else lmax_out
-        return alm2cl(alm1, alm2, lmax, lmax, lmax_out) * self._pixel_correction(pix_corr, lmax_out)
+        cl = alm2cl(alm1, alm2, lmax, lmax, lmax_out) * self.pixel_correction(pix_corr, lmax_out)
+        if smoothing_nbins is not None:
+            return self.smoothed_cl(cl, smoothing_nbins)
+        return cl
 
-    def map2cl(self, map1, map2=None, lmax_out=None, lmax=None, nthreads=None, pix_corr=None):
+    def map2cl(self, map1, map2=None, lmax_out=None, lmax=None, nthreads=None, pix_corr=None, smoothing_nbins=None):
         alm1 = self.map2alm(map1, lmax, nthreads)
         alm2 = self.map2alm(map2, lmax, nthreads) if map2 is not None else alm1
-        return self.alm2cl(alm1, alm2, lmax_out, lmax, pix_corr)
+        return self.alm2cl(alm1, alm2, lmax_out, lmax, pix_corr, smoothing_nbins)
 
     def synfast(self, Cl, lmax=None):
         lmax = self._get_lmax(lmax)
