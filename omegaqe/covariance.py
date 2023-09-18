@@ -9,8 +9,8 @@ from sympy import lambdify
 class Covariance:
 
 
-    def __init__(self):
-        self.noise = Noise()
+    def __init__(self, cosmology=None):
+        self.noise = Noise(cosmology=cosmology)
         self.power = Powerspectra(cosmology=self.noise.cosmo)
         self.binned_gal_types = list("abcdef")
         self.test_types = list("xyz")

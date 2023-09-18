@@ -24,7 +24,7 @@ class Fisher:
     power : Powerspectra
     """
 
-    def __init__(self, exp="SO", qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, iter_ext=False, data_dir=omegaqe.DATA_DIR, setup_bispectra=False):
+    def __init__(self, exp="SO", qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, iter_ext=False, data_dir=omegaqe.DATA_DIR, setup_bispectra=False, cosmology=None):
         """
         Constructor
 
@@ -32,7 +32,7 @@ class Fisher:
         ----------
 
         """
-        self.covariance = Covariance()
+        self.covariance = Covariance(cosmology=cosmology)
         self.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)
         self.bi = Bispectra(powerspectra=self.covariance.power)
         if setup_bispectra:
