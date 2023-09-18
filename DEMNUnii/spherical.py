@@ -83,8 +83,11 @@ class Spherical:
         return means, kBins, errors
     
     @staticmethod
-    def smoothed_cl(cl, nbins):
+    def smoothed_cl(cl, nbins, zerod=True):
         cl_binned, bins, _ = Spherical().bin_cl(cl, nbins)
+        if zerod:
+            cl_binned = np.insert(cl_binned, 0, 0.0)
+            bins = np.insert(bins, 0, 0.0)
         return InterpolatedUnivariateSpline(bins, cl_binned)(np.arange(np.size(cl)))
 
 
