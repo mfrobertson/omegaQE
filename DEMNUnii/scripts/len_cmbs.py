@@ -54,7 +54,8 @@ def get_glm(nthreads, deflect_typ):
     elif deflect_typ == "diff":
         kappa_map = dm.get_kappa_map(pb=True)
         Cl_kappa = dm.sht.map2cl(kappa_map, lmax=LMAX_MAP, lmax_out=LMAX_MAP, nthreads=nthreads)
-        klm = dm.sht.synalm(Cl_kappa, lmax=LMAX_MAP)
+        Cl_kappa_smooth = dm.sht.smoothed_cl(Cl_kappa, nbins=150, zerod=False)
+        klm = dm.sht.synalm(Cl_kappa_smooth, lmax=LMAX_MAP)
     return dm.sht.almxfl(klm, lensing_fac)
 
 
@@ -67,8 +68,8 @@ def get_clm(nthreads, deflect_typ):
     if deflect_typ == "dem":
         olm = dm.sht.map2alm(omega_map, lmax=LMAX_MAP, nthreads=nthreads)
     elif deflect_typ == "diff":
-        Cl_omega = dm.sht.map2cl(omega_map, lmax=LMAX_MAP, lmax_out=LMAX_MAP, nthreads=nthreads)
-        olm = dm.sht.synalm(Cl_omega, lmax=LMAX_MAP)
+        Cl_omega_smooth = dm.sht.map2cl(omega_map, lmax=LMAX_MAP, lmax_out=LMAX_MAP, nthreads=nthreads, smoothing_nbins=150)
+        olm = dm.sht.synalm(Cl_omega_smooth, lmax=LMAX_MAP)
     return dm.sht.almxfl(olm, lensing_fac)
 
 

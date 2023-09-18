@@ -40,16 +40,16 @@ class Fields:
         else:
             self.setup_rec(self.sim, self.deflect_typ)
 
-    def get_Cl(self, typ):
+    def get_Cl(self, typ, smoothing_nbins=None):
         alm1 = self.fft_maps[typ[0]]
         alm2 = self.fft_maps[typ[1]]
-        return self.dm.sht.alm2cl(alm1, alm2)
+        return self.dm.sht.alm2cl(alm1, alm2, smoothing_nbins=smoothing_nbins)
 
     def _get_cov(self, N_fields):
         C = np.empty((self.Lmax_map, N_fields, N_fields))
         for iii, field_i in enumerate(self.fields):
             for jjj, field_j in enumerate(self.fields):
-                C[:, iii, jjj] = self.get_Cl(field_i + field_j)[1:]
+                C[:, iii, jjj] = self.get_Cl(field_i + field_j, smoothing_nbins=150)[1:]
         return C
 
     def _get_gauss_alm(self):
