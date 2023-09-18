@@ -2,12 +2,21 @@ from mpi4py import MPI
 import numpy as np
 import omegaqe
 from omegaqe.bias import bias
-from omegaqe.tools import parse_boolean, mpi
+from omegaqe.tools import parse_boolean, mpi, none_or_str, getFileSep
 import os
 import sys
 
 
-def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_typ, gmv, fields, _id):
+def _get_lss_cls_dict(cls_path):
+    sep = getFileSep()
+    cls_dict = {
+        "kk": np.load(f"{cls_path}{sep}cl_kk.npy"),
+        "gk": np.load(f"{cls_path}{sep}cl_gk.npy"),
+        "Ik": np.load(f"{cls_path}{sep}cl_Ik.npy"),
+    }
+    return cls_dict
+
+def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_path, dir, bi_typ, gmv, fields, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -16,7 +25,7 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_ty
     start_time_tot = MPI.Wtime()
 
     mpi.output("-------------------------------------", my_rank, _id)
-    mpi.output(f"bias_typ: {bias_typ}, exp: {exp}, N_Ls: {N_Ls}, N_L1: {N_L1}, N_L3: {N_L3}, Ntheta12: {Ntheta12}, Ntheta13: {Ntheta13}, noise: {noise}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
+    mpi.output(f"bias_typ: {bias_typ}, exp: {exp}, N_Ls: {N_Ls}, N_L1: {N_L1}, N_L3: {N_L3}, Ntheta12: {Ntheta12}, Ntheta13: {Ntheta13}, noise: {noise}, lss_cls_path: {lss_cls_path}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
     mpi.output("Setting up parallisation of workload.", my_rank, _id)
 
     Ls = np.geomspace(30, 3000, N_Ls)
@@ -28,9 +37,12 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_ty
 
     verbose = True if my_rank == 0 else False
 
+    
+    lss_cls = None if lss_cls_path is None else _get_lss_cls_dict(lss_cls_path)
+
     start_time = MPI.Wtime()
     # TODO: be careful of F_L directory location
-    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=fields, gmv=gmv, N_L1=N_L1, N_L3=N_L3, Ntheta12=Ntheta12, Ntheta13=Ntheta13, F_L_path=f"{omegaqe.CACHE_DIR}/_F_L", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose, noise=noise)
+    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=fields, gmv=gmv, N_L1=N_L1, N_L3=N_L3, Ntheta12=Ntheta12, Ntheta13=Ntheta13, F_L_path=f"{omegaqe.CACHE_DIR}/_F_L", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose, noise=noise, lss_cls=lss_cls)
     end_time = MPI.Wtime()
 
     mpi.output("Bias calculation finished.", my_rank, _id)
@@ -61,8 +73,8 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_ty
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 13:
-        raise ValueError("Must supply arguments: bias_typ exp bi_typ fields gmv Nell N_L1 N_L3 Ntheta12 Ntheta13 noise dir id")
+    if len(args) != 14:
+        raise ValueError("Must supply arguments: bias_typ exp bi_typ fields gmv Nell N_L1 N_L3 Ntheta12 Ntheta13 noise lss_cls_path dir id")
     bias_typ = str(args[0])
     exp = str(args[1])
     bi_typ = str(args[2])
@@ -74,6 +86,7 @@ if __name__ == '__main__':
     Ntheta12 = int(args[8])
     Ntheta13 = int(args[9])
     noise = parse_boolean(args[10])
-    dir = args[11]
-    _id = args[12]
-    _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, dir, bi_typ, gmv, fields, _id)
+    lss_cls_path = none_or_str(args[11])
+    dir = args[12]
+    _id = args[13]
+    _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_path, dir, bi_typ, gmv, fields, _id)

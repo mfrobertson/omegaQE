@@ -333,8 +333,26 @@ def _build_C_inv_splines(C_inv, bi_typ, L_min_cut=30, L_max_cut=3000):
             C_inv_splines[iii, jjj] = InterpolatedUnivariateSpline(Ls[1:], C_inv_ij[1:])
     return C_inv_splines
 
+def _cache_lss_cls(lss_cls):
+    global Cl_kk_spline, Cl_gk_spline, Cl_Ik_spline
+    Cl_kk = global_fish.covariance.get_Cl("kk", ellmax=5000) if lss_cls is None else lss_cls["kk"]
+    Ls_sample = np.arange(np.size(Cl_kk))
+    Cl_kk_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_kk[1:])
+    Cl_gk = global_fish.covariance.get_Cl("kg", ellmax=5000) if lss_cls is None else lss_cls["gk"]
+    Cl_gk_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_gk[1:])
+    Cl_Ik = global_fish.covariance.get_Cl("kI", ellmax=5000) if lss_cls is None else lss_cls["Ik"]
+    Cl_Ik_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_Ik[1:])
 
-def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir=omegaqe.DATA_DIR, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False, noise=True):
+def _cache_splines(F_L_path, bi_typ, lss_cls):
+    global F_L_spline, C_inv_splines
+    sample_Ls, F_L = _get_cached_F_L(F_L_path, bi_typ)
+    F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
+    C_inv = global_fish.covariance.get_C_inv(bi_typ, Lmax=int(np.ceil(np.max(sample_Ls))), nu=353e9)
+    C_inv_splines = _build_C_inv_splines(C_inv, bi_typ)
+
+    _cache_lss_cls(lss_cls)
+
+def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir=omegaqe.DATA_DIR, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False, noise=True, lss_cls=None):
 
     global global_qe, global_fish, N0_w_spline, N0_k_spline
     global_fish = Fisher(exp, qe_fields, gmv, ps, L_cuts, iter, False, data_dir, setup_bispectra=True)
@@ -356,20 +374,8 @@ def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps=
 
 
     if bi_typ != "theory":
-        if verbose: print("Caching bispectrum splines")
-        global F_L_spline, C_inv_splines, Cl_kk_spline, Cl_gk_spline, Cl_Ik_spline
-        sample_Ls, F_L = _get_cached_F_L(F_L_path, bi_typ)
-        F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
-        C_inv = global_fish.covariance.get_C_inv(bi_typ, Lmax=int(np.ceil(np.max(sample_Ls))), nu=353e9)
-        C_inv_splines = _build_C_inv_splines(C_inv, bi_typ)
-
-        Cl_kk = global_fish.covariance.get_Cl("kk", ellmax=5000)
-        Ls_sample = np.arange(np.size(Cl_kk))
-        Cl_kk_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_kk[1:])
-        Cl_gk = global_fish.covariance.get_Cl("gk", ellmax=5000)
-        Cl_gk_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_gk[1:])
-        Cl_Ik = global_fish.covariance.get_Cl("Ik", ellmax=5000)
-        Cl_Ik_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_Ik[1:])
+        if verbose: print("Caching lss splines")
+        _cache_splines(F_L_path, bi_typ, lss_cls)
 
     Ls = np.ones(1, dtype=int)*Ls if np.size(Ls) == 1 else Ls
     return _bias(bias_typ, bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose, noise)
