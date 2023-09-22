@@ -1,4 +1,3 @@
-from omegaqe.powerspectra import Powerspectra
 from omegaqe.tools import getFileSep
 from DEMNUnii.demnunii import Demnunii
 from plancklens.sims import cmbs, phas
@@ -6,9 +5,7 @@ import numpy as np
 import sys
 import os
 
-power = Powerspectra()
 dm = Demnunii()
-power.cosmo = dm.cosmo
 sep = getFileSep()
 LMAX_MAP = 6000
 
