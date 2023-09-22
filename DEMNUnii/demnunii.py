@@ -45,10 +45,13 @@ class Demnunii:
     def get_particle_mass(self):
         return float(self.get_config("UnitMass_in_g"))
 
-    def get_particle_snap(self, snap):
+    def get_particle_snap(self, snap, lensed=False):
         sep = getFileSep()
         snap_num_app = "0" if len(str(snap)) == 2 else "00"
-        filename = f'{self.data_dir}{sep}SurfaceMassDensities{sep}SurfDensMap_snap_{snap_num_app}{snap}.0.fits'
+        if lensed:
+            filename = f'{self.cache_dir}{sep}_len_snaps{sep}len_snap_{snap_num_app}{snap}.fits'
+        else:
+            filename = f'{self.data_dir}{sep}SurfaceMassDensities{sep}SurfDensMap_snap_{snap_num_app}{snap}.0.fits'
         return self.sht.read_map(filename)
     
     def get_kappa_snap_old(self, snap):
@@ -57,10 +60,10 @@ class Demnunii:
         filename = f'{self.data_dir}{sep}CMB_Convergence{sep}KappaMap_snap_{snap_num_app}{snap}.0.fits'
         return self.sht.read_map(filename)
 
-    def get_density_snap(self, snap):
+    def get_density_snap(self, snap, lensed=False):
         pixel_area = self.sht.nside2pixarea()
         particle_mass = self.get_particle_mass()
-        rho = self.get_particle_snap(snap) * particle_mass / pixel_area
+        rho = self.get_particle_snap(snap, lensed) * particle_mass / pixel_area
         rho_bar = np.mean(rho)
         return rho / rho_bar - 1
 
@@ -142,16 +145,16 @@ class Demnunii:
         alm_corr = self.sht.almxfl(alm, 1/self.sht.pixwin)
         return self.sht.alm2map(alm_corr)
 
-    def get_obs_gal_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True):
-        window="Planck"
-        if verbose: print(f"DEMNUnii: Constructing gal map for zmin={zmin}, zmax={zmax}, window={window}")
+    def get_obs_gal_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
+        window="LSST"
+        if verbose: print(f"DEMNUnii: Constructing gal map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}, lensed={lensed}")
         npix = self.sht.nside2npix()
         gal = np.zeros(npix)
         snaps = self.get_snaps_z(zmin, zmax)
         t0 = datetime.datetime.now()
         for iii, snap in enumerate(snaps):
             if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
-            gal += self._window(snap, window) * self.get_density_snap(snap)
+            gal += self._window(snap, window) * self.get_density_snap(snap, lensed)
             if verbose: print('\r', end='')
         if verbose: print("")
         if pixel_corr: gal = self._apply_pixel_correction(gal)
@@ -172,12 +175,19 @@ class Demnunii:
         if pixel_corr: cib = self._apply_pixel_correction(cib)
         return cib
     
-    def get_gal_kappa_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True):
+    def get_gal_kappa_map(self, source_snap, verbose=False, pixel_corr=True):
+        if source_snap == 62:
+            print("Returning zerod map for snap 62 (z: 0)")
+            return np.zeros(self.sht.nside2npix())
+        zmin = 0
+        zmax = self._get_zmax(source_snap)
         if verbose: print(f"DEMNUnii: Constructing galaxy kappa map for zmin={zmin} and zmax={zmax}")
         npix = self.sht.nside2npix()
         gal_kappa = np.zeros(npix)
         snaps = self.get_snaps_z(zmin, zmax)
-        source_snap = np.min(snaps)
+        assert source_snap == np.min(snaps), (source_snap, snaps)
+        snaps = np.sort(snaps)[1:]
+        print(f"    Source snap: {source_snap}, so using snaps {snaps[-1]} -> {snaps[0]} (zmax: {self._get_zmax(snaps[0])}) to construct kappa.")
         t0 = datetime.datetime.now()
         for iii, snap in enumerate(snaps):
             if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
