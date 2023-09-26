@@ -160,16 +160,16 @@ class Demnunii:
         if pixel_corr: gal = self._apply_pixel_correction(gal)
         return gal
 
-    def get_obs_cib_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True):
+    def get_obs_cib_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
         window = "Planck"
-        if verbose: print(f"DEMNUnii: Constructing CIB map for zmin={zmin}, zmax={zmax}, window={window}")
+        if verbose: print(f"DEMNUnii: Constructing CIB map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}, lensed={lensed}")
         npix = self.sht.nside2npix()
         cib = np.zeros(npix)
         snaps = self.get_snaps_z(zmin, zmax)
         t0 = datetime.datetime.now()
         for iii, snap in enumerate(snaps):
             if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
-            cib += self._window(snap, window) * self.get_density_snap(snap)
+            cib += self._window(snap, window) * self.get_density_snap(snap, lensed)
             if verbose: print('\r', end='')
         if verbose: print("")
         if pixel_corr: cib = self._apply_pixel_correction(cib)
