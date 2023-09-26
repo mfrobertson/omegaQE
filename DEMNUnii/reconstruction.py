@@ -45,11 +45,10 @@ class Reconstruction:
         def hashdict(self):
             return {'cmbs': self.maps_filename, 'noise': self.maps_filename, 'data': self.maps_filename}
 
-    def __init__(self, exp, filename=None, L_cuts=(30, 3000, 30, 5000), sim=None, nthreads=1):
+    def __init__(self, exp, filename=None, L_cuts=(30, 3000, 30, 5000), sim=None, nthreads=1, iter=False):
         self.nthreads = nthreads
         self.filename = filename
-        self.setup_env()
-        self.temp = os.path.join(os.environ['PLENS'], 'demnunii', str(sim))
+        self.setup_env(exp, iter, sim)
         self.exp = exp
         self.dm = Demnunii(nthreads)
         self.sht = self.dm.sht
@@ -64,7 +63,7 @@ class Reconstruction:
         self.setup = False
         self.iter_rec_data = None
         if filename is not None:
-            self.setup_reconstruction(self.filename, seed=sim)
+            self.setup_reconstruction(self.filename, seed=sim, iter=iter)
 
     def _initialise(self):
         print("Initialising filters and librarys for Plancklens")
@@ -94,14 +93,15 @@ class Reconstruction:
         if typ == "ee" or typ == "bb":
             return self.L_cuts[3]
 
-    def setup_env(self):
+    def setup_env(self, exp, iter, sim):
         if not 'PLENS' in os.environ.keys():
-            plancklens_cachedir = "_tmp"
+            plancklens_cachedir = f"_tmp_{exp}_{iter}"
             os.environ['PLENS'] = plancklens_cachedir
             print(f"Setting up Plancklens ache at {plancklens_cachedir}")
-        if os.path.exists(os.environ['PLENS']) and os.path.isdir(os.environ['PLENS']):
-            print(f"Removing existing plancklens cache at {os.environ['PLENS']}")
-            shutil.rmtree(os.environ['PLENS'])
+        self.temp = os.path.join(os.environ['PLENS'], 'demnunii', str(sim))
+        if os.path.exists(self.temp) and os.path.isdir(self.temp):
+            print(f"Removing existing plancklens cache at {self.temp}")
+            shutil.rmtree(self.temp)
 
     def get_cmb_cls(self):
         Tcmb = 2.7255
@@ -172,9 +172,6 @@ class Reconstruction:
         qe_key = self._get_qe_key(typ)
         assert qe_key == 'p_p', qe_key
 
-        mf0_p = self.qlms_lib.get_sim_qlm_mf('p' + qe_key[1:], np.array([])) 
-        mf0_o = self.qlms_lib.get_sim_qlm_mf('x' + qe_key[1:], np.array([])) 
-
         plm0 = self.qlms_lib.get_sim_qlm('p' + qe_key[1:], simidx) 
         olm0 = self.qlms_lib.get_sim_qlm('x' + qe_key[1:], simidx) 
 
@@ -232,7 +229,7 @@ class Reconstruction:
             raise ValueError("Need to call 'setup_reconstruction' first. No qlm_lib has been instantiated.")
         
     def _setup_iter_libdir(self, qe_key):
-        TEMP =  opj(os.environ['SCRATCH'], "mathew_delensalot")
+        TEMP =  opj(self.temp, "iter_lib")
         version = "mathew"
         libdir_iterators = lambda qe_key, simidx, version: opj(TEMP,'%s_sim%04d'%(qe_key, simidx) + version)
         lib_dir_iterator = libdir_iterators(qe_key, -1, version) 
@@ -282,28 +279,26 @@ class Reconstruction:
         qnorm = utils.cli(resp)
         return self.sht.almxfl(qlm, qnorm)
     
-    def get_phi_rec_iter(self, iter, norm=False):
+    def get_phi_rec_iter(self, iter):
         if self.iter_rec_data is None:
             raise ValueError("No iterative reconstruction found, run calc_iter_rec first.")
         rec_lms =  self.iter_rec_data[iter]
         phi_lm = rec_lms[:len(rec_lms)//2]
-        if norm:
-            wiener = self.get_wiener("phi", self.iter_typ, iter=True)
-            return self.sht.almxfl(phi_lm, 1/wiener)
-        return phi_lm
+        normalisation = 1/self.get_wiener("phi", self.iter_typ, iter=True)
+        normalisation[0] = 0
+        return self.sht.almxfl(phi_lm, normalisation)
 
-    def get_curl_rec_iter(self, iter, norm=False):
+    def get_curl_rec_iter(self, iter):
         if self.iter_rec_data is None:
             raise ValueError("No iterative reconstruction found, run calc_iter_rec first.")
         rec_lms =  self.iter_rec_data[iter]
         curl_lm = rec_lms[len(rec_lms)//2:]
-        if norm:
-            wiener = self.get_wiener("curl", self.iter_typ, iter=True)
-            return self.sht.almxfl(curl_lm, 1/wiener)
-        return curl_lm
+        normalisation = 1/self.get_wiener("curl", self.iter_typ, iter=True)
+        normalisation[0] = 0
+        return self.sht.almxfl(curl_lm, normalisation)
     
     def get_wiener(self, typ, qe_typ, iter):
-        Cl = self._get_Cl_curl()
+        Cl = self._get_Cl_curl() if typ == "curl" else self._get_Cl_phi()
         N0 = self.noise.get_N0(typ, self.Lmax_map, qe=qe_typ, gmv=True, exp=self.exp, T_Lmin=self.L_cuts[0], T_Lmax=self.L_cuts[1], P_Lmin=self.L_cuts[2], P_Lmax=self.L_cuts[3], iter=iter, recalc_N0=True)
         return Cl/(Cl + N0)
 

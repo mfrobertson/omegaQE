@@ -20,18 +20,29 @@ class Template:
         self.use_kappa_rec = use_kappa_rec
         if self.use_kappa_rec:
             print(f"Using reconstructed kappa (QE: {cmb_lens_qe_typ}) in template.")
-            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True)
+            if "_iter" in cmb_lens_qe_typ:
+                iter=True
+                cmb_lens_qe_typ = cmb_lens_qe_typ[:-5]
+            else:
+                iter=False
+            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter)
         self._populate_a_bars(tracer_noise, neg_tracers)
 
     def _get_F_L_and_C_inv(self, cmb_lens_qe_typ):
         if cmb_lens_qe_typ == "T":
             qe_typ = "single"
             fields = "T"
-        elif cmb_lens_qe_typ == "TEB":
+        elif cmb_lens_qe_typ == "TEB" or cmb_lens_qe_typ == "EB":
             qe_typ = "gmv"
+            fields = cmb_lens_qe_typ
+        elif cmb_lens_qe_typ == "TEB_iter":
+            qe_typ = "gmv_iter"
             fields = "TEB"
+        elif cmb_lens_qe_typ == "EB_iter":
+            qe_typ = "gmv_iter"
+            fields = "EB"
         else:
-            raise ValueError(f"Supplied cmb_lens_qe_typ {cmb_lens_qe_typ} not of supported typs; T or TEB")
+            raise ValueError(f"Supplied cmb_lens_qe_typ {cmb_lens_qe_typ} not of supported typs; T, EB, TEB, TEB_iter, or EB_iter")
         Ls = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
         F_L = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
         C_inv = self.fields.fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)
