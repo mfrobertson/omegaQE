@@ -4,6 +4,8 @@ import os
 import numpy as np
 import DEMNUnii
 from DEMNUnii.demnunii import Demnunii
+import omegaqe
+from omegaqe.fisher import Fisher
 
 dm = Demnunii()
 
@@ -33,9 +35,9 @@ def _get_ps(exp, deflect_typ, tem_ext, nsims, nthreads):
     return Cl_ww/nsims
 
 
-def main(exp, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, nthreads, _id):
+def main(exp, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"exp: {exp}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f"exp: {exp}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, gauss_lss: {gauss_lss}, nthreads: {nthreads}", 0, _id)
 
     deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff", "dem_dem"] if deflect_typ is None else [deflect_typ]
 
@@ -44,6 +46,8 @@ def main(exp, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, nt
         ext += f"_{qe_typ}"
     if gauss_lss:
         ext += "_gauss"
+    elif len_lss:
+        ext += "_len"
     for deflect_typ in deflect_typs:
         mpi.output(f"Type: {deflect_typ}", 0, _id)
         ps = _get_ps(exp, deflect_typ, ext, nsims, nthreads)
@@ -52,9 +56,9 @@ def main(exp, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, nt
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 9:
+    if len(args) != 10:
         raise ValueError(
-            "Must supply arguments: exp tracer_noise kappa_rec qe_typ nsims deflect_typ gauss_lss nthreads _id")
+            "Must supply arguments: exp tracer_noise kappa_rec qe_typ nsims deflect_typ gauss_lss len_lss nthreads _id")
     exp = str(args[0])
     tracer_noise = parse_boolean(args[1])
     kappa_rec = parse_boolean(args[2])
@@ -62,6 +66,7 @@ if __name__ == '__main__':
     nsims = int(args[4])
     deflect_typ = none_or_str(args[5])
     gauss_lss = parse_boolean(args[6])
-    nthreads = int(args[7])
-    _id = str(args[8])
-    main(exp, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, nthreads, _id)
+    len_lss = parse_boolean(args[7])
+    nthreads = int(args[8])
+    _id = str(args[9])
+    main(exp, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, nthreads, _id)
