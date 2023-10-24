@@ -15,16 +15,16 @@ def setup_dirs(sims_dir, exp, deflect_typs):
                 os.makedirs(full_dir)
 
 
-def main(exp, qe_typ, nsims, deflect_typ, iter, nthreads, _id):
+def main(exp, qe_typ, start, end, deflect_typ, iter, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"exp: {exp}, qe_typ: {qe_typ}, nsims: {nsims}, deflect_typ: {deflect_typ}, iter: {iter}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f"exp: {exp}, qe_typ: {qe_typ}, start: {start}, end: {end}, deflect_typ: {deflect_typ}, iter: {iter}, nthreads: {nthreads}", 0, _id)
 
     fields = Fields(exp, use_lss_cache=True, use_cmb_cache=True, nthreads=nthreads)
-    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff", "dem_dem"] if deflect_typ is None else [deflect_typ]
+    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_zero"] if deflect_typ is None else [deflect_typ]
     sims_dir = DEMNUnii.SIMS_DIR
     qe_typ_str = qe_typ + "_iter" if iter else qe_typ
     setup_dirs(sims_dir, exp, deflect_typs)
-    for sim in range(nsims):
+    for sim in np.arange(start, end):
         mpi.output(f"Sim: {sim}", 0, _id)
         for deflect_typ in deflect_typs:
             fields.setup_rec(sim, deflect_typ, iter=iter)
@@ -38,14 +38,15 @@ def main(exp, qe_typ, nsims, deflect_typ, iter, nthreads, _id):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 7:
+    if len(args) != 8:
         raise ValueError(
-            "Must supply arguments: exp qe_typ nsims deflect_typ iter nthreads _id")
+            "Must supply arguments: exp qe_typ start end deflect_typ iter nthreads _id")
     exp = str(args[0])
     qe_typ = str(args[1])
-    nsims = int(args[2])
-    deflect_typ = none_or_str(args[3])
-    iter = parse_boolean(args[4])
-    nthreads  = int(args[5])
-    _id = str(args[6])
-    main(exp, qe_typ, nsims, deflect_typ, iter, nthreads, _id)
+    start = int(args[2])
+    end = int(args[3])
+    deflect_typ = none_or_str(args[4])
+    iter = parse_boolean(args[5])
+    nthreads  = int(args[6])
+    _id = str(args[7])
+    main(exp, qe_typ, start, end, deflect_typ, iter, nthreads, _id)
