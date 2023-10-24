@@ -10,8 +10,8 @@ from omegaqe.fisher import Fisher
 dm = Demnunii()
 
 
-def _save_ps(ps, exp, nsims, deflect_typ, ext):
-    ps_dir = f"{DEMNUnii.CACHE_DIR}/_raw_ps/{deflect_typ}/{exp}/"
+def _save_ps(ps, exp, tracer_fields, nsims, deflect_typ, ext):
+    ps_dir = f"{DEMNUnii.CACHE_DIR}/_raw_ps/{deflect_typ}/{exp}/{tracer_fields}"
     if not os.path.exists(ps_dir):
         os.makedirs(ps_dir)
     ps_filename = f"ps"
@@ -22,24 +22,24 @@ def _save_ps(ps, exp, nsims, deflect_typ, ext):
     np.save(f"{ps_full_path}", ps)
 
 
-def _get_ps(exp, deflect_typ, tem_ext, nsims, nthreads):
+def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, nthreads):
     mpi.output(f"  sim: 0", 0, _id)
-    omega_tem = dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}/_tems/{deflect_typ}/{exp}/omega_tem_{0}{tem_ext}.fits")
+    omega_tem = dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{0}{tem_ext}.fits")
     omega_rec = dm.sht.read_map(f"{DEMNUnii.SIMS_DIR}/{deflect_typ}/{exp}/omega/{qe_typ}_{0}.fits")
     Cl_ww = dm.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)
     for sim in range(1,nsims):
         mpi.output(f"  sim: {sim}", 0, _id)
-        omega_tem = dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}/_tems/{deflect_typ}/{exp}/omega_tem_{sim}{tem_ext}.fits")
+        omega_tem = dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{sim}{tem_ext}.fits")
         omega_rec = dm.sht.read_map(f"{DEMNUnii.SIMS_DIR}/{deflect_typ}/{exp}/omega/{qe_typ}_{sim}.fits")
         Cl_ww += dm.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)
     return Cl_ww/nsims
 
 
-def main(exp, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, nthreads, _id):
+def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"exp: {exp}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, gauss_lss: {gauss_lss}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f"exp: {exp}, tracer_fields: {tracer_fields}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, gauss_lss: {gauss_lss}, nthreads: {nthreads}", 0, _id)
 
-    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_diff", "dem_dem"] if deflect_typ is None else [deflect_typ]
+    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem"] if deflect_typ is None else [deflect_typ]
 
     ext = "_wN" if tracer_noise else ""
     if kappa_rec:
@@ -50,23 +50,24 @@ def main(exp, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, le
         ext += "_len"
     for deflect_typ in deflect_typs:
         mpi.output(f"Type: {deflect_typ}", 0, _id)
-        ps = _get_ps(exp, deflect_typ, ext, nsims, nthreads)
-        _save_ps(ps, exp, nsims, deflect_typ, ext)
+        ps = _get_ps(exp, tracer_fields, deflect_typ, ext, nsims, nthreads)
+        _save_ps(ps, exp, tracer_fields, nsims, deflect_typ, ext)
 
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 10:
+    if len(args) != 11:
         raise ValueError(
-            "Must supply arguments: exp tracer_noise kappa_rec qe_typ nsims deflect_typ gauss_lss len_lss nthreads _id")
+            "Must supply arguments: exp tracer_fields tracer_noise kappa_rec qe_typ nsims deflect_typ gauss_lss len_lss nthreads _id")
     exp = str(args[0])
-    tracer_noise = parse_boolean(args[1])
-    kappa_rec = parse_boolean(args[2])
-    qe_typ = str(args[3])
-    nsims = int(args[4])
-    deflect_typ = none_or_str(args[5])
-    gauss_lss = parse_boolean(args[6])
-    len_lss = parse_boolean(args[7])
-    nthreads = int(args[8])
-    _id = str(args[9])
-    main(exp, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, nthreads, _id)
+    tracer_fields = str(args[1])
+    tracer_noise = parse_boolean(args[2])
+    kappa_rec = parse_boolean(args[3])
+    qe_typ = str(args[4])
+    nsims = int(args[5])
+    deflect_typ = none_or_str(args[6])
+    gauss_lss = parse_boolean(args[7])
+    len_lss = parse_boolean(args[8])
+    nthreads = int(args[9])
+    _id = str(args[10])
+    main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, nthreads, _id)
