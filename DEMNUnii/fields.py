@@ -11,7 +11,7 @@ import copy
 
 class Fields:
 
-    def __init__(self, exp, use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1, gauss_lss=False, len_lss=False):
+    def __init__(self, exp, fields="kgI", use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1, gauss_lss=False, len_lss=False):
         self.nthreads = nthreads
         self.dm = Demnunii(nthreads)
         self.exp = exp
@@ -20,25 +20,32 @@ class Fields:
         self.deflect_typ = deflect_typ
         self.nside = self.dm.nside
         self.Lmax_map = self.dm.Lmax_map
-        self.fields = "kgI"
+        self.fields = fields
+        self._fields = self._get_rearanged_fields(fields)
         self.ells = np.arange(self.Lmax_map+1)
         self._initialise(use_lss_cache, use_cmb_cache, gauss_lss, len_lss)
 
     def _initialise(self, use_lss_cache, use_cmb_cache, gauss_lss, len_lss):
-        self.fft_maps = dict.fromkeys(self.fields)
-        self.fft_noise_maps = dict.fromkeys(self.fields)
-        for field in self.fields:
+        self.fft_maps = dict.fromkeys(self._fields)
+        self.fft_noise_maps = dict.fromkeys(self._fields)
+        for field in self._fields:
             self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache, lensed=len_lss)
             self.fft_noise_maps[field] = self.get_noise_map(field, set_seed=True, fft=True)
         if gauss_lss:
             print("Using Cls of previous maps to generate new gaussian realisations.")
             self.y = self._get_y(input_kappa_map=self.dm.sht.read_map(f"{DEMNUnii.SIMS_DIR}/kappa_diff.fits"))
-            for field in self.fields:
+            for field in self._fields:
                 self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache, gaussian=gauss_lss)
         if use_cmb_cache:
             self.rec = None
         else:
             self.setup_rec(self.sim, self.deflect_typ)
+
+    def _get_rearanged_fields(self, fields):
+        fields = np.char.array(list(fields))
+        fields = fields[fields != "k"]
+        fields = np.insert(fields, 0, "k")
+        return fields
 
     def get_Cl(self, typ, smoothing_nbins=None):
         alm1 = self.fft_maps[typ[0]]
@@ -47,8 +54,8 @@ class Fields:
 
     def _get_cov(self, N_fields):
         C = np.empty((self.Lmax_map, N_fields, N_fields))
-        for iii, field_i in enumerate(self.fields):
-            for jjj, field_j in enumerate(self.fields):
+        for iii, field_i in enumerate(self._fields):
+            for jjj, field_j in enumerate(self._fields):
                 C[:, iii, jjj] = self.get_Cl(field_i + field_j, smoothing_nbins=150)[1:]
         return C
 
@@ -79,12 +86,11 @@ class Fields:
         return res
 
     def _get_y(self, input_kappa_map):
-        N_fields = np.size(list(self.fields))
+        N_fields = np.size(list(self._fields))
         C = self._get_cov(N_fields)
         L = self._get_L(C, N_fields)
         v = self._get_gauss_alms(N_fields)
         if input_kappa_map is not None:
-            # TODO: this only works if k is the fist field listed
             C_kappa_sqrt = L[:, 0, 0]
             C_kappa_sqrt_inv = np.zeros(np.size(C_kappa_sqrt))
             C_kappa_sqrt_inv[1:] = 1/C_kappa_sqrt[1:]
@@ -150,7 +156,7 @@ class Fields:
         return self._get_cmb_lens_rec("omega", cmb_fields, iter, fft)
 
     def _get_index(self, field):
-        return np.where(np.char.array(list(self.fields)) == field)[0][0]
+        return np.where(np.char.array(list(self._fields)) == field)[0][0]
 
     def get_gaussian_map(self, field):
         index = self._get_index(field)
