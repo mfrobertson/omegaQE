@@ -14,7 +14,9 @@ from omegaqe.noise import Noise
 from omegaqe.powerspectra import Powerspectra
 import omegaqe.postborn as postborn
 import shutil
-from delensalot.core.opfilt.MAP_opfilt_iso_p import alm_filter_nlev_wl
+from delensalot.core.opfilt.MAP_opfilt_iso_p import alm_filter_nlev_wl as alm_filter_nlev_wl_pol_only
+from delensalot.core.opfilt.MAP_opfilt_iso_tp import alm_filter_nlev_wl as alm_filter_nlev_wl_teb
+from delensalot.core.opfilt.MAP_opfilt_iso_t import alm_filter_nlev_wl as alm_filter_nlev_wl_t_only
 from delensalot.utility import utils_steps
 from delensalot.core.iterator.cs_iterator_multi import iterator_cstmf
 from delensalot.core.iterator.statics import rec as Rec
@@ -95,10 +97,10 @@ class Reconstruction:
 
     def setup_env(self, exp, iter, sim):
         if not 'PLENS' in os.environ.keys():
-            plancklens_cachedir = f"_tmp_{exp}_{iter}"
+            plancklens_cachedir = f"_tmp"
             os.environ['PLENS'] = plancklens_cachedir
-            print(f"Setting up Plancklens ache at {plancklens_cachedir}")
-        self.temp = os.path.join(os.environ['PLENS'], 'demnunii', str(sim))
+            print(f"Setting up Plancklens cahe at {plancklens_cachedir}")
+        self.temp = os.path.join(os.environ['PLENS'], 'demnunii', f"{exp}_{iter}", str(sim))
         if os.path.exists(self.temp) and os.path.isdir(self.temp):
             print(f"Removing existing plancklens cache at {self.temp}")
             shutil.rmtree(self.temp)
@@ -169,8 +171,8 @@ class Reconstruction:
                 cg_tol: tolerance of conjugate-gradient filter
         """
         simidx = -1
+        assert typ in ["T", "EB", "TEB"], typ
         qe_key = self._get_qe_key(typ)
-        assert qe_key == 'p_p', qe_key
 
         plm0 = self.qlms_lib.get_sim_qlm('p' + qe_key[1:], simidx) 
         olm0 = self.qlms_lib.get_sim_qlm('x' + qe_key[1:], simidx) 
@@ -207,21 +209,34 @@ class Reconstruction:
         ffi = deflection(self.sht.geom, np.zeros_like(plm0), self.Lmax_map, numthreads=self.nthreads, epsilon=1e-7)
         transfers =  self._apply_cuts(self.get_transfers(), self.indices)
         arcmin_to_rad = np.pi/180/60
+        noise_t = np.sqrt(self.noise_cls['t']) / arcmin_to_rad
         noise_e = np.sqrt(self.noise_cls['e']) / arcmin_to_rad
         noise_b = np.sqrt(self.noise_cls['b']) / arcmin_to_rad
-        filtr = alm_filter_nlev_wl(nlev_p=noise_e, ffi=ffi, transf=transfers[1],
+        if typ == "EB":
+            filtr = alm_filter_nlev_wl_pol_only(nlev_p=noise_e, ffi=ffi, transf=transfers[1],
                 unlalm_info=(self.Lmax_map, self.Lmax_map), lenalm_info=(self.Lmax_map, self.Lmax_map), transf_b=transfers[2], nlev_b=noise_b)
-        elm, blm = self.maps_lib.get_sim_pmap(simidx)
-        datmaps = np.array([alm_copy(elm, None, self.Lmax_map, self.Lmax_map), alm_copy(blm, None, self.Lmax_map, self.Lmax_map)])
-
-
+            elm, blm = self.maps_lib.get_sim_pmap(simidx)
+            datmaps = np.array([alm_copy(elm, None, self.Lmax_map, self.Lmax_map), alm_copy(blm, None, self.Lmax_map, self.Lmax_map)])
+            wflm0=lambda : alm_copy(self.rdn0_lib.ivfs.get_sim_emliklm(simidx), None, self.Lmax_map, self.Lmax_map)
+        elif typ == "TEB":
+            filtr = alm_filter_nlev_wl_teb(nlev_t=noise_t, nlev_p=noise_e, ffi=ffi, transf=transfers[0], unlalm_info=(self.Lmax_map, self.Lmax_map), lenalm_info=(self.Lmax_map, self.Lmax_map),
+                                    transf_e=transfers[1], transf_b=transfers[2], nlev_b=noise_b)
+            elm, blm = self.maps_lib.get_sim_pmap(simidx)
+            tlm = self.maps_lib.get_sim_tmap(simidx)
+            datmaps = np.array([alm_copy(tlm, None, self.Lmax_map, self.Lmax_map),alm_copy(elm, None, self.Lmax_map, self.Lmax_map),alm_copy(blm, None, self.Lmax_map, self.Lmax_map)])
+            wflm0 = lambda: np.array([alm_copy(self.rdn0_lib.ivfs.get_sim_tmliklm(simidx), None, self.Lmax_map, self.Lmax_map),alm_copy(self.rdn0_lib.ivfs.get_sim_emliklm(simidx), None, self.Lmax_map, self.Lmax_map)])
+        elif typ == "T":
+            filtr = alm_filter_nlev_wl_t_only(nlev_t=noise_t, ffi=ffi, transf=transfers[0], unlalm_info=(self.Lmax_map, self.Lmax_map), lenalm_info=(self.Lmax_map, self.Lmax_map))
+            tlm = self.maps_lib.get_sim_tmap(simidx)
+            datmaps = alm_copy(tlm, None, self.Lmax_map, self.Lmax_map)
+            wflm0 = lambda: alm_copy(self.rdn0_lib.ivfs.get_sim_tmliklm(simidx), None, self.Lmax_map, self.Lmax_map)
         k_geom = filtr.ffi.geom 
         stepper = utils_steps.harmonicbump(xa=400, xb=1500)
         mean_field = np.zeros(np.shape(plm0), dtype=complex)
         iterator = iterator_cstmf(libdir_iterator, 'p', [(self.Lmax_map, self.Lmax_map), (self.Lmax_map, self.Lmax_map)], datmaps,
                                 [plm0, olm0], [mean_field, mean_field], [Rpp_unl, Roo_unl], [cpp, coo], ('p', 'x'), self.cl_unl, filtr, k_geom,
                                 chain_descrs(self.Lmax_map, cg_tol), stepper,
-                                wflm0=lambda : alm_copy(self.rdn0_lib.ivfs.get_sim_emliklm(simidx), None, self.Lmax_map, self.Lmax_map))
+                                wflm0=wflm0)
         return iterator
 
     def _check_setup(self):
@@ -243,7 +258,7 @@ class Reconstruction:
         return lib_dir_iterator
     
     def calc_iter_rec(self, typ="EB", itmax=15):
-        tol_iter = 1e-7
+        tol_iter = 1e-5 if typ == "TEB" else 1e-7
         soltn_cond = True
         qe_key = self._get_qe_key(typ)
         lib_dir_iterator = self._setup_iter_libdir(qe_key)
