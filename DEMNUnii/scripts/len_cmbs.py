@@ -147,7 +147,7 @@ def main(nsims, nthreads, loc, unl_loc):
     deflect_configs = {"pbdem_dem":(glm_pb, clm_dem),
                        "pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb))),
                        "npbdem_dem": (-glm_pb, clm_dem),
-                       "diff_diff":(glm_diff, clm_diff),
+                       "diff_zero": (glm_diff, np.zeros(np.size(glm_diff))),
                        "dem_dem":(glm_dem, clm_dem)
                        }
     unl_cmb_spectra = get_unlensed_cmb_ps()
