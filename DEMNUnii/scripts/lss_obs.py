@@ -8,15 +8,15 @@ def main():
     gal_map = dm.get_obs_gal_map(verbose=True)
     cib_map = dm.get_obs_cib_map(verbose=True)
 
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/k2.fits", kappa_map)
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/w2.fits", omega_map)
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/g2.fits", gal_map)
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/I2.fits", cib_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/k.fits", kappa_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/w.fits", omega_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/g.fits", gal_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/I.fits", cib_map)
 
     gal_map = dm.get_obs_gal_map(verbose=True, lensed=True)
     cib_map = dm.get_obs_cib_map(verbose=True, lensed=True)
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/g2_len.fits", gal_map)
-    dm.sht.write_map(f"{dm.cache_dir}/_maps/I2_len.fits", cib_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/g_len.fits", gal_map)
+    dm.sht.write_map(f"{dm.cache_dir}/_maps/I_len.fits", cib_map)
 
 
 if __name__ == '__main__':
