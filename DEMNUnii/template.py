@@ -45,7 +45,9 @@ class Template:
             raise ValueError(f"Supplied cmb_lens_qe_typ {cmb_lens_qe_typ} not of supported typs; T, EB, TEB, TEB_iter, or EB_iter")
         Ls = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
         F_L = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
-        C_inv = self.fields.fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)
+        iter=True if "_iter" in qe_typ else False 
+        self.fields.setup_noise(qe=cmb_lens_qe_typ, iter=iter)
+        C_inv = self._fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)
         F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
         Ls_sample = np.arange(self.Lmax_map+1)
         F_L = F_L_spline(Ls_sample)
@@ -70,6 +72,9 @@ class Template:
     def _populate_a_bars(self, tracer_noise, neg_tracers):
         print(f"Creating filtered maps for template. Noise included: {tracer_noise}.")
         for iii, field_i in enumerate(self.fields.fields):
+            if tracer_noise:
+                print(f"Recreating tracer noise maps incase fisher env has changed.")
+                self.fields.fft_noise_maps[field_i] = self.fields.get_noise_map(field_i, set_seed=True, fft=True)
             a_bar_i = np.zeros(np.shape(self._get_fft_maps('k', tracer_noise, neg_tracers)), dtype="complex128")
             for jjj, field_j in enumerate(self.fields.fields):
                 a_j = self._get_fft_maps(field_j, tracer_noise, neg_tracers)
