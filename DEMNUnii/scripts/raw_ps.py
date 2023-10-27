@@ -4,8 +4,6 @@ import os
 import numpy as np
 import DEMNUnii
 from DEMNUnii.demnunii import Demnunii
-import omegaqe
-from omegaqe.fisher import Fisher
 
 dm = Demnunii()
 
@@ -22,7 +20,7 @@ def _save_ps(ps, exp, tracer_fields, nsims, deflect_typ, ext):
     np.save(f"{ps_full_path}", ps)
 
 
-def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, nthreads):
+def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, nthreads, qe_typ):
     mpi.output(f"  sim: 0", 0, _id)
     omega_tem = dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{0}{tem_ext}.fits")
     omega_rec = dm.sht.read_map(f"{DEMNUnii.SIMS_DIR}/{deflect_typ}/{exp}/omega/{qe_typ}_{0}.fits")
@@ -50,7 +48,7 @@ def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ
         ext += "_len"
     for deflect_typ in deflect_typs:
         mpi.output(f"Type: {deflect_typ}", 0, _id)
-        ps = _get_ps(exp, tracer_fields, deflect_typ, ext, nsims, nthreads)
+        ps = _get_ps(exp, tracer_fields, deflect_typ, ext, nsims, nthreads, qe_typ)
         _save_ps(ps, exp, tracer_fields, nsims, deflect_typ, ext)
 
 

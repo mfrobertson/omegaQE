@@ -20,7 +20,7 @@ def main(exp, qe_typ, start, end, deflect_typ, iter, nthreads, _id):
     mpi.output(f"exp: {exp}, qe_typ: {qe_typ}, start: {start}, end: {end}, deflect_typ: {deflect_typ}, iter: {iter}, nthreads: {nthreads}", 0, _id)
 
     fields = Fields(exp, use_lss_cache=True, use_cmb_cache=True, nthreads=nthreads)
-    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "diff_zero"] if deflect_typ is None else [deflect_typ]
+    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem"] if deflect_typ is None else [deflect_typ]
     sims_dir = DEMNUnii.SIMS_DIR
     qe_typ_str = qe_typ + "_iter" if iter else qe_typ
     setup_dirs(sims_dir, exp, deflect_typs)

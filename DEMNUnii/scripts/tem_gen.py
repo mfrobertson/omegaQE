@@ -24,7 +24,7 @@ def main(exp, field_typs, Nchi, tracer_noise, start, end, kappa_rec, kappa_qe_ty
     mpi.output("-------------------------------------", 0, _id)
     mpi.output(f"exp: {exp}, fields: {field_typs}, Nchi: {Nchi}, start: {start}, end: {end}, tracer_noise: {tracer_noise}, kappa_rec: {kappa_rec}, kappa_qe_typ: {kappa_qe_typ}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, len_lss: {len_lss}, nthreads: {nthreads}", 0, _id)
 
-    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem"] if deflect_typ is None else [deflect_typ]
+    deflect_typs = ["pbdem_dem", "pbdem_zero", "npbdem_dem", "zero_dem"] if deflect_typ is None else [deflect_typ]
     for sim in range(start, end):
         mpi.output(f"Sim: {sim}", 0, _id)
         fields = Fields(exp, field_typs, use_lss_cache=True, use_cmb_cache=True, cmb_sim=sim, deflect_typ=deflect_typ, gauss_lss=gauss_lss, len_lss=len_lss, nthreads=nthreads)

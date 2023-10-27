@@ -148,13 +148,13 @@ def main(nsims, nthreads, loc, unl_loc):
                        "pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb))),
                        "npbdem_dem": (-glm_pb, clm_dem),
                        "diff_zero": (glm_diff, np.zeros(np.size(glm_diff))),
-                       "dem_dem":(glm_dem, clm_dem)
+                       "zero_dem":(np.zeros(np.size(glm_diff)), clm_dem)
                        }
     unl_cmb_spectra = get_unlensed_cmb_ps()
     for sim in range(nsims):
         unl_alms = get_unlensed_alms(unl_cmb_spectra, sim, unl_loc)
         _save_unl_cmbs(loc, unl_alms, sim, nthreads)
-        for iii, deflect_typ in enumerate(deflect_configs):
+        for deflect_typ in deflect_configs:
             glm, clm = deflect_configs[deflect_typ]
             dlm = np.array([glm, clm])
             outdir = f"{loc}{sep}{deflect_typ}"
