@@ -62,7 +62,8 @@ class Cosmology:
         if np.size(Chi1) == 1 and heaviside and Chi1 > Chi2:
             return 0
         if heaviside:
-            # win[win < 0] = 0
+            if np.size(Chi1) == 1:
+                win = np.array([win])
             return maths.heaviside_steps(win) * win
         return win
 
