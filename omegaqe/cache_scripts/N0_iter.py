@@ -2,9 +2,7 @@ import numpy as np
 import omegaqe
 import omegaqe.tools as tools
 import sys
-import os
-from plancklens import utils, n0s
-import plancklens
+from plancklens import n0s
 from scipy.interpolate import InterpolatedUnivariateSpline
 import pandas as pd
 from omegaqe.covariance import Covariance
@@ -83,15 +81,19 @@ def get_N_dict(exp, delta_T, beam, Lmax):
 def main(exp, fields, gmv, iters, T_Lmin, T_Lmax, P_Lmin, P_Lmax, ext):
     global cov
     cov = Covariance()
-    cls_path = os.path.join(os.path.dirname(os.path.abspath(plancklens.__file__)), 'data', 'cls')
-    cls_unl = utils.camb_clfile(os.path.join(cls_path, 'FFP10_wdipole_lenspotentialCls.dat'))
+    keys = ['tt', 'ee', 'bb', 'te']
+    Tcmb = 2.7255
+    fac = (Tcmb * 1e6) ** 2
+    ellmax = 5000
+    cls_unl = {key: fac * cov.power.cosmo.get_unlens_ps(key.upper(), ellmax=ellmax) for key in keys}
+    cls_unl['pp'] = cov.power.get_phi_ps(np.arange(ellmax + 1), extended=True)
     qe_key = get_qe_key(fields, gmv)
     delta_T, beam = cov.noise.get_noise_args(exp)
     delta_T, delta_P, beam = _noise_args(delta_T, beam, np.max([T_Lmax, P_Lmax]))
-    rho_sqd_ext = cov.get_total_tracer_corr("gI", 5000)**2 if ext else 0
+    rho_sqd_ext = cov.get_total_tracer_corr("gI", ellmax) ** 2 if ext else 0
     for key in cls_unl.keys():
         cls_unl[key] = cls_unl[key][:5001]
-    N0_iter = n0s.get_N0_iter(qe_key, delta_T, delta_P, beam, cls_unl, {'t': T_Lmin, 'e': P_Lmin, 'b': P_Lmin}, {'t': T_Lmax, 'e': P_Lmax, 'b': P_Lmax}, lmax_qlm=5000, itermax=iters, ret_delcls=False, ret_curl=True, rho_sqd_ext=rho_sqd_ext)
+    N0_iter = n0s.get_N0_iter(qe_key, delta_T, delta_P, beam, cls_unl, {'t': T_Lmin, 'e': P_Lmin, 'b': P_Lmin}, {'t': T_Lmax, 'e': P_Lmax, 'b': P_Lmax}, lmax_qlm=ellmax, itermax=iters, ret_delcls=False, ret_curl=True, rho_sqd_ext=rho_sqd_ext)
     N0 = (N0_iter[0][iters], N0_iter[2][iters])
     save(N0, fields, exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax, ext)
 
