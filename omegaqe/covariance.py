@@ -196,6 +196,15 @@ class Covariance:
                 rho_jk = self._get_rho(a_j + "k", Lmax, nu, gal_bins, use_bins, gal_distro, include_kappa_noise=False)
                 rho += rho_ik * rho_inv[iii][jjj] * rho_jk
         return np.sqrt(rho)
+    
+    def _get_delens_rho(self, Lmax, zerod=True):
+        ells = np.arange(Lmax + 1)
+        cl_phi = self.power.get_phi_ps(ells)
+        N0 = self.noise.get_N0("phi", Lmax)
+        rho = cl_phi/(cl_phi + N0) 
+        if zerod:
+            rho[0] = 0
+        return rho
 
     def get_C_inv(self, typs, Lmax, nu, gal_bins=(None, None, None, None), gal_distro="LSST_gold"):
         """
@@ -264,6 +273,24 @@ class Covariance:
 
         """
         return self._get_rho(typ, Lmax, nu, gal_bins, use_bins, gal_distro, include_kappa_noise)
+    
+    def get_delens_corr(self, Lmax):
+        """
+
+        Parameters
+        ----------
+        typ
+        Lmax
+        nu
+        gal_bins
+        use_bins
+        gal_distro
+
+        Returns
+        -------
+
+        """
+        return self._get_delens_rho(Lmax)
 
     def get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None, None, None, None), use_bins=False, gal_distro="LSST_gold"):
         """
