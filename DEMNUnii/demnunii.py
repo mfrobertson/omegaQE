@@ -109,8 +109,12 @@ class Demnunii:
 
     def _window_LSST(self, z):
         return self.cosmo.gal_window_z(z)
+    
+    def _window_LSST_mu(self, z):
+        # Need to divide by H(z) to convert window into function of z and not chi
+        return self.cosmo.gal_lens_window_matter(self.cosmo.z_to_Chi(z), self.cosmo.get_chi_star())/self.cosmo.get_hubble(z)
 
-    def _window_Planck(self, z):
+    def _window_Planck_cib(self, z):
         return self.cosmo.cib_window_z(z)
 
     def _window_CMB(self, z):
@@ -131,8 +135,10 @@ class Demnunii:
         dz = zs[1] - zs[0]
         if typ == "LSST":
             return np.sum(self._window_LSST(zs)) * dz
-        if typ == "Planck":
-            return np.sum(self._window_Planck(zs)) * dz
+        if typ == "LSST_mu":
+            return np.sum(self._window_LSST_mu(zs)) * dz
+        if typ == "Planck_cib":
+            return np.sum(self._window_Planck_cib(zs)) * dz
         if typ == "CMB":
             wins = self._window_CMB(zs)
             zerod_indices = np.logical_or(np.isnan(wins), np.isinf(wins))
@@ -159,9 +165,25 @@ class Demnunii:
         if verbose: print("")
         if pixel_corr: gal = self._apply_pixel_correction(gal)
         return gal
+    
+    def get_obs_mag_bias_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
+        # TODO: This assumes s=0.2 
+        window="LSST_mu"
+        if verbose: print(f"DEMNUnii: Constructing mag bias map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}, lensed={lensed}")
+        npix = self.sht.nside2npix()
+        gal = np.zeros(npix)
+        snaps = self.get_snaps_z(zmin, zmax)
+        t0 = datetime.datetime.now()
+        for iii, snap in enumerate(snaps):
+            if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
+            gal += self._window(snap, window) * self.get_density_snap(snap, lensed)
+            if verbose: print('\r', end='')
+        if verbose: print("")
+        if pixel_corr: gal = self._apply_pixel_correction(gal)
+        return gal
 
     def get_obs_cib_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
-        window = "Planck"
+        window = "Planck_cib"
         if verbose: print(f"DEMNUnii: Constructing CIB map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}, lensed={lensed}")
         npix = self.sht.nside2npix()
         cib = np.zeros(npix)
