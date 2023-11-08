@@ -7,6 +7,7 @@ import datetime
 import re
 from DEMNUnii.spherical import Spherical
 import DEMNUnii
+from scipy.interpolate import RectBivariateSpline, InterpolatedUnivariateSpline
 
 class Demnunii:
 
@@ -61,9 +62,7 @@ class Demnunii:
         return self.sht.read_map(filename)
 
     def get_density_snap(self, snap, lensed=False):
-        pixel_area = self.sht.nside2pixarea()
-        particle_mass = self.get_particle_mass()
-        rho = self.get_particle_snap(snap, lensed) * particle_mass / pixel_area
+        rho = self.get_particle_snap(snap, lensed)
         rho_bar = np.mean(rho)
         return rho / rho_bar - 1
 
@@ -107,8 +106,8 @@ class Demnunii:
     def _get_chi(self, snap):
         return self.cosmo.z_to_Chi(self._get_z(snap))
 
-    def _window_LSST(self, z):
-        return self.cosmo.gal_window_z(z)
+    def _window_LSST(self, z, zmin, zmax):
+        return self.cosmo.gal_window_z(z, zmin=zmin, zmax=zmax)
     
     def _window_LSST_mu(self, z):
         # Need to divide by H(z) to convert window into function of z and not chi
@@ -122,19 +121,25 @@ class Demnunii:
         return self.cosmo.cmb_lens_window_matter(self.cosmo.z_to_Chi(z), self.cosmo.get_chi_star())/self.cosmo.get_hubble(z)
     
     def _window_gal_kappa(self, snap, source_snap):
-        # TODO: why doesn't this work as an integral?
-        chi = self._get_chi(snap)
-        chi_source = self._get_chi(source_snap)
-        return (chi_source - chi)/chi_source * self.cosmo.get_chi_star()/(self.cosmo.get_chi_star() - chi)
+        # Need to divide by H(z) to convert window into function of z and not chi
+        zmin = self._get_zmin(snap)
+        zmax = self._get_zmax(snap)
+        zs = np.linspace(zmin, zmax, 1000)
+        dz = zs[1] - zs[0]
+        wins = self.cosmo.cmb_lens_window_matter(self.cosmo.z_to_Chi(zs), self._get_chi(source_snap))/self.cosmo.get_hubble(zs)
+        zerod_indices = np.logical_or(np.isnan(wins), np.isinf(wins))
+        wins[zerod_indices] = 0
+        return np.sum(wins) * dz
 
 
-    def _window(self, snap, typ):
+
+    def _window(self, snap, typ, gal_zmin=None, gal_zmax=None):
         zmin = self._get_zmin(snap)
         zmax = self._get_zmax(snap)
         zs = np.linspace(zmin, zmax, 1000)
         dz = zs[1] - zs[0]
         if typ == "LSST":
-            return np.sum(self._window_LSST(zs)) * dz
+            return np.sum(self._window_LSST(zs, gal_zmin, gal_zmax)) * dz
         if typ == "LSST_mu":
             return np.sum(self._window_LSST_mu(zs)) * dz
         if typ == "Planck_cib":
@@ -160,7 +165,7 @@ class Demnunii:
         t0 = datetime.datetime.now()
         for iii, snap in enumerate(snaps):
             if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
-            gal += self._window(snap, window) * self.get_density_snap(snap, lensed)
+            gal += self._window(snap, window, zmin, zmax) * self.get_density_snap(snap, lensed)
             if verbose: print('\r', end='')
         if verbose: print("")
         if pixel_corr: gal = self._apply_pixel_correction(gal)
@@ -220,7 +225,7 @@ class Demnunii:
         return gal_kappa
     
     def get_gal_kappa_snap(self, snap, source_snap, pixel_corr=False):
-        gal_kappa = self._window_gal_kappa(snap, source_snap) * self.get_kappa_snap(snap)
+        gal_kappa = self._window_gal_kappa(snap, source_snap) * self.get_density_snap(snap)
         if pixel_corr: gal_kappa = self._apply_pixel_correction(gal_kappa)
         return gal_kappa
     
@@ -262,3 +267,47 @@ class Demnunii:
         omega_file = "map0_rotation_ecp262_dmn2_lmax8000.fits"
         filename = self.data_dir + sep + "nbody" + sep + omega_file
         return self.sht.read_map(filename)
+    
+    def get_PK(self, typ="total"):
+        typ_name = "" if typ == "total" else "_" + typ 
+        h = (self.cosmo._pars.H0 / 100)
+        class PKInterpolator(RectBivariateSpline):
+            def P(self, z, kh, grid=None):
+                if grid is None:
+                    grid = not np.isscalar(z) and not np.isscalar(kh)
+                else:
+                    return self(z, np.log(kh), grid=grid)
+                
+        def _get_k(snap):
+            zeros="0" if snap>9 else "00"
+            ks_ = np.loadtxt(f"{self.data_dir}/powerspectra_LCDM_2Gp_2048_PlTab5_binned_II/ps{typ_name}_{zeros}{snap}.txt", usecols=0, skiprows=1)
+            return ks_ * h
+
+        def _get_pk(snap):
+            zeros="0" if snap>9 else "00"
+            pk_ = np.loadtxt(f"{self.data_dir}/powerspectra_LCDM_2Gp_2048_PlTab5_binned_II/ps{typ_name}_{zeros}{snap}.txt", usecols=2, skiprows=1)
+            return pk_/h**3
+        
+        Nsnaps = 63
+        snaps = np.arange(Nsnaps)
+        ks = _get_k(snaps[-1])
+        zs = np.array([self._get_z(snap) for snap in snaps[::-1]])
+        ps = np.zeros((Nsnaps, np.size(ks)))
+        for iii, snap in enumerate(snaps[::-1]):
+            ks_ = _get_k(snap)
+            ps_ = _get_pk(snap)
+            ps[iii,:] = InterpolatedUnivariateSpline(ks_, ps_)(ks)
+
+        PK = PKInterpolator(zs, np.log(ks), ps)
+        PK.kmin = np.min(ks)
+        PK.kmax = np.max(ks)
+        PK.islog = False
+        PK.logsign = 1
+        PK.zmin = np.min(zs)
+        PK.zmax = np.max(zs)
+        return PK
+        
+
+        
+        
+        
