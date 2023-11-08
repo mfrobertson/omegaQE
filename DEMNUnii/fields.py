@@ -124,10 +124,10 @@ class Fields:
         return self.dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}_maps/{field}.fits")
 
     def _lensing_fac(self):
-        return -self.ells*(self.ells + 1)/2
+        return self.ells*(self.ells + 1)/2
     
     def _get_cmb_lens_rec_iter(self, typ, cmb_fields):
-        itmax = 7
+        itmax = 20
         if self.rec.iter_rec_data is None:
             self.rec.calc_iter_rec(cmb_fields, itmax)
         rec_func = self.rec.get_phi_rec_iter if typ == "kappa" else self.rec.get_curl_rec_iter

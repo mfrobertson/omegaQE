@@ -19,7 +19,7 @@ if not 'PLENS' in os.environ.keys():
 def _lensing_fac():
     ells = np.arange(LMAX_MAP+1)[1:]
     fac = np.zeros(LMAX_MAP+1)
-    fac[1:] = -2 / np.sqrt(ells * (ells + 1))
+    fac[1:] = 2 / np.sqrt(ells * (ells + 1))
     return fac
 
 
