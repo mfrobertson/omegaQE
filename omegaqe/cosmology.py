@@ -7,6 +7,7 @@ import omegaqe.tools as tools
 from omegaqe.tools import maths
 from pathlib import Path
 import os
+from scipy.interpolate import InterpolatedUnivariateSpline
 
 class Cosmology:
     """
@@ -178,7 +179,7 @@ class Cosmology:
         if typ == "flat_bias_unity" or typ == "LSST_gold_bias_unity" or typ == "perfect":
             return 1
         return 1 + (0.84*z)
-
+    
     def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         """
         1705.02332 equation 14 and B1 (originally from 0912.0201)
@@ -193,15 +194,13 @@ class Cosmology:
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
         b = self._get_bias(z, typ, bias_unity)
-        zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)    #TODO: optimize step size here
-        dz = zs[1] - zs[0]
-        if zmin is not None and zmax is not None:
-            norm = 1 if typ == "perfect" else np.sum(dz * maths.rectangular_pulse_steps(zs, zmin, zmax) * z_distr_func(zs))
-            window = (dn_dz * b) / norm
-            return maths.rectangular_pulse_steps(z, zmin, zmax) * window
+        zmin = 0 if zmin is None else zmin
+        zmax = self.Chi_to_z(self.get_chi_star()) if zmax is None else zmax
+        zs = np.linspace(zmin, zmax, 10000)
+        dz = zs[1] - zs[0] 
         norm = 1 if typ == "perfect" else np.sum(dz * z_distr_func(zs))
         window = (dn_dz * b) / norm
-        return window
+        return maths.rectangular_pulse_steps(z, zmin, zmax) * window
 
     def gal_window_Chi(self, Chi, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         """
