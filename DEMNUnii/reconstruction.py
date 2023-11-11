@@ -11,7 +11,6 @@ from plancklens.n1 import n1
 from plancklens.sims import phas, maps
 from DEMNUnii.demnunii import Demnunii
 from omegaqe.noise import Noise
-from omegaqe.powerspectra import Powerspectra
 import omegaqe.postborn as postborn
 import shutil
 from delensalot.core.opfilt.MAP_opfilt_iso_p import alm_filter_nlev_wl as alm_filter_nlev_wl_pol_only
@@ -55,7 +54,7 @@ class Reconstruction:
         self.dm = Demnunii(nthreads)
         self.sht = self.dm.sht
         self.noise = Noise(cosmology=self.dm.cosmo)
-        self.power = Powerspectra(cosmology=self.dm.cosmo)
+        self.power = self.dm.power
         self.L_cuts = L_cuts
         self.Lmax_map = self.dm.Lmax_map
         self.indices = ["tt", "ee", "bb"]
@@ -148,7 +147,7 @@ class Reconstruction:
             return potential + "_p"
         self._raise_typ_error(typ)
 
-    def setup_reconstruction(self, TQUmaps_filename, seed=None, iter=False):
+    def setup_reconstruction(self, TQUmaps_filename, seed=None, iter=False, noise=True):
         print(f"Setting up reconstruction for file: {TQUmaps_filename}")
         libdir_pixphas = os.path.join(self.temp, 'phas_lmax%s' % self.Lmax_map)
         rng_state = np.random.get_state
@@ -158,7 +157,8 @@ class Reconstruction:
             rng_state = rng.get_state
         cl = self.cl_len if iter else self.cl_grad
         pix_phas = phas.lib_phas(libdir_pixphas, 3, self.Lmax_map, get_state_func=rng_state)
-        self.maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.Lmax_map, TQUmaps_filename, self.sht), self.transfer_dict, self.noise_cls, noise_phas=pix_phas)
+        noise_cls = self.noise_cls if noise else {idx[0]: np.zeros(np.size(self.Lmax_map + 1)) for idx in self.indices}
+        self.maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.Lmax_map, TQUmaps_filename, self.sht), self.transfer_dict, noise_cls, noise_phas=pix_phas)
         weighted_maps_lib = filt_simple.library_fullsky_alms_sepTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
         self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, cl['te'], self.dm.nside, lmax_qlm=self.Lmax_map)
         self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, cl, self.Lmax_map)
@@ -329,10 +329,10 @@ class Reconstruction:
         return N0_unnorm * resp[:np.size(N0_unnorm)]**2
 
     def _get_Cl_phi(self):
-        ells = np.arange(1, self.Lmax_map + 1)
-        Cl_phi = np.zeros(np.size(ells) + 1)
-        Cl_phi[1:] = self.power.get_phi_ps(ells)
-        return Cl_phi
+        ells = np.arange(self.Lmax_map + 1)
+        Cl_kappa = np.zeros(np.size(ells))
+        Cl_kappa[1:] = self.power.get_kappa_ps(ells[1:], use_weyl=False)
+        return 4/(ells*(ells+1))**2 * Cl_kappa
     
     def _get_Cl_curl(self, use_cache=True):
         if use_cache:
