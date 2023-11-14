@@ -18,7 +18,7 @@ class Noise:
         Essentially the value of ellmin of the N0 array.
     """
 
-    def __init__(self, cosmology=None):
+    def __init__(self, cosmology=None, full_sky=False):
         """
         Constructor
 
@@ -32,6 +32,7 @@ class Noise:
         self.N0 = None
         self.cmb_offset = 2
         self.cosmo = Cosmology() if cosmology is None else cosmology
+        self.full_sky = full_sky
 
     def _get_N0_phi(self, ellmax):
         return np.concatenate((np.zeros(self.cmb_offset), self.N0[0][:ellmax + 1 - self.cmb_offset]))
@@ -41,11 +42,13 @@ class Noise:
 
     def _get_N0_kappa(self, ellmax):
         ells = np.arange(ellmax + 1)
-        return self._get_N0_phi(ellmax) * 0.25 * (ells) ** 4
+        fac = 0.25 * (ells * (ells+1)) ** 2 if self.full_sky else 0.25 * (ells) ** 4
+        return self._get_N0_phi(ellmax) * fac
 
     def _get_N0_omega(self, ellmax):
         ells = np.arange(ellmax + 1)
-        return self._get_N0_curl(ellmax) * 0.25 * (ells) ** 4
+        fac = 0.25 * (ells * (ells+1)) ** 2 if self.full_sky else 0.25 * (ells) ** 4
+        return self._get_N0_curl(ellmax) * fac
 
     def _replace_bad_Ls(self, N0):
         bad_Ls = np.where(N0 <= 0.)[0]
