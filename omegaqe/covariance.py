@@ -199,7 +199,9 @@ class Covariance:
     
     def _get_delens_rho(self, Lmax, zerod=True):
         ells = np.arange(Lmax + 1)
-        cl_phi = self.power.get_phi_ps(ells)
+        cl_kappa = self.power.get_kappa_ps(ells, use_weyl=False)
+        cl_phi = 4/(ells*(ells+1))**2 * cl_kappa
+        cl_phi[0] = 0
         N0 = self.noise.get_N0("phi", Lmax)
         rho = cl_phi/(cl_phi + N0) 
         if zerod:
