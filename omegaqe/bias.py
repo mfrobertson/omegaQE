@@ -40,7 +40,8 @@ def _get_cov_inv_spline(typ, typs):
     cov_inv2 = C_inv_splines[combo2_idx1][combo2_idx2]
     return cov_inv1, cov_inv2
 
-def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
+def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise, iter):
+    response_ps = "lensed" if iter else "gradient"
     Xbar_Ybar = XY.replace("B", "E")
     X_Ybar = XY[0] + XY[1].replace("B", "E")
     Xbar_Y = XY[0].replace("B", "E") + XY[1]
@@ -49,7 +50,7 @@ def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim
     C_Xbar_l = global_qe.cmb[Xbar_Y].gradCl_spline(ls[None, :])
     L_A1_fac = (l_primprim_vec @ L1_vec) * (l_primprim_vec @ L2_vec)
     L_C1_fac = (l_vec @ L1_vec) * (l_vec @ L2_vec)
-    g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
+    g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True, resp_ps=response_ps)
     h_X_A1 = global_qe.geo_fac(XY[0], theta12=l_primprim_vec.deltaphi(l_vec))   # this is different to N32 paper
     h_Y_A1 = global_qe.geo_fac(XY[1], theta12=l_primprim_vec.deltaphi(l_prim_vec))       # ^^^ same ^^^
     h_X_C1 = global_qe.geo_fac(XY[0], theta12=l_vec.deltaphi(l_prim_vec))
@@ -58,11 +59,12 @@ def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim
     C1_fac = 1 if gmv else 0.5
     I_C1_theta1 = C1_fac * dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * C_Ybar_l * g_XY * h_Y_C1)
     if not gmv:
-        g_YX = global_qe.weight_function(XY[::-1], L_vec, l_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True)
+        g_YX = global_qe.weight_function(XY[::-1], L_vec, l_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True, resp_ps=response_ps)
         I_C1_theta1 += dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * (C_Xbar_l * g_YX * h_X_C1))
     return I_A1_theta1 + I_C1_theta1
 
-def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
+def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise, iter):
+    response_ps = "lensed" if iter else "gradient"
     g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True)
     includeBB = False
     XprimsYprims = global_qe.parse_fields(fields, unique=False, includeBB=includeBB) if gmv else [fields]  # include BB here?
@@ -73,24 +75,25 @@ def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primp
         C_XXprim_l = global_qe.cmb[XXprim].lenCl_spline(ls)
         if noise:
             C_XXprim_l += global_qe.cmb[XXprim].N_spline(ls)
-        g_XprimYprim = global_qe.weight_function(XprimYprim, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
-        resp_YYprim = global_qe.response(YYprim, L2_vec, l_prim_vec, curl=False)
+        g_XprimYprim = global_qe.weight_function(XprimYprim, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True, resp_ps=response_ps)
+        resp_YYprim = global_qe.response(YYprim, L2_vec, l_prim_vec, curl=False, cl=response_ps)
         inner_sum += g_XprimYprim * C_XXprim_l * resp_YYprim
     return 4 * dThetal * dl * np.sum(alpha * g_XY * inner_sum * ls[None, :] * w_prim)
 
-def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise):
-    g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True)
+def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise, iter):
+    response_ps = "lensed" if iter else "gradient"
+    g_XY = global_qe.weight_function(XY, L_vec, l_vec, curl=True, gmv=gmv, fields=fields, apply_Lcuts=True, resp_ps=response_ps)
     includeBB = False
     XpYps = global_qe.parse_fields(fields, unique=False, includeBB=includeBB) if gmv else [fields]     # include BB here?
     inner_sum = np.zeros(np.shape(w_prim))
     for XpYp in XpYps:
-        g_XpYp = global_qe.weight_function(XpYp, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
+        g_XpYp = global_qe.weight_function(XpYp, L1_vec, l_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True, resp_ps=response_ps)
         XXp = XY[0] + XpYp[0]
         C_XXp_l = global_qe.cmb[XXp].lenCl_spline(ls)
         if noise:
             C_XXp_l += global_qe.cmb[XXp].N_spline(ls)
         for XppYpp in XpYps:
-            g_XppYpp= global_qe.weight_function(XppYpp, L2_vec, l_prim_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True)
+            g_XppYpp= global_qe.weight_function(XppYpp, L2_vec, l_prim_vec, curl=False, gmv=gmv, fields=fields, apply_Lcuts=True, resp_ps=response_ps)
             YXpp = XY[1] + XppYpp[0]
             YpYpp = XpYp[1] + XppYpp[1]
             C_YXpp_l = global_qe.cmb[YXpp].lenCl_spline(l_prim_vec.rho)
@@ -102,7 +105,7 @@ def _get_N0_innerloop(XY, curl, gmv, fields, dThetal, dl, beta, w_prim, w_primpr
             inner_sum += g_XpYp * g_XppYpp * C_XXp_l * C_YXpp_l * C_YpYpp_l
     return 4 * dThetal * dl * np.sum(beta * g_XY * inner_sum * ls[None, :] * w_prim * w_primprim)
 
-def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, thetasl, verbose, noise):
+def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, thetasl, verbose, noise, iter):
     if bias_typ == "N2" or bias_typ == "N32":
         innerloop_func = _get_N2_innerloop
     elif bias_typ == "N1" or bias_typ == "N1_no_k":
@@ -140,7 +143,7 @@ def _bias_calc(bias_typ, XY, L, gmv, fields, bi_typ, curl, L1s, thetas1, ls, the
                 w_prim[l_prims < Lmin_cmb] = 0
                 w_prim[l_prims > Lmax_cmb] = 0
                 if np.sum(w_prim) != 0 and np.sum(w_primprim) != 0:
-                    I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise)
+                    I_theta1[jjj] = innerloop_func(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise, iter)
 
         I_L1[iii] = L1 * 2 * InterpolatedUnivariateSpline(thetas1, I_theta1).integral(0, np.pi-dTheta1)
     N = InterpolatedUnivariateSpline(L1s, I_L1).integral(Lmin_lss, Lmax_lss) / ((2 * np.pi) ** 4)
@@ -174,7 +177,7 @@ def _bias_prep(fields, gmv, N_L1, N_l, Ntheta12, Ntheta1l):
     thetasl = np.linspace(0, 2 * np.pi - dThetal, Ntheta1l)
     return L1s, thetas1, ls, thetasl
 
-def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose, noise):
+def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose, noise, iter):
     curl = False if bias_typ == "N32" else True
     A = _get_normalisation(Ls, curl)
     N_Ls = np.size(Ls)
@@ -187,9 +190,9 @@ def _bias(bias_typ, bi_typ, fields, gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, ver
         for XY in XYs:
             if verbose: print(f"  XY = {XY}")
             if gmv:
-                N_tmp = _bias_calc(bias_typ, XY, L, True, fields, bi_typ, curl, *_bias_prep(fields, True, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose, noise=noise)
+                N_tmp = _bias_calc(bias_typ, XY, L, True, fields, bi_typ, curl, *_bias_prep(fields, True, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose, noise=noise, iter=iter)
             else:
-                N_tmp = _bias_calc(bias_typ, XY, L, False, XY, bi_typ, curl, *_bias_prep(XY, False, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose, noise=noise)
+                N_tmp = _bias_calc(bias_typ, XY, L, False, XY, bi_typ, curl, *_bias_prep(XY, False, N_L1, N_L3, Ntheta12, Ntheta13), verbose=verbose, noise=noise, iter=iter)
             N[iii] += N_tmp / A[iii]
     return N
 
@@ -375,4 +378,4 @@ def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps=
         if verbose: print("Caching lss splines")
         _cache_splines(F_L_path, bi_typ, lss_cls, iter)
     Ls = np.ones(1, dtype=int)*Ls if np.size(Ls) == 1 else Ls
-    return _bias(bias_typ, bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose, noise)
+    return _bias(bias_typ, bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose, noise, iter)
