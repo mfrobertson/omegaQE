@@ -4,7 +4,7 @@ import datetime
 
 class Template:
 
-    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False):
+    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False):
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
@@ -12,7 +12,9 @@ class Template:
         self.Lmax_map = self.fields.Lmax_map
         self.nside = self.fields.nside
         self._fish = self.fields.fish
-        self._power = self._fish.power
+        self._power = self.fields.dm.power
+        self._fish.covariance.power = self._power
+        self._fish.power = self._power
         self._cosmo = self._power.cosmo
         self.F_L, self.C_inv = self._get_F_L_and_C_inv(cmb_lens_qe_typ)
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
@@ -23,10 +25,19 @@ class Template:
             if "_iter" in cmb_lens_qe_typ:
                 iter=True
                 cmb_lens_qe_typ = cmb_lens_qe_typ[:-5]
+                mc_corr = self._get_iter_mc_corr_k(self.fields.exp, cmb_lens_qe_typ) if iter_mc_corr else np.ones(self.Lmax_map+1)
             else:
                 iter=False
+                mc_corr = np.ones(self.Lmax_map+1)
             self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter)
+            self.kappa_rec = self.sht.almxfl(self.kappa_rec, mc_corr)
         self._populate_a_bars(tracer_noise, neg_tracers)
+    
+    def _get_iter_mc_corr_k(self, exp, qe_typ):
+        offset=10
+        nbins=50
+        dir_loc = f"{self.fields.dm.cache_dir}/_iter_norm/{exp}/{qe_typ}/{offset}_{nbins}"
+        return np.load(f"{dir_loc}/iter_norm_k.npy")
 
     def _get_F_L_and_C_inv(self, cmb_lens_qe_typ):
         if cmb_lens_qe_typ == "T":
@@ -46,7 +57,7 @@ class Template:
         Ls = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
         F_L = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
         iter=True if "_iter" in qe_typ else False 
-        self.fields.setup_noise(qe=cmb_lens_qe_typ, iter=iter)
+        self.fields.setup_noise(qe=fields, iter=iter)
         C_inv = self._fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)
         F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
         Ls_sample = np.arange(self.Lmax_map+1)
