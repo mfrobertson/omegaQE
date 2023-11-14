@@ -102,6 +102,7 @@ class Modecoupling:
         if recalc_PK:
             self.weyl_PK = self._powerspectra.weyl_PK
             self.matter_weyl_PK = self._powerspectra.matter_weyl_PK
+            self.matter_PK = self._powerspectra.matter_PK
         if extended:
             ks = (ells1_vec + 0.5) / Chis
         else:
