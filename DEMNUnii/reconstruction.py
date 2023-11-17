@@ -6,6 +6,7 @@ from lenspyx.remapping.deflection import deflection
 from plancklens.filt import filt_simple
 from plancklens.qcinv import cd_solve
 from plancklens import utils
+from plancklens.filt import filt_cinv
 from plancklens import qest, qresp, nhl
 from plancklens.n1 import n1
 from plancklens.sims import phas, maps
@@ -19,7 +20,9 @@ from delensalot.core.opfilt.MAP_opfilt_iso_t import alm_filter_nlev_wl as alm_fi
 from delensalot.utility import utils_steps
 from delensalot.core.iterator.cs_iterator_multi import iterator_cstmf
 from delensalot.core.iterator.statics import rec as Rec
-
+from lensitbiases import n1_fft
+from scipy.interpolate import InterpolatedUnivariateSpline
+import copy
 
 class Reconstruction:
 
@@ -46,14 +49,14 @@ class Reconstruction:
         def hashdict(self):
             return {'cmbs': self.maps_filename, 'noise': self.maps_filename, 'data': self.maps_filename}
 
-    def __init__(self, exp, filename=None, L_cuts=(30, 3000, 30, 5000), sim=None, nthreads=1, iter=False):
+    def __init__(self, exp, filename=None, L_cuts=(30, 3000, 30, 5000), sim=None, nthreads=1, iter=False, noise=True, gmv=False):
         self.nthreads = nthreads
         self.filename = filename
         self.setup_env(exp, iter, sim)
         self.exp = exp
         self.dm = Demnunii(nthreads)
         self.sht = self.dm.sht
-        self.noise = Noise(cosmology=self.dm.cosmo)
+        self.noise = Noise(cosmology=self.dm.cosmo, full_sky=True)
         self.power = self.dm.power
         self.L_cuts = L_cuts
         self.Lmax_map = self.dm.Lmax_map
@@ -63,16 +66,17 @@ class Reconstruction:
         self._initialise()
         self.setup = False
         self.iter_rec_data = None
+        self.noise = noise
+        self.gmv = gmv
         if filename is not None:
-            self.setup_reconstruction(self.filename, seed=sim, iter=iter)
+            self.setup_reconstruction(self.filename, seed=sim, iter=iter, noise=noise, gmv=gmv)
 
     def _initialise(self):
-        print("Initialising filters and librarys for Plancklens")
+        print("Initialising filters and libraries for Plancklens")
         transfers = self.get_transfers()
         self.transfer_dict = {'t': transfers[0], 'e': transfers[1], 'b': transfers[2]}
         filters = self.get_filters(self.indices, self.cl_len, self.noise_cls)
         self.filt_dict = {'t': filters[0], 'e': filters[1], 'b': filters[2]}
-        self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, self.cl_grad, self.cl_grad, self.filt_dict, self.Lmax_map)
         self.n1_lib = n1.library_n1(os.path.join(self.temp, 'n1'), self.cl_grad['tt'], self.cl_grad['ee'], self.cl_grad['bb'], lmaxphi=5000)
 
     def get_transfers(self):
@@ -87,12 +91,14 @@ class Reconstruction:
             return self.L_cuts[0]
         if typ == "ee" or typ == "bb":
             return self.L_cuts[2]
+        return np.max([self.L_cuts[0], self.L_cuts[2]])
 
     def _get_Lmax(self, typ):
         if typ == "tt":
             return self.L_cuts[1]
         if typ == "ee" or typ == "bb":
             return self.L_cuts[3]
+        return np.min([self.L_cuts[1], self.L_cuts[3]])
 
     def setup_env(self, exp, iter, sim):
         if not 'PLENS' in os.environ.keys():
@@ -147,7 +153,40 @@ class Reconstruction:
             return potential + "_p"
         self._raise_typ_error(typ)
 
-    def setup_reconstruction(self, TQUmaps_filename, seed=None, iter=False, noise=True):
+    def _get_cov(self, cl_dict, iii, jjj, noise):
+        idx_i = self.indices[iii][0]
+        idx_j = self.indices[jjj][0]
+        ij = idx_i + idx_j
+        N = np.zeros(self.Lmax_map + 1)
+        cl = np.zeros(self.Lmax_map + 1)
+        if idx_i == idx_j:
+            if noise:
+                N = self.noise_cls[idx_i]
+            cl = cl_dict[ij][:self.Lmax_map+1]
+        elif ij == "te" or ij == "et":
+            cl = cl_dict['te'][:self.Lmax_map + 1]
+        return cl + N
+        
+    def _get_filt_matrix(self, cl_dict, noise=True):
+        mat = np.zeros((self.Lmax_map + 1, 3, 3))
+        for iii in np.arange(3):
+            for jjj in np.arange(3):         
+                mat[:, iii,jjj] = self._get_cov(cl_dict, iii, jjj, noise)
+        c_inv = np.linalg.pinv(mat)
+        fal_dict = {}
+        for iii in np.arange(3):
+            idx_i = self.indices[iii][0]
+            for jjj in np.arange(3):
+                idx_j = self.indices[jjj][0]
+                c_inv_ij = c_inv[:,iii,jjj]
+                Lmin = self._get_Lmin(idx_i+idx_j)
+                Lmax = self._get_Lmax(idx_i+idx_j)
+                c_inv_ij[:Lmin] *= 0.
+                c_inv_ij[Lmax+1:] *= 0.
+                fal_dict[idx_i+idx_j] = c_inv_ij
+        return fal_dict
+
+    def setup_reconstruction(self, TQUmaps_filename, seed=None, iter=False, noise=True, gmv=False):
         print(f"Setting up reconstruction for file: {TQUmaps_filename}")
         libdir_pixphas = os.path.join(self.temp, 'phas_lmax%s' % self.Lmax_map)
         rng_state = np.random.get_state
@@ -155,13 +194,22 @@ class Reconstruction:
             print(f"   Setting random_state for noise map generation with seed {seed}.")
             rng = np.random.RandomState(seed)
             rng_state = rng.get_state
-        cl = self.cl_len if iter else self.cl_grad
+        cl_wf = self.cl_len if iter else self.cl_grad
+        cl_wf_nobb = copy.deepcopy(cl_wf)
+        cl_wf_nobb['bb'] *=0.
         pix_phas = phas.lib_phas(libdir_pixphas, 3, self.Lmax_map, get_state_func=rng_state)
-        noise_cls = self.noise_cls if noise else {idx[0]: np.zeros(np.size(self.Lmax_map + 1)) for idx in self.indices}
+        noise_cls = self.noise_cls if noise else {idx[0]: np.zeros(np.size(self.noise_cls[idx[0]])) for idx in self.indices}
         self.maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.Lmax_map, TQUmaps_filename, self.sht), self.transfer_dict, noise_cls, noise_phas=pix_phas)
-        weighted_maps_lib = filt_simple.library_fullsky_alms_sepTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
-        self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, cl['te'], self.dm.nside, lmax_qlm=self.Lmax_map)
-        self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, cl, self.Lmax_map)
+        if gmv:
+            filt_matrix = self._get_filt_matrix(self.cl_len, noise=True)
+            weighted_maps_lib = filt_simple.library_fullsky_alms_jTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf_nobb, filt_matrix)
+            self.qlms_lib = qest.library_jtTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.dm.nside, lmax_qlm=self.Lmax_map)
+            self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf_nobb, cl_wf, filt_matrix, self.Lmax_map)
+        else:
+            weighted_maps_lib = filt_simple.library_fullsky_alms_sepTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
+            self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, cl_wf['te'], self.dm.nside, lmax_qlm=self.Lmax_map)
+            self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, self.filt_dict, self.Lmax_map)
+        self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, cl_wf, self.Lmax_map)
         self.setup = True
 
     def get_itlib(self, typ, cg_tol:float, libdir_iterator, chain_descrs):
@@ -326,13 +374,15 @@ class Reconstruction:
         qe_key = self._get_qe_key(typ, curl=curl)
         N0_unnorm = self.rdn0_lib.get_sim_nhl(-1, qe_key, qe_key)
         resp = self.get_response(typ, curl)
-        return N0_unnorm * resp[:np.size(N0_unnorm)]**2
+        qnorm = utils.cli(resp)**2
+        return N0_unnorm * qnorm[:np.size(N0_unnorm)]
 
     def _get_Cl_phi(self):
         ells = np.arange(self.Lmax_map + 1)
-        Cl_kappa = np.zeros(np.size(ells))
-        Cl_kappa[1:] = self.power.get_kappa_ps(ells[1:], use_weyl=False)
-        return 4/(ells*(ells+1))**2 * Cl_kappa
+        Cl_kappa = self.power.get_kappa_ps(ells, use_weyl=False)
+        Cl_phi = 4/(ells*(ells+1))**2 * Cl_kappa
+        Cl_phi[0] = 0
+        return Cl_phi
     
     def _get_Cl_curl(self, use_cache=True):
         if use_cache:
@@ -345,13 +395,16 @@ class Reconstruction:
         Cl_curl[1:] = 4/(ells * (ells + 1))**2 * Cl_omega
         return Cl_curl
 
-    def get_N1(self, typ, curl=False, lmax=3000):
-        Cl_phi = self._get_Cl_phi()
-        qe_key = self._get_qe_key(typ, curl=curl)
-        N1_unnorm = self.n1_lib.get_n1(qe_key, "p", Cl_phi, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'], lmax)
-        resp = self.get_response(typ, curl)
-        return N1_unnorm * resp[:np.size(N1_unnorm)] ** 2
-    
+    def get_N1(self, typ):
+        qe_key = self._get_qe_key(typ)
+        fal = self._get_filt_matrix(self.cl_len, True) if self.gmv else fal = self.filt_dict
+        lib_n1 = n1_fft.n1_fft(fal, self.cl_grad, self.cl_grad, self._get_Cl_phi(), lminbox=10, lmaxbox=5000 + 100) 
+        Ls_n1 = np.linspace(30, 3000, 200)
+        n1 = np.array([lib_n1.get_n1(qe_key, L, do_n1mat=False) for L in Ls_n1])
+        qnorm = utils.cli(self.get_response(typ, curl=False))
+        qnorm = InterpolatedUnivariateSpline(np.arange(np.size(qnorm)), qnorm)(Ls_n1)
+        return Ls_n1, n1 * qnorm**2
+
     def get_map(self, typ, with_noise=True):
         if typ.lower() == "T":
             Tmap = self.maps_lib.get_sim_tmap(-1)
