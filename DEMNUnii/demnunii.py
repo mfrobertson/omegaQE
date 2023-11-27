@@ -1,5 +1,6 @@
 from omegaqe.tools import getFileSep
 from omegaqe.cosmology import Cosmology
+from omegaqe.powerspectra import Powerspectra
 import numpy as np
 from configparser import ConfigParser
 import pandas as pd
@@ -21,6 +22,8 @@ class Demnunii:
         self.sht = Spherical(self.nside, self.Lmax_map, nthreads=nthreads)
         self.snap_df = self.get_snap_info()
         self.cosmo = Cosmology("DEMNUnii")
+        self.power = Powerspectra(cosmology=self.cosmo)
+        self.power.matter_PK = self.get_PK()
 
     def setup_config(self):
         sep = getFileSep()
