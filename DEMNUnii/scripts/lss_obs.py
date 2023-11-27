@@ -3,7 +3,7 @@ from DEMNUnii.demnunii import Demnunii
 
 def main(nthreads=30):
     dm = Demnunii(nthreads)
-    kappa_map = dm.get_kappa_map()
+    kappa_map = dm.get_kappa_map(pb=True)
     omega_map = dm.get_omega_map()
     gal_map = dm.get_obs_gal_map(verbose=True)
     cib_map = dm.get_obs_cib_map(verbose=True)
