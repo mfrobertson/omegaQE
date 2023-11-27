@@ -4,7 +4,7 @@ import datetime
 
 class Template:
 
-    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False):
+    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False, gmv=True):
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
@@ -15,6 +15,7 @@ class Template:
         self._power = self.fields.dm.power
         self._fish.covariance.power = self._power
         self._fish.power = self._power
+        self._fish.covariance.noise.full_sky=True
         self._cosmo = self._power.cosmo
         self.F_L, self.C_inv = self._get_F_L_and_C_inv(cmb_lens_qe_typ)
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
@@ -29,7 +30,7 @@ class Template:
             else:
                 iter=False
                 mc_corr = np.ones(self.Lmax_map+1)
-            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter)
+            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter, gmv=gmv)
             self.kappa_rec = self.sht.almxfl(self.kappa_rec, mc_corr)
         self._populate_a_bars(tracer_noise, neg_tracers)
     

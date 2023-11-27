@@ -98,21 +98,22 @@ class Fields:
         y = self._matmul(L, v)
         return y
 
-    def setup_rec(self, sim, deflect_typ, iter=False, noise=True):
+    def setup_rec(self, sim, deflect_typ, iter=False, noise=True, gmv=True):
         self.sim = sim
         self.deflect_typ = deflect_typ
         print(f"Creating Reconstruction instance with exp: {self.exp}, and file: {self.dm.sims_dir}/{self.deflect_typ}/TQU_{self.sim}.fits")
-        self.rec = Reconstruction(self.exp, filename=f"{self.dm.sims_dir}/{self.deflect_typ}/TQU_{self.sim}.fits", sim=self.sim, nthreads=self.nthreads, iter=iter, noise=noise)
+        self.rec = Reconstruction(self.exp, filename=f"{self.dm.sims_dir}/{self.deflect_typ}/TQU_{self.sim}.fits", sim=self.sim, nthreads=self.nthreads, iter=iter, noise=noise, gmv=gmv)
 
     def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, iter_ext=None, data_dir=None):
         return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)
 
-    def get_cached_cmb_lens_rec(self, typ, cmb_fields, sim=None, deflect_typ=None, iter=False):
+    def get_cached_cmb_lens_rec(self, typ, cmb_fields, sim=None, deflect_typ=None, iter=False, gmv=True):
         sim = self.sim if sim is None else sim
         deflect_typ = self.deflect_typ if deflect_typ is None else deflect_typ
         qe_typ = cmb_fields + "_iter" if iter else cmb_fields
-        print(f"Getting cached {typ} reconstruction for sim: {sim}, deflection type: {deflect_typ}, and exp: {self.exp}.")
-        return self.dm.sht.read_map(f"{self.dm.sims_dir}/{deflect_typ}/{self.exp}/{typ}/{qe_typ}_{sim}.fits")
+        ext = "_gmv" if gmv else ""
+        print(f"Getting cached {typ} reconstruction for sim: {sim}, deflection type: {deflect_typ}, exp: {self.exp}, iter: {iter}, and gmv: {gmv}")
+        return self.dm.sht.read_map(f"{self.dm.sims_dir}/{deflect_typ}/{self.exp}/{typ}/{qe_typ}_{sim}_{ext}.fits")
 
     def get_cached_lss(self, field, gaussian, lensed=False):
         if gaussian:
@@ -124,7 +125,7 @@ class Fields:
         return self.dm.sht.read_map(f"{DEMNUnii.CACHE_DIR}_maps/{field}.fits")
 
     def _lensing_fac(self):
-        return self.ells*(self.ells + 1)/2
+        return -self.ells*(self.ells + 1)/2
     
     def _get_cmb_lens_rec_iter(self, typ, cmb_fields):
         itmax = 20
@@ -133,9 +134,9 @@ class Fields:
         rec_func = self.rec.get_phi_rec_iter if typ == "kappa" else self.rec.get_curl_rec_iter
         return rec_func(itmax)
     
-    def _get_cmb_lens_rec(self, typ, cmb_fields, iter, fft):
+    def _get_cmb_lens_rec(self, typ, cmb_fields, iter, fft, gmv):
         if self.rec is None:
-            map = self.get_cached_cmb_lens_rec(typ, cmb_fields, iter=iter)
+            map = self.get_cached_cmb_lens_rec(typ, cmb_fields, iter=iter, gmv=gmv)
             if fft:
                 return self.dm.sht.map2alm(map, nthreads=self.nthreads)
             return map
@@ -149,11 +150,11 @@ class Fields:
             return alm
         return self.dm.sht.alm2map(alm, nthreads=self.nthreads)
 
-    def get_kappa_rec(self, cmb_fields="T", iter=False, fft=False):
-        return self._get_cmb_lens_rec("kappa", cmb_fields, iter, fft)
+    def get_kappa_rec(self, cmb_fields="T", iter=False, fft=False, gmv=True):
+        return self._get_cmb_lens_rec("kappa", cmb_fields, iter, fft, gmv)
 
-    def get_omega_rec(self, cmb_fields="T", iter=False, fft=False):
-        return self._get_cmb_lens_rec("omega", cmb_fields, iter, fft)
+    def get_omega_rec(self, cmb_fields="T", iter=False, fft=False, gmv=True):
+        return self._get_cmb_lens_rec("omega", cmb_fields, iter, fft, gmv)
 
     def _get_index(self, field):
         return np.where(np.char.array(list(self._fields)) == field)[0][0]
@@ -217,6 +218,6 @@ class Fields:
             return self.dm.sht.map2alm(map, nthreads=self.nthreads)
         return map
 
-    def omega_template(self, Nchi, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False):
-        self.tem = Template(self, Lmin, Lmax, tracer_noise, use_kappa_rec, kappa_rec_qe_typ, neg_tracers=neg_tracers, iter_mc_corr=iter_mc_corr)
+    def omega_template(self, Nchi, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False, gmv=True):
+        self.tem = Template(self, Lmin, Lmax, tracer_noise, use_kappa_rec, kappa_rec_qe_typ, neg_tracers=neg_tracers, iter_mc_corr=iter_mc_corr, gmv=gmv)
         return self.tem.get_omega(Nchi)
