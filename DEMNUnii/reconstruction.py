@@ -66,7 +66,6 @@ class Reconstruction:
         self._initialise()
         self.setup = False
         self.iter_rec_data = None
-        self.noise = noise
         self.gmv = gmv
         if filename is not None:
             self.setup_reconstruction(self.filename, seed=sim, iter=iter, noise=noise, gmv=gmv)
@@ -195,16 +194,16 @@ class Reconstruction:
             rng = np.random.RandomState(seed)
             rng_state = rng.get_state
         cl_wf = self.cl_len if iter else self.cl_grad
-        cl_wf_nobb = copy.deepcopy(cl_wf)
-        cl_wf_nobb['bb'] *=0.
+        # cl_wf_nobb = copy.deepcopy(cl_wf)
+        # cl_wf_nobb['bb'] *=0.
         pix_phas = phas.lib_phas(libdir_pixphas, 3, self.Lmax_map, get_state_func=rng_state)
         noise_cls = self.noise_cls if noise else {idx[0]: np.zeros(np.size(self.noise_cls[idx[0]])) for idx in self.indices}
         self.maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.Lmax_map, TQUmaps_filename, self.sht), self.transfer_dict, noise_cls, noise_phas=pix_phas)
         if gmv:
             filt_matrix = self._get_filt_matrix(self.cl_len, noise=True)
-            weighted_maps_lib = filt_simple.library_fullsky_alms_jTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf_nobb, filt_matrix)
+            weighted_maps_lib = filt_simple.library_fullsky_alms_jTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf, filt_matrix)
             self.qlms_lib = qest.library_jtTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.dm.nside, lmax_qlm=self.Lmax_map)
-            self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf_nobb, cl_wf, filt_matrix, self.Lmax_map)
+            self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, filt_matrix, self.Lmax_map)
         else:
             weighted_maps_lib = filt_simple.library_fullsky_alms_sepTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
             self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, cl_wf['te'], self.dm.nside, lmax_qlm=self.Lmax_map)
@@ -225,8 +224,11 @@ class Reconstruction:
         plm0 = self.qlms_lib.get_sim_qlm('p' + qe_key[1:], simidx) 
         olm0 = self.qlms_lib.get_sim_qlm('x' + qe_key[1:], simidx) 
 
-        Rpp, Roo = qresp.get_response(qe_key, self.Lmax_map, 'p', self.cl_len, self.cl_len,
-                                            self.filt_dict, lmax_qlm=self.Lmax_map)[0:2]
+        # Rpp, Roo = qresp.get_response(qe_key, self.Lmax_map, 'p', self.cl_len, self.cl_len,
+        #                                     self.filt_dict, lmax_qlm=self.Lmax_map)[0:2]
+
+        Rpp = self.get_response(typ, curl=False)
+        Roo= self.get_response(typ, curl=True)
 
         cpp = self._get_Cl_phi()[:self.Lmax_map + 1]
         coo = self._get_Cl_curl()[:self.Lmax_map + 1]
@@ -397,7 +399,7 @@ class Reconstruction:
 
     def get_N1(self, typ):
         qe_key = self._get_qe_key(typ)
-        fal = self._get_filt_matrix(self.cl_len, True) if self.gmv else fal = self.filt_dict
+        fal = self._get_filt_matrix(self.cl_len, True) if self.gmv else self.filt_dict
         lib_n1 = n1_fft.n1_fft(fal, self.cl_grad, self.cl_grad, self._get_Cl_phi(), lminbox=10, lmaxbox=5000 + 100) 
         Ls_n1 = np.linspace(30, 3000, 200)
         n1 = np.array([lib_n1.get_n1(qe_key, L, do_n1mat=False) for L in Ls_n1])
@@ -406,13 +408,13 @@ class Reconstruction:
         return Ls_n1, n1 * qnorm**2
 
     def get_map(self, typ, with_noise=True):
-        if typ.lower() == "T":
+        if typ.lower() == "t":
             Tmap = self.maps_lib.get_sim_tmap(-1)
             return Tmap if with_noise else Tmap - self.get_noise_map("T")
-        if typ.lower()== "E":
+        if typ.lower()== "e":
             Emap = self.maps_lib.get_sim_pmap(-1)[0]
             return Emap if with_noise else Emap - self.get_noise_map("E")
-        if typ.lower() == "B":
+        if typ.lower() == "b":
             Bmap = self.maps_lib.get_sim_pmap(-1)[1]
             return Bmap if with_noise else Bmap - self.get_noise_map("B")
         raise ValueError("Type not of accepted T, E, or B.")
