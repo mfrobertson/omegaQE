@@ -22,6 +22,7 @@ class Modecoupling:
         self._cosmo = self._powerspectra.cosmo
         self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
         self.binned_gal_types = list("abcdef")
+        self.use_LSST_abcde = False
 
     def _vectorise_ells(self, ells, ndim):
         if np.size(ells) == 1:
@@ -62,7 +63,11 @@ class Modecoupling:
             win2 = gal_window
         elif typ[0] in self.binned_gal_types:
             index = 2*(ord(typ[0]) - ord("a"))
-            gal_window = self._cosmo.gal_window_Chi(Chis, zmin=gal_bins[index], zmax=gal_bins[index+1], typ=gal_distro)
+            if self.use_LSST_abcde:
+                gal_distro = f"LSST_{typ[0]}"
+                gal_window = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
+            else:
+                gal_window = self._cosmo.gal_window_Chi(Chis, zmin=gal_bins[index], zmax=gal_bins[index+1], typ=gal_distro)
             win1 = cmb_lens_window
             win2 = gal_window
         elif typ[0] == "I":
@@ -82,6 +87,9 @@ class Modecoupling:
             return self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK, gal_distro=gal_distro, use_weyl=False)
         if typ[1] in self.binned_gal_types:
             index = 2*(ord(typ[1]) - ord("a"))
+            if self.use_LSST_abcde:
+                gal_distro = f"LSST_{typ[1]}"
+                return self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK, gal_distro=gal_distro, use_weyl=False)
             return self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK, gal_win_zmin=gal_bins[index], gal_win_zmax=gal_bins[index+1], gal_distro=gal_distro, use_weyl=False)
         if typ[1] == "I":
             return self._powerspectra.get_cib_kappa_ps(ells, nu=nu, Chi_source1=Chis, recalc_PK=recalc_PK, use_weyl=False)

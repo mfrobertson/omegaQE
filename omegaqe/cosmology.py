@@ -22,12 +22,16 @@ class Cosmology:
         self._pars = self._get_pars(self._get_param_file(paramfile))
         self._results = camb.get_results(self._pars)
         self.cib_norms = None
+        self.dn_dz_splines = None
+        self.gal_biases = None
 
     def _get_param_file(self, name):
         if name.lower() == "lensit":
             return "Lensit_fiducial_flatsky_params.ini"
         if name.lower() == "demnunii":
             return "DEMNUnii_params.ini"
+        if name.lower() == "agora":
+            return "AGORA_params.ini"
         return name
 
     def _get_pars(self, filename):
@@ -138,10 +142,32 @@ class Cosmology:
     def poisson_factor(self, z):
         return (1 + z) * self.z_to_Chi(z) ** 2 * 3 / 2 * self._pars.omegam * self.get_hubble(0) ** 2
 
+    def setup_dndz_splines(self, zs, dn_dzs, biases):
+        self.dn_dz_splines = np.empty(np.shape(dn_dzs)[0], dtype=InterpolatedUnivariateSpline)
+        self.gal_biases = np.empty(np.shape(dn_dzs)[0])
+        for iii, dn_dz in enumerate(dn_dzs):
+            self.dn_dz_splines[iii] = InterpolatedUnivariateSpline(zs, dn_dz, ext=1)
+            self.gal_biases[iii] = biases[iii]
+
     def _gal_z_LSST_distribution(self, z):
         # 1705.02332 equation 14 and B1
         z0 = 0.311
         return 1/(2*z0) * (z/z0)**2 * np.exp(-z/z0)
+    
+    def _agora_dist(self, z):
+        # z0 = 0.13
+        # alpha = 0.78
+        # return z**2*np.exp(-z/z0)**alpha
+        zs = np.linspace(0,1200,10000)
+        n_tot = None
+        for iii in np.arange(5):
+            if n_tot is None:
+                n_tot = self.dn_dz_splines[iii](zs)
+            else:
+                n_tot += self.dn_dz_splines[iii](zs)
+        return InterpolatedUnivariateSpline(zs, n_tot)(z)
+
+
 
     def _gal_z_CMB_distribution(self, z):
         return self.cmb_lens_window(self.z_to_Chi(z), self.get_chi_star())/self.get_hubble(z)
@@ -159,9 +185,19 @@ class Cosmology:
             raise ValueError(f"Redshift distribution type {typ} not from accepted types: {typs}")
 
     def _get_z_distr_func(self, typ):
-        self._check_z_distr_typ(typ)
+        # self._check_z_distr_typ(typ)
         if typ == "LSST_gold":
             return self._gal_z_LSST_distribution
+        if typ == "LSST_a":
+            return self.dn_dz_splines[0]
+        if typ == "LSST_b":
+            return self.dn_dz_splines[1]
+        if typ == "LSST_c":
+            return self.dn_dz_splines[2]
+        if typ == "LSST_d":
+            return self.dn_dz_splines[3]
+        if typ == "LSST_e":
+            return self.dn_dz_splines[4]
         if typ == "CMB":
             return self._gal_z_CMB_distribution
         if typ == "flat":
@@ -170,6 +206,8 @@ class Cosmology:
             return self._get_z_distr_func("flat")
         if typ == "perfect":
             return self._get_z_distr_func("flat")
+        if typ == "agora":
+            return self._agora_dist
         else:
             raise ValueError(f"No galaxy distribution of type {typ}.")
 
@@ -178,6 +216,26 @@ class Cosmology:
             return 1
         if typ == "flat_bias_unity" or typ == "LSST_gold_bias_unity" or typ == "perfect":
             return 1
+        if typ == "LSST_a": 
+            return self.gal_biases[0]
+        if typ == "LSST_b": 
+            return self.gal_biases[1]
+        if typ == "LSST_c": 
+            return self.gal_biases[2]
+        if typ == "LSST_d": 
+            return self.gal_biases[3]
+        if typ == "LSST_e": 
+            return self.gal_biases[4]
+        if typ == "agora":
+            bias = np.ones(np.size(z))
+            bias[z<0.2] = 1 + (0.84*z[z<0.2])
+            bias[np.logical_and(z>0.2, z<0.4)]=self.gal_biases[0]
+            bias[np.logical_and(z>0.4, z<0.6)]=self.gal_biases[1]
+            bias[np.logical_and(z>0.6, z<0.8)]=self.gal_biases[2]
+            bias[np.logical_and(z>0.8, z<1.0)]=self.gal_biases[3]
+            bias[np.logical_and(z>1.0, z<1.2)]=self.gal_biases[4]
+            bias[z>1.2] = 1 + (0.84*z[z>1.2])
+            return bias
         return 1 + (0.84*z)
     
     def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):

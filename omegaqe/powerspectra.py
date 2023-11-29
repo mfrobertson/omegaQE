@@ -255,10 +255,12 @@ class Powerspectra:
         I = step * matter_weyl_ps / (Chis ** 2) * dChi * window1 * window2
         return I.sum(axis=1)
 
-    def _Cl_gal(self, ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended, gal_distro="LSST_gold"):
+    def _Cl_gal(self, ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended, gal_distro="LSST_gold", gal_distro_b=None):
         step, Chis, matter_ps, dChi = self._integral_prep(ells, Nchi, zmin, zmax, kmin, kmax, extended, curly=False, matter_ps_typ="matter")
+        if gal_distro_b is None:
+            gal_distro_b = gal_distro
         window1 = self.cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin_a, zmax=gal_win_zmax_a)
-        window2 = self.cosmo.gal_window_Chi(Chis, gal_distro, zmin=gal_win_zmin_b, zmax=gal_win_zmax_b)
+        window2 = self.cosmo.gal_window_Chi(Chis, gal_distro_b, zmin=gal_win_zmin_b, zmax=gal_win_zmax_b)
         I = step * matter_ps / (Chis) ** 2 * dChi * window1 * window2
         return I.sum(axis=1)
 
@@ -558,7 +560,7 @@ class Powerspectra:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
         return self._Cl_gal_kappa_matter(ells, Chi_source1, Nchi, kmin, kmax, gal_win_zmin, gal_win_zmax, extended, gal_distro=gal_distro)
 
-    def get_gal_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, extended=False, recalc_PK=False, gal_distro="LSST_gold"):
+    def get_gal_ps(self, ells, Nchi=100, zmin=0, zmax=None, kmin=0, kmax=100, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, extended=False, recalc_PK=False, gal_distro="LSST_gold", gal_distro_b=None):
         """
         Return the Limber approximated lensing convergence power spectrum.
 
@@ -588,7 +590,7 @@ class Powerspectra:
         """
         if recalc_PK or self.matter_PK is None:
             self.matter_PK = self._get_PK("matter", np.max(ells), Nchi)
-        return self._Cl_gal(ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended, gal_distro=gal_distro)
+        return self._Cl_gal(ells, Nchi, zmin, zmax, kmin, kmax, gal_win_zmin_a, gal_win_zmax_a, gal_win_zmin_b, gal_win_zmax_b, extended, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
 
     def get_cib_kappa_ps(self, ells, nu=353e9, Chi_source1=None, Nchi=100, kmin=0, kmax=100, extended=False, bias=None, recalc_PK=False, use_weyl=False):
         """

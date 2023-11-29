@@ -14,6 +14,8 @@ class Covariance:
         self.power = Powerspectra(cosmology=self.noise.cosmo)
         self.binned_gal_types = list("abcdef")
         self.test_types = list("xyz")
+        self.use_LSST_abcde = False
+        self.shot_noise = [2.25, 3.11, 3.09, 2.61, 2.00] if self.use_LSST_abcde else None
 
     def get_log_sample_Ls(self, Lmin, Lmax, Nells=500, dL_small=1):
         floaty = Lmax / 1000
@@ -32,11 +34,11 @@ class Covariance:
         ells = np.arange(ellmax + 1)
         return self.power.get_kappa_ps(ells)
 
-    def _get_Cl_gal(self, ellmax, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, use_bins=True, gal_distro="LSST_gold"):
+    def _get_Cl_gal(self, ellmax, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, use_bins=True, gal_distro="LSST_gold", gal_distro_b=None):
         ells = np.arange(ellmax + 1)
         if use_bins:
-            return self.power.get_gal_ps(ells, gal_win_zmin_a=gal_win_zmin_a, gal_win_zmax_a=gal_win_zmax_a, gal_win_zmin_b=gal_win_zmin_b, gal_win_zmax_b=gal_win_zmax_b, gal_distro=gal_distro)
-        return self.power.get_gal_ps(ells, gal_distro=gal_distro)
+            return self.power.get_gal_ps(ells, gal_win_zmin_a=gal_win_zmin_a, gal_win_zmax_a=gal_win_zmax_a, gal_win_zmin_b=gal_win_zmin_b, gal_win_zmax_b=gal_win_zmax_b, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
+        return self.power.get_gal_ps(ells, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
 
     def _get_Cl_cib(self, ellmax, nu=353e9):
         ells = np.arange(ellmax + 1)
@@ -58,7 +60,7 @@ class Covariance:
             return self.power.get_cib_gal_ps(ells, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, gal_distro=gal_distro)
         return self.power.get_cib_gal_ps(ells, nu=nu, gal_distro=gal_distro)
 
-    def _get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
+    def _get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold", gal_distro_b=None):
         if "s" in typ:
             return self.power.get_ps(typ, np.arange(ellmax + 1), nu=nu)
         if typ == "kk":
@@ -66,7 +68,7 @@ class Covariance:
         elif typ == "gk" or typ == "kg":
             return self._get_Cl_gal_kappa(ellmax, gal_bins[0], gal_bins[1], use_bins, gal_distro=gal_distro)
         elif typ == "gg":
-            return self._get_Cl_gal(ellmax, gal_bins[0], gal_bins[1], gal_bins[2], gal_bins[3], use_bins, gal_distro=gal_distro)
+            return self._get_Cl_gal(ellmax, gal_bins[0], gal_bins[1], gal_bins[2], gal_bins[3], use_bins, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
         elif typ == "Ik" or typ == "kI":
             return self._get_Cl_cib_kappa(ellmax, nu)
         elif typ == "II":
@@ -88,6 +90,8 @@ class Covariance:
             gal_win_zmax_1 = gal_bins[index_1 + 1]
             typ = "g" + typ[1]
             type_0_binned = True
+            if self.use_LSST_abcde:
+                gal_distro = f"LSST_{typ[0]}"
         if typ[1] in self.binned_gal_types:
             index_2 = 2*(ord(typ[1]) - ord("a"))
             typ = typ[0] + "g"
@@ -97,6 +101,8 @@ class Covariance:
             else:
                 gal_win_zmin_1 = gal_bins[index_2]
                 gal_win_zmax_1 = gal_bins[index_2 + 1]
+            if self.use_LSST_abcde:
+                gal_distro_b = f"LSST_{typ[1]}"
         return self._get_Cl(typ, ellmax, nu, (gal_win_zmin_1, gal_win_zmax_1, gal_win_zmin_2, gal_win_zmax_2), use_bins=True, gal_distro=gal_distro)
 
     def _get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
@@ -124,12 +130,18 @@ class Covariance:
             index = 2 * (ord(typ[0]) - ord("a"))
             gal_win_zmin = gal_bins[index]
             gal_win_zmax = gal_bins[index + 1]
-            N = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin, zmax=gal_win_zmax)
+            N = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin, zmax=gal_win_zmax, n=self._get_n(typ[0]))
             # N = 1e-100
             return self._get_Cl_gal(ellmax, gal_win_zmin, gal_win_zmax, gal_win_zmin, gal_win_zmax, gal_distro=gal_distro) + N
         else:
             raise ValueError(f"Could not get Cov for type {typ}")
         return self._get_Cl(typ, ellmax, nu, gal_bins, gal_distro=gal_distro) + N
+
+    def _get_n(self, typ):
+        if self.shot_noise is None:
+            return 40
+        idx = 2 * (ord(typ[0]) - ord("a"))
+        return self.shot_noise[idx]
 
     def _get_C_inv(self, typs, Lmax, nu, gal_bins, gal_distro="LSST_gold"):
         Ntyps = np.size(typs)
