@@ -4,21 +4,21 @@ import datetime
 
 class Template:
 
-    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False, gmv=True):
+    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False, gmv=True, cmb_noise=True):
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
-        self.sht = self.fields.dm.sht
+        self.sht = self.fields.nbody.sht
         self.Lmax_map = self.fields.Lmax_map
         self.nside = self.fields.nside
         self._fish = self.fields.fish
-        self._power = self.fields.dm.power
+        self._power = self.fields.nbody.power
         self._fish.covariance.power = self._power
         self._fish.power = self._power
         self._fish.covariance.noise.full_sky=True
         self._cosmo = self._power.cosmo
         self.F_L, self.C_inv = self._get_F_L_and_C_inv(cmb_lens_qe_typ)
-        self.matter_PK = self._cosmo.get_matter_PK(typ="matter")
+        self.matter_PK = self.fields.nbody.get_PK()
         self.a_bars = dict.fromkeys(self.fields.fields)
         self.use_kappa_rec = use_kappa_rec
         if self.use_kappa_rec:
@@ -30,14 +30,14 @@ class Template:
             else:
                 iter=False
                 mc_corr = np.ones(self.Lmax_map+1)
-            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter, gmv=gmv)
+            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter, gmv=gmv, cmb_noise=cmb_noise)
             self.kappa_rec = self.sht.almxfl(self.kappa_rec, mc_corr)
         self._populate_a_bars(tracer_noise, neg_tracers)
     
     def _get_iter_mc_corr_k(self, exp, qe_typ):
         offset=10
         nbins=50
-        dir_loc = f"{self.fields.dm.cache_dir}/_iter_norm/{exp}/{qe_typ}/{offset}_{nbins}"
+        dir_loc = f"{self.fields.nbody.cache_dir}/_iter_norm/{exp}/{qe_typ}/{offset}_{nbins}"
         return np.load(f"{dir_loc}/iter_norm_k.npy")
 
     def _get_F_L_and_C_inv(self, cmb_lens_qe_typ):
@@ -55,8 +55,8 @@ class Template:
             fields = "EB"
         else:
             raise ValueError(f"Supplied cmb_lens_qe_typ {cmb_lens_qe_typ} not of supported typs; T, EB, TEB, TEB_iter, or EB_iter")
-        Ls = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
-        F_L = np.load(f"{self.fields.dm.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
+        Ls = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
+        F_L = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
         iter=True if "_iter" in qe_typ else False 
         self.fields.setup_noise(qe=fields, iter=iter)
         C_inv = self._fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)
@@ -130,7 +130,7 @@ class Template:
                 h_lambda += self.sht.almxfl(self.a_bars[field_i], Cls[field_i])
         return self.sht.almxfl(h_gamma, matter_ps), h_lambda
 
-    def get_omega(self, Nchi=20):
+    def get_omega(self, Nchi=20, gal_distro="LSST_gold"):
         Chis = np.linspace(0, self._cosmo.get_chi_star(), Nchi + 1)[1:]
         dChi = Chis[1] - Chis[0]
         I_map_tot = None
@@ -141,7 +141,7 @@ class Template:
             windows = dict.fromkeys(self.fields.fields)
             matter_ps = self._get_matter_ps(Chi)
             for field in self.fields.fields:
-                Cls[field], windows[field] = self._get_Cl_and_window(Chi, field)
+                Cls[field], windows[field] = self._get_Cl_and_window(Chi, field, gal_distro=gal_distro)
 
             E_gamma, E_lambda = self._get_Egamma_Elambda(Cls, windows, matter_ps)
             B_gamma = np.zeros(np.shape(E_gamma))
