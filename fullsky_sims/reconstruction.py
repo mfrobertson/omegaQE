@@ -10,7 +10,7 @@ from plancklens.filt import filt_cinv
 from plancklens import qest, qresp, nhl
 from plancklens.n1 import n1
 from plancklens.sims import phas, maps
-from fullsky_sims.demnunii import Demnunii
+import fullsky_sims
 from omegaqe.noise import Noise
 import omegaqe.postborn as postborn
 import shutil
@@ -49,17 +49,18 @@ class Reconstruction:
         def hashdict(self):
             return {'cmbs': self.maps_filename, 'noise': self.maps_filename, 'data': self.maps_filename}
 
-    def __init__(self, exp, filename=None, L_cuts=(30, 3000, 30, 5000), sim=None, nthreads=1, iter=False, noise=True, gmv=False):
+    def __init__(self, exp, nbody="DEMNUnii", filename=None, L_cuts=(30, 3000, 30, 5000), sim=None, nthreads=1, iter=False, noise=True, gmv=False):
         self.nthreads = nthreads
         self.filename = filename
         self.setup_env(exp, iter, sim)
         self.exp = exp
-        self.dm = Demnunii(nthreads)
-        self.sht = self.dm.sht
-        self.noise = Noise(cosmology=self.dm.cosmo, full_sky=True)
-        self.power = self.dm.power
+        self.nbody = fullsky_sims.wrapper_class(nbody, nthreads) if isinstance(nbody, str) else nbody
+        self.sht = self.nbody.sht
+        self.cosmo = self.nbody.cosmo
+        self.noise = Noise(cosmology=self.cosmo, full_sky=True)
+        self.power = self.nbody.power
         self.L_cuts = L_cuts
-        self.Lmax_map = self.dm.Lmax_map
+        self.Lmax_map = self.nbody.Lmax_map
         self.indices = ["tt", "ee", "bb"]
         self.cl_unl, self.cl_len, self.cl_grad = self.get_cmb_cls()
         self.noise_cls = self.get_noise_cls(exp)
@@ -113,15 +114,16 @@ class Reconstruction:
         Tcmb = 2.7255
         fac = (Tcmb * 1e6) ** 2
         indices = self.indices + ['te']
-        cl_unl = {idx : self.dm.cosmo.get_unlens_ps(idx.upper()) * fac for idx in indices}
-        cl_len = {idx : self.dm.cosmo.get_lens_ps(idx.upper()) * fac for idx in indices}
-        cl_grad = {idx: self.dm.cosmo.get_grad_lens_ps(idx.upper()) * fac for idx in indices}
+        cl_unl = {idx : self.cosmo.get_unlens_ps(idx.upper()) * fac for idx in indices}
+        cl_len = {idx : self.cosmo.get_lens_ps(idx.upper()) * fac for idx in indices}
+        cl_grad = {idx: self.cosmo.get_grad_lens_ps(idx.upper()) * fac for idx in indices}
         return cl_unl, cl_len, cl_grad
 
     def get_noise_cls(self, exp):
         Tcmb = 2.7255
         fac = (Tcmb * 1e6) ** 2
-        return {idx[0]: self.noise.get_cmb_gaussian_N(idx.upper(), None, None, ellmax=self.Lmax_map, exp=exp) * fac for idx in self.indices}
+        nT, beam = self.noise.get_noise_args(exp)
+        return {idx[0]: self.noise.get_cmb_gaussian_N(idx.upper(), nT, beam, ellmax=self.Lmax_map, exp=exp) * fac for idx in self.indices}
 
     def _apply_cuts(self, filts, indices):
         for iii, filt in enumerate(filts):
@@ -202,11 +204,11 @@ class Reconstruction:
         if gmv:
             filt_matrix = self._get_filt_matrix(self.cl_len, noise=True)
             weighted_maps_lib = filt_simple.library_fullsky_alms_jTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf, filt_matrix)
-            self.qlms_lib = qest.library_jtTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.dm.nside, lmax_qlm=self.Lmax_map)
+            self.qlms_lib = qest.library_jtTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.nbody.nside, lmax_qlm=self.Lmax_map)
             self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, filt_matrix, self.Lmax_map)
         else:
             weighted_maps_lib = filt_simple.library_fullsky_alms_sepTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
-            self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, cl_wf['te'], self.dm.nside, lmax_qlm=self.Lmax_map)
+            self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, cl_wf['te'], self.nbody.nside, lmax_qlm=self.Lmax_map)
             self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, self.filt_dict, self.Lmax_map)
         self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, cl_wf, self.Lmax_map)
         self.setup = True
@@ -312,7 +314,7 @@ class Reconstruction:
         soltn_cond = True
         qe_key = self._get_qe_key(typ)
         lib_dir_iterator = self._setup_iter_libdir(qe_key)
-        chain_descrs = lambda lmax_sol, cg_tol : [[0, ["diag_cl"], lmax_sol, self.dm.nside, np.inf, cg_tol, cd_solve.tr_cg, cd_solve.cache_mem()]]
+        chain_descrs = lambda lmax_sol, cg_tol : [[0, ["diag_cl"], lmax_sol, self.nbody.nside, np.inf, cg_tol, cd_solve.tr_cg, cd_solve.cache_mem()]]
         if itmax >= 0 and Rec.maxiterdone(lib_dir_iterator) < itmax:
             itlib = self.get_itlib(typ, 1., lib_dir_iterator, chain_descrs)
             for iii in range(itmax + 1):
