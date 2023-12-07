@@ -1,4 +1,9 @@
-DATA_DIR = "/mnt/lustre/users/astro/mr671/DEMNUnii/LCDM/"
-CACHE_DIR = "/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/cache/"
-SIMS_DIR = "/mnt/lustre/users/astro/mr671/len_cmbs/sims"
-LMAX_MAP = 5000
+from fullsky_sims.demnunii import Demnunii
+from fullsky_sims.agora import Agora
+
+def wrapper_class(nbody, nthreads):
+    if nbody.lower() == "demnunii":
+        return Demnunii(nthreads)
+    if nbody.lower() == "agora":
+        return Agora(nthreads)
+    raise ValueError(f"Nbody sim {nbody} not recognised.")

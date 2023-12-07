@@ -7,18 +7,18 @@ import pandas as pd
 import datetime
 import re
 from fullsky_sims.spherical import Spherical
-import fullsky_sims
 from scipy.interpolate import RectBivariateSpline, InterpolatedUnivariateSpline
 
 class Demnunii:
 
     def __init__(self, nthreads=1):
-        self.data_dir = fullsky_sims.DATA_DIR
-        self.cache_dir = fullsky_sims.CACHE_DIR
-        self.sims_dir = fullsky_sims.SIMS_DIR
+        self.data_dir = "/mnt/lustre/users/astro/mr671/DEMNUnii/LCDM/"
+        self.cache_dir = f"/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/cache/"
+        self.sims_dir = f"/mnt/lustre/users/astro/mr671/len_cmbs/sims/"
+        self.omegaqe_data = f"/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/data/"
         self.config = self.setup_config()
         self.nside = int(self.parse_config(self.get_config("HealpixNside")))
-        self.Lmax_map = fullsky_sims.LMAX_MAP
+        self.Lmax_map = 5000
         self.sht = Spherical(self.nside, self.Lmax_map, nthreads=nthreads)
         self.snap_df = self.get_snap_info()
         self.cosmo = Cosmology("DEMNUnii")
