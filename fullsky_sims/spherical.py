@@ -55,8 +55,8 @@ class Spherical:
         return almxfl(alm, fl, None, False)
 
     @staticmethod
-    def read_map(filename):
-        return hp.fitsfunc.read_map(filename, dtype=float, field=None, memmap=True)
+    def read_map(filename, field=None):
+        return hp.fitsfunc.read_map(filename, dtype=float, field=field, memmap=True)
 
     @staticmethod
     def write_map(filename, map):
