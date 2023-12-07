@@ -3,13 +3,10 @@ import sys
 import os
 import numpy as np
 import fullsky_sims
-from fullsky_sims.demnunii import Demnunii
-
-dm = Demnunii()
 
 
 def _save_ps(ps, exp, tracer_fields, nsims, deflect_typ, ext, qe_typ, cmb_noise):
-    ps_dir = f"{fullsky_sims.CACHE_DIR}/_raw_ps/{deflect_typ}/{exp}/{tracer_fields}"
+    ps_dir = f"{nbody.cache_dir}/_raw_ps/{deflect_typ}/{exp}/{tracer_fields}"
     if not os.path.exists(ps_dir):
         os.makedirs(ps_dir)
     ps_filename = f"ps"
@@ -25,13 +22,13 @@ def _save_ps(ps, exp, tracer_fields, nsims, deflect_typ, ext, qe_typ, cmb_noise)
 def _get_iter_mc_corr_w(exp, qe_typ):
     offset=10
     nbins=30
-    dir_loc = f"{dm.cache_dir}/_iter_norm/{exp}/{qe_typ}/{offset}_{nbins}"
+    dir_loc = f"{nbody.cache_dir}/_iter_norm/{exp}/{qe_typ}/{offset}_{nbins}"
     return np.load(f"{dir_loc}/iter_norm_w.npy")
 
 
 def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_noise, gmv, nthreads, qe_typ):
     mpi.output(f"  sim: 0", 0, _id)
-    dm.sht.nthreads = nthreads
+    nbody.sht.nthreads = nthreads
     if not cmb_noise:
         ext = "_nN"
         if gmv:
@@ -39,25 +36,28 @@ def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_n
     elif gmv:
         ext = "__gmv"
 
-    omega_tem = dm.sht.read_map(f"{fullsky_sims.CACHE_DIR}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{0}{tem_ext}.fits")
-    omega_rec = dm.sht.read_map(f"{fullsky_sims.SIMS_DIR}/{deflect_typ}/{exp}/omega/{qe_typ}_{0}{ext}.fits")
+    omega_tem = nbody.sht.read_map(f"{nbody.cache_dir}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{0}{tem_ext}.fits")
+    omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{0}{ext}.fits")
     # if iter_mc_corr:
     #     mc_corr = _get_iter_mc_corr_w(exp, qe_typ) 
-    #     omega_rec = dm.sht.alm2map(dm.sht.almxfl(dm.sht.map2alm(omega_rec), mc_corr))
-    Cl_ww = dm.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)
+    #     omega_rec = nbody.sht.alm2map(nbody.sht.almxfl(nbody.sht.map2alm(omega_rec), mc_corr))
+    Cl_ww = nbody.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)
     for sim in range(1,nsims):
         mpi.output(f"  sim: {sim}", 0, _id)
-        omega_tem = dm.sht.read_map(f"{fullsky_sims.CACHE_DIR}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{sim}{tem_ext}.fits")
-        omega_rec = dm.sht.read_map(f"{fullsky_sims.SIMS_DIR}/{deflect_typ}/{exp}/omega/{qe_typ}_{sim}{ext}.fits")
+        omega_tem = nbody.sht.read_map(f"{nbody.cache_dir}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{sim}{tem_ext}.fits")
+        omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{sim}{ext}.fits")
         # if iter_mc_corr:
-        #     omega_rec = dm.sht.alm2map(dm.sht.almxfl(dm.sht.map2alm(omega_rec), mc_corr))
-        Cl_ww += dm.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)
+        #     omega_rec = nbody.sht.alm2map(nbody.sht.almxfl(nbody.sht.map2alm(omega_rec), mc_corr))
+        Cl_ww += nbody.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)
     return Cl_ww/nsims
 
 
-def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, iter_mc_corr, cmb_noise, gmv, nthreads, _id):
+def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, iter_mc_corr, cmb_noise, gmv, nbody_name, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
     mpi.output(f"exp: {exp}, tracer_fields: {tracer_fields}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, gauss_lss: {gauss_lss}, cmb_noise: {cmb_noise}, gmv: {gmv}, nthreads: {nthreads}", 0, _id)
+
+    global nbody
+    nbody = fullsky_sims.wrapper_class(nbody_name, nthreads)
 
     deflect_typs = ["pbdem_dem", "pbdem_zero"] if deflect_typ is None else [deflect_typ]
 
@@ -70,6 +70,8 @@ def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ
         ext += "_len"
     if iter_mc_corr:
         ext += "_mc"
+    if not cmb_noise:
+        ext += "_nN"
     if gmv:
         ext += "_gmv"
     for deflect_typ in deflect_typs:
@@ -80,9 +82,9 @@ def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 14:
+    if len(args) != 15:
         raise ValueError(
-            "Must supply arguments: exp tracer_fields tracer_noise kappa_rec qe_typ nsims deflect_typ gauss_lss len_lss iter_mc_corr cmb_noise gmv nthreads _id")
+            "Must supply arguments: exp tracer_fields tracer_noise kappa_rec qe_typ nsims deflect_typ gauss_lss len_lss iter_mc_corr cmb_noise gmv nbody nthreads _id")
     exp = str(args[0])
     tracer_fields = str(args[1])
     tracer_noise = parse_boolean(args[2])
@@ -95,6 +97,7 @@ if __name__ == '__main__':
     iter_mc_corr = parse_boolean(args[9])
     cmb_noise = parse_boolean(args[10])
     gmv = parse_boolean(args[11])
-    nthreads = int(args[12])
-    _id = str(args[13])
-    main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, iter_mc_corr, cmb_noise, gmv, nthreads, _id)
+    nbody_name = str(args[12])
+    nthreads = int(args[13])
+    _id = str(args[14])
+    main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, iter_mc_corr, cmb_noise, gmv, nbody_name, nthreads, _id)

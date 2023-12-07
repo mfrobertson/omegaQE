@@ -15,13 +15,13 @@ def setup_dirs(sims_dir, exp, deflect_typs):
                 os.makedirs(full_dir)
 
 
-def main(exp, qe_typ, start, end, deflect_typ, iter, noise, gmv, nthreads, _id):
+def main(exp, qe_typ, start, end, deflect_typ, iter, noise, gmv, nbody, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"exp: {exp}, qe_typ: {qe_typ}, start: {start}, end: {end}, deflect_typ: {deflect_typ}, iter: {iter}, noise: {noise}, gmv:{gmv}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f"exp: {exp}, qe_typ: {qe_typ}, start: {start}, end: {end}, deflect_typ: {deflect_typ}, iter: {iter}, noise: {noise}, gmv:{gmv}, nbody: {nbody}, nthreads: {nthreads}", 0, _id)
 
-    fields = Fields(exp, use_lss_cache=True, use_cmb_cache=True, nthreads=nthreads)
-    deflect_typs = ["pbdem_dem", "pbdem_zero", "diff_zero"] if deflect_typ is None else [deflect_typ]
-    sims_dir = fullsky_sims.SIMS_DIR
+    fields = Fields(exp, nbody, use_lss_cache=True, use_cmb_cache=True, nthreads=nthreads)
+    deflect_typs = ["pbdem_dem", "pbdem_zero"] if deflect_typ is None else [deflect_typ]
+    sims_dir = fields.nbody.sims_dir
     qe_typ_str = qe_typ + "_iter" if iter else qe_typ
     ext = "" if noise else "nN"
     if gmv:
@@ -32,18 +32,18 @@ def main(exp, qe_typ, start, end, deflect_typ, iter, noise, gmv, nthreads, _id):
         for deflect_typ in deflect_typs:
             fields.setup_rec(sim, deflect_typ, iter=iter, noise=noise, gmv=gmv)
             kappa_rec = fields.get_kappa_rec(qe_typ, fft=False, iter=iter)
-            fields.dm.sht.write_map(f"{sims_dir}/{deflect_typ}/{exp}/kappa/{qe_typ_str}_{sim}_{ext}.fits", kappa_rec)
+            fields.nbody.sht.write_map(f"{sims_dir}/{deflect_typ}/{exp}/kappa/{qe_typ_str}_{sim}_{ext}.fits", kappa_rec)
             mpi.output(f"   {deflect_typ} kappa done.", 0, _id)
             omega_rec = fields.get_omega_rec(qe_typ, fft=False, iter=iter)
-            fields.dm.sht.write_map(f"{sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ_str}_{sim}_{ext}.fits", omega_rec)
+            fields.nbody.sht.write_map(f"{sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ_str}_{sim}_{ext}.fits", omega_rec)
             mpi.output(f"   {deflect_typ} omega done.", 0, _id)
 
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 10:
+    if len(args) != 11:
         raise ValueError(
-            "Must supply arguments: exp qe_typ start end deflect_typ iter noise gmv nthreads _id")
+            "Must supply arguments: exp qe_typ start end deflect_typ iter noise gmv nbody nthreads _id")
     exp = str(args[0])
     qe_typ = str(args[1])
     start = int(args[2])
@@ -52,6 +52,7 @@ if __name__ == '__main__':
     iter = parse_boolean(args[5])
     noise = parse_boolean(args[6])
     gmv =parse_boolean(args[7])
-    nthreads  = int(args[8])
-    _id = str(args[9])
-    main(exp, qe_typ, start, end, deflect_typ, iter, noise, gmv, nthreads, _id)
+    nbody = str(args[8])
+    nthreads  = int(args[9])
+    _id = str(args[10])
+    main(exp, qe_typ, start, end, deflect_typ, iter, noise, gmv, nbody, nthreads, _id)
