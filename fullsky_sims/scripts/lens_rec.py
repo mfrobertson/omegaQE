@@ -7,7 +7,7 @@ import fullsky_sims
 
 
 def setup_dirs(sims_dir, exp, deflect_typs):
-    obs_typs = obs_typs = ["kappa", "omega"]
+    obs_typs = ["kappa", "omega"]
     for deflect_typ in deflect_typs:
         for obs_typ in obs_typs:
             full_dir = f"{sims_dir}/{deflect_typ}/{exp}/{obs_typ}"
