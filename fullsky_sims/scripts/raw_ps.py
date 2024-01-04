@@ -19,11 +19,12 @@ def _save_ps(ps, exp, tracer_fields, nsims, deflect_typ, ext, qe_typ, cmb_noise)
     mpi.output(f"Saving cross-spectrum to {ps_full_path}", 0, _id)
     np.save(f"{ps_full_path}", ps)
 
-def _get_iter_mc_corr_w(exp, qe_typ):
+def _get_iter_mc_corr_w(exp, qe_typ, gmv):
     offset=10
     nbins=30
+    ext = "_gmv" if gmv else ""
     dir_loc = f"{nbody.cache_dir}/_iter_norm/{exp}/{qe_typ}/{offset}_{nbins}"
-    return np.load(f"{dir_loc}/iter_norm_w.npy")
+    return np.load(f"{dir_loc}/iter_norm_w{ext}.npy")
 
 
 def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_noise, gmv, nthreads, qe_typ):
@@ -38,16 +39,16 @@ def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_n
 
     omega_tem = nbody.sht.read_map(f"{nbody.cache_dir}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{0}{tem_ext}.fits")
     omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{0}{ext}.fits")
-    # if iter_mc_corr:
-    #     mc_corr = _get_iter_mc_corr_w(exp, qe_typ) 
-    #     omega_rec = nbody.sht.alm2map(nbody.sht.almxfl(nbody.sht.map2alm(omega_rec), mc_corr))
+    if iter_mc_corr:
+        mc_corr = _get_iter_mc_corr_w(exp, qe_typ, gmv) 
+        omega_rec = nbody.sht.alm2map(nbody.sht.almxfl(nbody.sht.map2alm(omega_rec), 1/mc_corr))
     Cl_ww = nbody.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)
     for sim in range(1,nsims):
         mpi.output(f"  sim: {sim}", 0, _id)
         omega_tem = nbody.sht.read_map(f"{nbody.cache_dir}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{sim}{tem_ext}.fits")
         omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{sim}{ext}.fits")
-        # if iter_mc_corr:
-        #     omega_rec = nbody.sht.alm2map(nbody.sht.almxfl(nbody.sht.map2alm(omega_rec), mc_corr))
+        if iter_mc_corr:
+            omega_rec = nbody.sht.alm2map(nbody.sht.almxfl(nbody.sht.map2alm(omega_rec), 1/mc_corr))
         Cl_ww += nbody.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)
     return Cl_ww/nsims
 
