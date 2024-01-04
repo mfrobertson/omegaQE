@@ -7,7 +7,8 @@ import pandas as pd
 import datetime
 import re
 from fullsky_sims.spherical import Spherical
-from scipy.interpolate import RectBivariateSpline, InterpolatedUnivariateSpline
+from scipy.interpolate import RectBivariateSpline, InterpolatedUnivariateSpline, UnivariateSpline
+from scipy import signal
 
 class Demnunii:
 
@@ -271,7 +272,14 @@ class Demnunii:
         filename = self.data_dir + sep + "nbody" + sep + omega_file
         return self.sht.read_map(filename)
     
+    @staticmethod
+    def gaussian_smooth_1d(data, sigma=1, nsigma=1):
+        win = signal.gaussian(nsigma * sigma, std=sigma)
+        res = np.convolve(data, win, mode='same')
+        return res / np.convolve(np.ones(data.shape), win, mode='same')
+    
     def get_PK(self, typ="total"):
+        power = Powerspectra(cosmology=self.cosmo)
         typ_name = "" if typ == "total" else "_" + typ 
         h = (self.cosmo._pars.H0 / 100)
         class PKInterpolator(RectBivariateSpline):
@@ -293,13 +301,33 @@ class Demnunii:
         
         Nsnaps = 63
         snaps = np.arange(Nsnaps)
-        ks = _get_k(snaps[-1])
+        # ks = _get_k(snaps[-1])
+        # zs = np.array([self._get_z(snap) for snap in snaps[::-1]])
+        # ps = np.zeros((Nsnaps, np.size(ks)))
+        # kmin = 2e-3
+        # kmax = 1
+        # for iii, snap in enumerate(snaps[::-1]):
+        #     ks_ = _get_k(snap)
+        #     ps_ = _get_pk(snap)
+        #     ps_[ks_<kmin] = power.get_matter_ps("matter", self._get_z(snap), ks_[ks_<kmin])
+        #     ps_[ks_>kmax] = power.get_matter_ps("matter", self._get_z(snap), ks_[ks_>kmax])
+        #     ps[iii,:] = InterpolatedUnivariateSpline(ks_, ps_)(ks)
+
+        ks = np.geomspace(1e-4,1e3,1000)
         zs = np.array([self._get_z(snap) for snap in snaps[::-1]])
         ps = np.zeros((Nsnaps, np.size(ks)))
+        # Will use Mead in interpolator over the edges (don't think it makes much difference)
+        kmin = 2e-3
+        kmax = 1
         for iii, snap in enumerate(snaps[::-1]):
             ks_ = _get_k(snap)
             ps_ = _get_pk(snap)
-            ps[iii,:] = InterpolatedUnivariateSpline(ks_, ps_)(ks)
+            # ps_ = self.gaussian_smooth_1d(ps_)    # Smoothing empirical Pk
+            ps[iii,:] = power.get_matter_ps("matter", self._get_z(snap), ks)
+            ks_overlap_idx = np.logical_and(ks>kmin,ks<kmax)
+            ks_overlap = ks[ks_overlap_idx]
+            ps[iii,np.logical_and(ks>kmin,ks<kmax)] = InterpolatedUnivariateSpline(ks_, ps_)(ks_overlap)
+
 
         PK = PKInterpolator(zs, np.log(ks), ps)
         PK.kmin = np.min(ks)
