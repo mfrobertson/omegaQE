@@ -23,6 +23,7 @@ class Cosmology:
         self._results = camb.get_results(self._pars)
         self.cib_norms = None
         self.dn_dz_splines = None
+        self.dn_dz_tot_spline = None
         self.gal_biases = None
 
     def _get_param_file(self, name):
@@ -145,9 +146,15 @@ class Cosmology:
     def setup_dndz_splines(self, zs, dn_dzs, biases):
         self.dn_dz_splines = np.empty(np.shape(dn_dzs)[0], dtype=InterpolatedUnivariateSpline)
         self.gal_biases = np.empty(np.shape(dn_dzs)[0])
+        dn_dz_tot = None
         for iii, dn_dz in enumerate(dn_dzs):
             self.dn_dz_splines[iii] = InterpolatedUnivariateSpline(zs, dn_dz, ext=1)
+            if dn_dz_tot is None:
+                dn_dz_tot = dn_dz
+            else:
+                dn_dz_tot += dn_dz
             self.gal_biases[iii] = biases[iii]
+        self.dn_dz_tot_spline = InterpolatedUnivariateSpline(zs, dn_dz_tot, ext=1)
 
     def _gal_z_LSST_distribution(self, z):
         # 1705.02332 equation 14 and B1
@@ -158,14 +165,16 @@ class Cosmology:
         # z0 = 0.13
         # alpha = 0.78
         # return z**2*np.exp(-z/z0)**alpha
-        zs = np.linspace(0,1200,10000)
-        n_tot = None
-        for iii in np.arange(5):
-            if n_tot is None:
-                n_tot = self.dn_dz_splines[iii](zs)
-            else:
-                n_tot += self.dn_dz_splines[iii](zs)
-        return InterpolatedUnivariateSpline(zs, n_tot)(z)
+
+        # zs = np.linspace(0,1200,10000)
+        # n_tot = None
+        # for iii in np.arange(5):
+        #     if n_tot is None:
+        #         n_tot = self.dn_dz_splines[iii](zs)
+        #     else:
+        #         n_tot += self.dn_dz_splines[iii](zs)
+        # return InterpolatedUnivariateSpline(zs, n_tot)(z)
+        return self.dn_dz_tot_spline(z)
 
 
 
@@ -227,14 +236,14 @@ class Cosmology:
         if typ == "LSST_e": 
             return self.gal_biases[4]
         if typ == "agora":
-            bias = np.ones(np.size(z))
-            bias[z<0.2] = 1 + (0.84*z[z<0.2])
+            if np.size(z) == 1:
+                z = np.array([z])
+            bias = 1 + (0.84*z)
             bias[np.logical_and(z>0.2, z<0.4)]=self.gal_biases[0]
             bias[np.logical_and(z>0.4, z<0.6)]=self.gal_biases[1]
             bias[np.logical_and(z>0.6, z<0.8)]=self.gal_biases[2]
             bias[np.logical_and(z>0.8, z<1.0)]=self.gal_biases[3]
             bias[np.logical_and(z>1.0, z<1.2)]=self.gal_biases[4]
-            bias[z>1.2] = 1 + (0.84*z[z>1.2])
             return bias
         return 1 + (0.84*z)
     
