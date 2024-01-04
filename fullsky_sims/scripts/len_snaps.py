@@ -32,7 +32,7 @@ def get_lensed_map(dlm, unl_alm, nthreads):
 
 
 def save_lens_maps(len_map, snap):
-    directory = f"{fullsky_sims.CACHE_DIR}{sep}_len_snaps"
+    directory = f"{dm.cache_dir}{sep}_len_snaps"
     if not os.path.isdir(directory):
         os.makedirs(directory)
     snap_num_app = "0" if len(str(snap)) == 2 else "00"
