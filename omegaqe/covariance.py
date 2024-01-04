@@ -84,26 +84,29 @@ class Covariance:
         gal_win_zmin_2 = None
         gal_win_zmax_2 = None
         type_0_binned = False
+        gal_distro_b = None
         if typ[0] in self.binned_gal_types:
-            index_1 = 2 * (ord(typ[0]) - ord("a"))
-            gal_win_zmin_1 = gal_bins[index_1]
-            gal_win_zmax_1 = gal_bins[index_1 + 1]
-            typ = "g" + typ[1]
-            type_0_binned = True
             if self.use_LSST_abcde:
                 gal_distro = f"LSST_{typ[0]}"
-        if typ[1] in self.binned_gal_types:
-            index_2 = 2*(ord(typ[1]) - ord("a"))
-            typ = typ[0] + "g"
-            if type_0_binned:
-                gal_win_zmin_2 = gal_bins[index_2]
-                gal_win_zmax_2 = gal_bins[index_2 + 1]
             else:
-                gal_win_zmin_1 = gal_bins[index_2]
-                gal_win_zmax_1 = gal_bins[index_2 + 1]
+                index_1 = 2 * (ord(typ[0]) - ord("a"))
+                gal_win_zmin_1 = gal_bins[index_1]
+                gal_win_zmax_1 = gal_bins[index_1 + 1]
+                type_0_binned = True
+            typ = "g" + typ[1]
+        if typ[1] in self.binned_gal_types:
             if self.use_LSST_abcde:
                 gal_distro_b = f"LSST_{typ[1]}"
-        return self._get_Cl(typ, ellmax, nu, (gal_win_zmin_1, gal_win_zmax_1, gal_win_zmin_2, gal_win_zmax_2), use_bins=True, gal_distro=gal_distro)
+            else:
+                index_2 = 2*(ord(typ[1]) - ord("a"))
+                if type_0_binned:
+                    gal_win_zmin_2 = gal_bins[index_2]
+                    gal_win_zmax_2 = gal_bins[index_2 + 1]
+                else:
+                    gal_win_zmin_1 = gal_bins[index_2]
+                    gal_win_zmax_1 = gal_bins[index_2 + 1]
+            typ = typ[0] + "g"
+        return self._get_Cl(typ, ellmax, nu, (gal_win_zmin_1, gal_win_zmax_1, gal_win_zmin_2, gal_win_zmax_2), use_bins=True, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
 
     def _get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
         if typ[0] != typ[1]:
@@ -128,9 +131,13 @@ class Covariance:
             N = self.noise.get_gal_shot_N(ellmax=ellmax)
         elif typ[0] in self.binned_gal_types:
             index = 2 * (ord(typ[0]) - ord("a"))
+            if self.use_LSST_abcde:
+                N = self.noise.get_gal_shot_N(ellmax=ellmax, n=self._get_n(typ[0]))
+                gal_distro = f"LSST_{typ[0]}"
+                return self._get_Cl_gal(ellmax, gal_distro=gal_distro) + N
             gal_win_zmin = gal_bins[index]
             gal_win_zmax = gal_bins[index + 1]
-            N = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin, zmax=gal_win_zmax, n=self._get_n(typ[0]))
+            N = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin, zmax=gal_win_zmax)
             # N = 1e-100
             return self._get_Cl_gal(ellmax, gal_win_zmin, gal_win_zmax, gal_win_zmin, gal_win_zmax, gal_distro=gal_distro) + N
         else:
@@ -140,7 +147,7 @@ class Covariance:
     def _get_n(self, typ):
         if self.shot_noise is None:
             return 40
-        idx = 2 * (ord(typ[0]) - ord("a"))
+        idx = ord(typ[0]) - ord("a")
         return self.shot_noise[idx]
 
     def _get_C_inv(self, typs, Lmax, nu, gal_bins, gal_distro="LSST_gold"):
