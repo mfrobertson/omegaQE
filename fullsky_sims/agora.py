@@ -11,7 +11,7 @@ class Agora:
     def __init__(self, nthreads=1):
         self.data_dir = "/mnt/lustre/users/astro/mr671/AGORA/"
         self.cache_dir = f"/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/cache_ag/"
-        self.sims_dir = f"{self.data_dir}/cmb_sims/"
+        self.sims_dir = f"{self.data_dir}/cmbsim/"
         self.omegaqe_data = f"/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/data_ag/"
         self.nside = 8192
         self.Lmax_map = 5000
@@ -68,11 +68,17 @@ class Agora:
         if pixel_corr: gal_map = self._apply_pixel_correction(gal_map)
         return gal_map
     
-    def get_obs_cib_map(self, nu=353, pixel_corr=True, lensed=True, verbose=False, Kelvin=True):
+    def get_obs_cib_map(self, nu=353, pixel_corr=True, lensed=True, verbose=False, muK=True):
         if not lensed:
             raise ValueError("AGORA products are all lensed.")
-        cib_map = self.sht.read_map(f"{self.data_dir}/cib/agora_len_mag_cibmap_planck_{nu}ghz.fits")
-        if Kelvin: cib_map *= self.Jy_to_muK(nu*1e9)
+        if nu == 95:
+            nu = 90   #TODO: Prob should account for freq diff
+            cib_map = self.sht.read_map(f"{self.data_dir}/cib/agora_len_mag_cibmap_act_{nu}ghz_uk.fits")
+        elif nu == 150 or nu == 220:
+            cib_map = self.sht.read_map(f"{self.data_dir}/cib/agora_len_mag_cibmap_act_{nu}ghz_uk.fits")
+        else:
+            cib_map = self.sht.read_map(f"{self.data_dir}/cib/agora_len_mag_cibmap_planck_{nu}ghz.fits")
+            if muK: cib_map *= self.Jy_to_muK(nu*1e9)
         if pixel_corr: cib_map = self._apply_pixel_correction(cib_map)
         return cib_map
     
@@ -137,14 +143,33 @@ class Agora:
         return y_map
     
     def get_obs_tsz_map(self, nu, pixel_corr=True, lensed=True, agn_T_pow=80):
-        return self.get_obs_y_map(pixel_corr, lensed, agn_T_pow) * self.y_to_muK(nu)
+        return self.get_obs_y_map(pixel_corr, lensed, agn_T_pow) * self.y_to_muK(nu*1e9)
     
     def get_obs_rad_map(self, nu, pixel_corr=True, lensed=True):
         rad = self.sht.read_map(f"{self.data_dir}/radio/agora_radiomap_len_universemachine_trinity_{nu}ghz_randflux_datta2018_truncgauss.0.fits", field=0)
         rad[rad*self.sht.nside2pixarea()>6e-3]=0
-        rad *= self.Jy_to_muK(nu*1e9, -0.75)
+        rad *= self.Jy_to_muK(nu*1e9, alpha=-0.75)
         if pixel_corr: rad = self._apply_pixel_correction(rad)
         return rad
+    
+    @staticmethod
+    def get_mask_limits(nu):
+        if nu == 95:
+            return [6e-3, 1.12e-3, 1.12e-3]
+        if nu == 150:
+            return [6e-3, 1.68e-3, 1.68e-3]
+        if nu == 220:
+            return [6e-3, 4.45e-3, 4.45e-3]
+    
+    def get_obs_rad_maps(self, nu, pixel_corr=True, lensed=True):
+        # B-mode radio sources not correct (but seem unimportant anyway 1911.09466)
+        T, Q, U = self.sht.read_map(f"{self.data_dir}/radio/agora_radiomap_len_universemachine_trinity_{nu}ghz_randflux_datta2018_truncgauss.0.fits")
+        mask_limits = self.get_mask_limits(nu)
+        for iii, field in enumerate([T, Q, U]):
+            field[np.abs(T*self.sht.nside2pixarea())>mask_limits[iii]]=0
+            field *= self.Jy_to_muK(nu*1e9, alpha=-0.75)
+            if pixel_corr: field = self._apply_pixel_correction(field)
+        return T, Q, U
     
     def get_PK(self):
         return self.cosmo.get_matter_PK(typ="matter")
