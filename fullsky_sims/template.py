@@ -26,19 +26,20 @@ class Template:
             if "_iter" in cmb_lens_qe_typ:
                 iter=True
                 cmb_lens_qe_typ = cmb_lens_qe_typ[:-5]
-                mc_corr = self._get_iter_mc_corr_k(self.fields.exp, cmb_lens_qe_typ) if iter_mc_corr else np.ones(self.Lmax_map+1)
+                mc_corr = self._get_iter_mc_corr_k(self.fields.exp, cmb_lens_qe_typ, gmv) if iter_mc_corr else np.ones(self.Lmax_map+1)
             else:
                 iter=False
                 mc_corr = np.ones(self.Lmax_map+1)
             self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter, gmv=gmv, cmb_noise=cmb_noise)
-            self.kappa_rec = self.sht.almxfl(self.kappa_rec, mc_corr)
+            self.kappa_rec = self.sht.almxfl(self.kappa_rec, 1/mc_corr)
         self._populate_a_bars(tracer_noise, neg_tracers)
     
-    def _get_iter_mc_corr_k(self, exp, qe_typ):
+    def _get_iter_mc_corr_k(self, exp, qe_typ, gmv):
         offset=10
         nbins=50
         dir_loc = f"{self.fields.nbody.cache_dir}/_iter_norm/{exp}/{qe_typ}/{offset}_{nbins}"
-        return np.load(f"{dir_loc}/iter_norm_k.npy")
+        ext = "_gmv" if gmv else ""
+        return np.load(f"{dir_loc}/iter_norm_k{ext}.npy")
 
     def _get_F_L_and_C_inv(self, cmb_lens_qe_typ):
         if cmb_lens_qe_typ == "T":
