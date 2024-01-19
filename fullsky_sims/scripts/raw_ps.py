@@ -36,11 +36,13 @@ def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_n
             ext += "_gmv"
     elif gmv:
         ext = "__gmv"
+    else:
+        ext = "_"
 
     omega_tem = nbody.sht.read_map(f"{nbody.cache_dir}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{0}{tem_ext}.fits")
     omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{0}{ext}.fits")
     if iter_mc_corr:
-        mc_corr = _get_iter_mc_corr_w(exp, qe_typ, gmv) 
+        mc_corr = _get_iter_mc_corr_w(exp, qe_typ, gmv)
         omega_rec = nbody.sht.alm2map(nbody.sht.almxfl(nbody.sht.map2alm(omega_rec), 1/mc_corr))
     Cl_ww = nbody.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)
     for sim in range(1,nsims):
@@ -55,7 +57,7 @@ def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_n
 
 def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, iter_mc_corr, cmb_noise, gmv, nbody_name, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"exp: {exp}, tracer_fields: {tracer_fields}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, gauss_lss: {gauss_lss}, cmb_noise: {cmb_noise}, gmv: {gmv}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f"exp: {exp}, tracer_fields: {tracer_fields}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, len_lss: {len_lss}, cmb_noise: {cmb_noise}, gmv: {gmv}, nthreads: {nthreads}", 0, _id)
 
     global nbody
     nbody = fullsky_sims.wrapper_class(nbody_name, nthreads)
