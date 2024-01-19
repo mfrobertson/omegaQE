@@ -15,7 +15,7 @@ class Covariance:
         self.binned_gal_types = list("abcdef")
         self.test_types = list("xyz")
         self.use_LSST_abcde = False
-        self.shot_noise = [2.25, 3.11, 3.09, 2.61, 2.00] if self.use_LSST_abcde else None
+        self.shot_noise = [2.25, 3.11, 3.09, 2.61, 2.00] if self.use_LSST_abcde else None  # caution that one bin agora is using n=40 
 
     def get_log_sample_Ls(self, Lmin, Lmax, Nells=500, dL_small=1):
         floaty = Lmax / 1000
@@ -225,7 +225,7 @@ class Covariance:
         rho = cl_phi/(cl_phi + N0) 
         if zerod:
             rho[0] = 0
-        return rho
+        return np.sqrt(rho)
 
     def get_C_inv(self, typs, Lmax, nu, gal_bins=(None, None, None, None), gal_distro="LSST_gold"):
         """
