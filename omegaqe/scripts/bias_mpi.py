@@ -39,10 +39,19 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_pa
 
     
     lss_cls = None if lss_cls_path is None else _get_lss_cls_dict(lss_cls_path)
+    
+    if "_iter" in fields:
+        iter = True
+        qe_fields = fields[:-5]
+        mpi.output(f"Iter rec on fields {qe_fields}.", my_rank, _id)
+    else:
+        iter=False
+        qe_fields = fields
+        mpi.output(f"QE rec on fields {qe_fields}.", my_rank, _id)
 
     start_time = MPI.Wtime()
     # TODO: be careful of F_L directory location
-    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=fields, gmv=gmv, N_L1=N_L1, N_L3=N_L3, Ntheta12=Ntheta12, Ntheta13=Ntheta13, F_L_path=f"{omegaqe.CACHE_DIR}/_F_L", qe_setup_path=f"{omegaqe.CACHE_DIR}/_Cls/{exp}/Cls_cmb_6000.npy", verbose=verbose, noise=noise, lss_cls=lss_cls)
+    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=qe_fields, gmv=gmv, N_L1=N_L1, N_L3=N_L3, Ntheta12=Ntheta12, Ntheta13=Ntheta13, F_L_path=f"{omegaqe.CACHE_DIR}/_F_L", verbose=verbose, noise=noise, lss_cls=lss_cls, iter=iter)
     end_time = MPI.Wtime()
 
     mpi.output("Bias calculation finished.", my_rank, _id)
