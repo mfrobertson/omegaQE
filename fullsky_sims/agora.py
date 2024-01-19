@@ -5,6 +5,7 @@ import numpy as np
 from fullsky_sims.spherical import Spherical
 import healpy as hp
 from scipy.constants import Planck, physical_constants
+import copy
 
 class Agora:
 
@@ -17,6 +18,7 @@ class Agora:
         self.Lmax_map = 5000
         self.sht = Spherical(self.nside, self.Lmax_map, nthreads=nthreads)
         self.cosmo = Cosmology("AGORA")
+        self.cosmo.agora = True
         self._setup_dndz_splines()
         self.power = Powerspectra(cosmology=self.cosmo)
 
@@ -68,7 +70,7 @@ class Agora:
         if pixel_corr: gal_map = self._apply_pixel_correction(gal_map)
         return gal_map
     
-    def get_obs_cib_map(self, nu=353, pixel_corr=True, lensed=True, verbose=False, muK=True):
+    def get_obs_cib_map(self, nu=353, pixel_corr=True, lensed=True, verbose=False, muK=False):
         if not lensed:
             raise ValueError("AGORA products are all lensed.")
         if nu == 95:
@@ -78,7 +80,9 @@ class Agora:
             cib_map = self.sht.read_map(f"{self.data_dir}/cib/agora_len_mag_cibmap_act_{nu}ghz_uk.fits")
         else:
             cib_map = self.sht.read_map(f"{self.data_dir}/cib/agora_len_mag_cibmap_planck_{nu}ghz.fits")
-            if muK: cib_map *= self.Jy_to_muK(nu*1e9)
+            cib_map *= self.Jy_to_muK(nu*1e9)
+        if not muK:
+            cib_map /= self.Jy_to_muK(nu*1e9) * 1e6   # Converting to MJy
         if pixel_corr: cib_map = self._apply_pixel_correction(cib_map)
         return cib_map
     
@@ -164,9 +168,10 @@ class Agora:
     def get_obs_rad_maps(self, nu, pixel_corr=True, lensed=True):
         # B-mode radio sources not correct (but seem unimportant anyway 1911.09466)
         T, Q, U = self.sht.read_map(f"{self.data_dir}/radio/agora_radiomap_len_universemachine_trinity_{nu}ghz_randflux_datta2018_truncgauss.0.fits")
+        T_tmp = copy.deepcopy(T)
         mask_limits = self.get_mask_limits(nu)
         for iii, field in enumerate([T, Q, U]):
-            field[np.abs(T*self.sht.nside2pixarea())>mask_limits[iii]]=0
+            field[np.abs(T_tmp*self.sht.nside2pixarea())>mask_limits[iii]]=0
             field *= self.Jy_to_muK(nu*1e9, alpha=-0.75)
             if pixel_corr: field = self._apply_pixel_correction(field)
         return T, Q, U
