@@ -8,12 +8,13 @@ import vector
 
 def _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax):
     mode = Modecoupling()
-    if (zmin == 0 and zmax) is None:
+    if zmin == 0 and zmax is None:
         sep = getFileSep()
         mode_typ = "ww" if cmb else "rr"
         ells_sample = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "ells.npy")
         M = np.load(M_path + sep + mode_typ + sep + f"{M_ellmax}_{M_Nell}" + sep + "M.npy")
         return mode.spline(ells_sample, M)
+    print("Generating new M_ww... ")
     mode_typ = "kk" if cmb else "ss"
     return mode.spline(ells_sample=mode.generate_sample_ells(Lmax, 100), typ=mode_typ, star=False, zmin=zmin, zmax=zmax)
 
