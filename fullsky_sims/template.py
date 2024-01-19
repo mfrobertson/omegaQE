@@ -25,8 +25,8 @@ class Template:
             print(f"Using reconstructed kappa (QE: {cmb_lens_qe_typ}) in template.")
             if "_iter" in cmb_lens_qe_typ:
                 iter=True
-                cmb_lens_qe_typ = cmb_lens_qe_typ[:-5]
                 mc_corr = self._get_iter_mc_corr_k(self.fields.exp, cmb_lens_qe_typ, gmv) if iter_mc_corr else np.ones(self.Lmax_map+1)
+                cmb_lens_qe_typ = cmb_lens_qe_typ[:-5]
             else:
                 iter=False
                 mc_corr = np.ones(self.Lmax_map+1)
@@ -44,7 +44,7 @@ class Template:
     def _get_F_L_and_C_inv(self, cmb_lens_qe_typ):
         if cmb_lens_qe_typ == "T":
             qe_typ = "single"
-            fields = "T"
+            fields = "TT"
         elif cmb_lens_qe_typ == "TEB" or cmb_lens_qe_typ == "EB":
             qe_typ = "gmv"
             fields = cmb_lens_qe_typ
@@ -59,7 +59,7 @@ class Template:
         Ls = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
         F_L = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
         iter=True if "_iter" in qe_typ else False 
-        self.fields.setup_noise(qe=fields, iter=iter)
+        self.fields.setup_noise(qe=fields, iter=iter, gmv=qe_typ!="single")
         C_inv = self._fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)
         F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
         Ls_sample = np.arange(self.Lmax_map+1)
