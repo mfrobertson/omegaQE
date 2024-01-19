@@ -318,10 +318,10 @@ class Demnunii:
         ps = np.zeros((Nsnaps, np.size(ks)))
         # Will use Mead in interpolator over the edges (don't think it makes much difference)
         kmin = 2e-3
-        kmax = 1
         for iii, snap in enumerate(snaps[::-1]):
             ks_ = _get_k(snap)
             ps_ = _get_pk(snap)
+            kmax = 10 if snap > 30 else 1 
             # ps_ = self.gaussian_smooth_1d(ps_)    # Smoothing empirical Pk
             ps[iii,:] = power.get_matter_ps("matter", self._get_z(snap), ks)
             ks_overlap_idx = np.logical_and(ks>kmin,ks<kmax)
