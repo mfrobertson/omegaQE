@@ -33,6 +33,7 @@ class Noise:
         self.cmb_offset = 2
         self.cosmo = Cosmology() if cosmology is None else cosmology
         self.full_sky = full_sky
+        self.agora = self.cosmo.agora
 
     def _get_N0_phi(self, ellmax):
         return np.concatenate((np.zeros(self.cmb_offset), self.N0[0][:ellmax + 1 - self.cmb_offset]))
@@ -123,7 +124,9 @@ class Noise:
     def get_cib_shot_N(self, nu, ellmax=4000):
         # 1309.0382 Table 9
         ones = np.ones(ellmax + 1)
+        print(self.agora)
         if nu == 353e9:
+            if self.agora: return 426e-12  # My fit of AGORA cib between ell of 110 and 2000
             # N = 262 * 1e-12    # 1e-12 to change units to MJy^2/sr
             N = 225.6 * 1e-12   # From Toshiya, matching 1705.02332 and 2110.09730
         elif nu == 545e9:

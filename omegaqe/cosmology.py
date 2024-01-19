@@ -25,6 +25,7 @@ class Cosmology:
         self.dn_dz_splines = None
         self.dn_dz_tot_spline = None
         self.gal_biases = None
+        self.agora = False
 
     def _get_param_file(self, name):
         if name.lower() == "lensit":
@@ -349,7 +350,9 @@ class Cosmology:
     def _get_cib_norm(self, nu):
         if self.cib_norms is None:
             self.cib_norms = np.load(Path(__file__).parent/"data/planck_cib/b_c.npy")
+        print(self.agora)
         if nu == 353e9:
+            if self.agora: return 6.48e-65*1e-6   # My fit of AGORA cib between ell of 110 and 2000
             return 5.28654e-65*1e-6  # From Toshiya, matching 1705.02332 and 2110.09730
             # return 7.75714689e-65* 1e-6
             # return self.cib_norms[0]
