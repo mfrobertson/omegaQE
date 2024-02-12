@@ -5,6 +5,7 @@ import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 import vector
 from omegaqe.tools import getFileSep, path_exists
+from fullsky_sims.demnunii import Demnunii
 
 def _get_Cl_spline(typ):
     if typ == "kk":
@@ -60,7 +61,7 @@ def _get_N2_innerloop(XY, curl, gmv, fields, dThetal, dl, bi, w_prim, w_primprim
     I_C1_theta1 = C1_fac * dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * C_Ybar_l * g_XY * h_Y_C1)
     if not gmv:
         g_YX = global_qe.weight_function(XY[::-1], L_vec, l_vec, curl=curl, gmv=gmv, fields=fields, apply_Lcuts=True, resp_ps=response_ps)
-        I_C1_theta1 += dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * (C_Xbar_l * g_YX * h_X_C1))
+        I_C1_theta1 += C1_fac * dThetal * dl * np.sum(bi * ls[None, :] * w_prim * L_C1_fac * (C_Xbar_l * g_YX * h_X_C1))
     return I_A1_theta1 + I_C1_theta1
 
 def _get_N1_innerloop(XY, curl, gmv, fields, dThetal, dl, alpha, w_prim, w_primprim, ls, l_primprims, L_vec, L1_vec, L2_vec, l_vec, l_prim_vec, l_primprim_vec, noise, iter):
@@ -357,6 +358,13 @@ def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps=
 
     global global_qe, global_fish, N0_w_spline, N0_k_spline
     global_fish = Fisher(exp, qe_fields, gmv, ps, L_cuts, iter, False, data_dir, setup_bispectra=True)
+    
+    # DEMNUnii runs only ----------------
+    dm = Demnunii()
+    global_fish.covariance.power = dm.power
+    global_fish.covariance.noise.full_sky = True
+    # DEMNUnii runs only ----------------
+    
     # global_fish.setup_noise(exp, qe_fields, gmv, ps, L_cuts, iter, data_dir)
     # global_fish.setup_bispectra()
     if qe_setup_path is None:
