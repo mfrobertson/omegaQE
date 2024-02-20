@@ -27,15 +27,21 @@ def _get_iter_mc_corr_w(exp, qe_typ, gmv):
     return np.load(f"{dir_loc}/iter_norm_w{ext}.npy")
 
 
-def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_noise, gmv, nthreads, qe_typ):
+def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_noise, gmv, bh, nthreads, qe_typ):
     mpi.output(f"  sim: 0", 0, _id)
     nbody.sht.nthreads = nthreads
     if not cmb_noise:
         ext = "_nN"
         if gmv:
             ext += "_gmv"
+        if bh:
+            ext += "_bh"            
     elif gmv:
         ext = "__gmv"
+        if bh:
+            ext += "_bh" 
+    elif bh:
+        ext = "_bh"
     else:
         ext = "_"
 
@@ -55,9 +61,9 @@ def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_n
     return Cl_ww/nsims
 
 
-def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, iter_mc_corr, cmb_noise, gmv, nbody_name, nthreads, _id):
+def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, iter_mc_corr, cmb_noise, gmv, bh, nbody_name, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"exp: {exp}, tracer_fields: {tracer_fields}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, len_lss: {len_lss}, cmb_noise: {cmb_noise}, gmv: {gmv}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f"exp: {exp}, tracer_fields: {tracer_fields}, nsims: {nsims}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, len_lss: {len_lss}, cmb_noise: {cmb_noise}, gmv: {gmv}, bh: {bh}, nthreads: {nthreads}", 0, _id)
 
     global nbody
     nbody = fullsky_sims.wrapper_class(nbody_name, nthreads)
@@ -77,17 +83,19 @@ def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ
         ext += "_nN"
     if gmv:
         ext += "_gmv"
+    if bh:
+        ext += "_bh"
     for deflect_typ in deflect_typs:
         mpi.output(f"Type: {deflect_typ}", 0, _id)
-        ps = _get_ps(exp, tracer_fields, deflect_typ, ext, nsims, iter_mc_corr, cmb_noise, gmv, nthreads, qe_typ)
+        ps = _get_ps(exp, tracer_fields, deflect_typ, ext, nsims, iter_mc_corr, cmb_noise, gmv, bh, nthreads, qe_typ)
         _save_ps(ps, exp, tracer_fields, nsims, deflect_typ, ext, qe_typ, cmb_noise)
 
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 15:
+    if len(args) != 16:
         raise ValueError(
-            "Must supply arguments: exp tracer_fields tracer_noise kappa_rec qe_typ nsims deflect_typ gauss_lss len_lss iter_mc_corr cmb_noise gmv nbody nthreads _id")
+            "Must supply arguments: exp tracer_fields tracer_noise kappa_rec qe_typ nsims deflect_typ gauss_lss len_lss iter_mc_corr cmb_noise gmv bh nbody nthreads _id")
     exp = str(args[0])
     tracer_fields = str(args[1])
     tracer_noise = parse_boolean(args[2])
@@ -100,7 +108,8 @@ if __name__ == '__main__':
     iter_mc_corr = parse_boolean(args[9])
     cmb_noise = parse_boolean(args[10])
     gmv = parse_boolean(args[11])
-    nbody_name = str(args[12])
-    nthreads = int(args[13])
-    _id = str(args[14])
-    main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, iter_mc_corr, cmb_noise, gmv, nbody_name, nthreads, _id)
+    bh = parse_boolean(args[12])
+    nbody_name = str(args[13])
+    nthreads = int(args[14])
+    _id = str(args[15])
+    main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ, gauss_lss, len_lss, iter_mc_corr, cmb_noise, gmv, bh, nbody_name, nthreads, _id)
