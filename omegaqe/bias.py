@@ -6,6 +6,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 import vector
 from omegaqe.tools import getFileSep, path_exists
 from fullsky_sims.demnunii import Demnunii
+from camb.correlations import lensed_cls
 
 def _get_Cl_spline(typ):
     if typ == "kk":
@@ -345,6 +346,25 @@ def _cache_lss_cls(lss_cls, iter):
     Cl_Ik *= np.sqrt(1-rho**2)
     Cl_Ik_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_Ik[1:])
 
+def _setup_delen_cmb_cls():
+    # TODO: note that lensed grad cls are unchanged in N2 calc 
+    Lmax = 6000
+    Ls = np.arange(Lmax + 1)
+    typs = np.array(["TT", "EE", "BB", "TE"])
+    unl_cls = np.zeros((Lmax + 1, np.size(typs)))
+    cl2dl = Ls * (Ls + 1) / (2 * np.pi)
+    for iii, typ in enumerate(typs):
+        unl_cls[:, iii] = global_qe.cosmo.get_unlens_ps(typ, Lmax)[:Lmax+1] * cl2dl
+    delen_len_cls = lensed_cls(unl_cls, Cl_kk_spline(Ls))
+
+    for iii, typ in enumerate(typs):
+        delen_len_cl = delen_len_cls[:, iii] / cl2dl
+        global_qe.cmb[typ].lenCl_spline = InterpolatedUnivariateSpline(Ls[2:], delen_len_cl[2:])
+
+        if typ[0] != typ[1]:
+            global_qe.cmb[typ[::-1]].lenCl_spline = InterpolatedUnivariateSpline(Ls[2:], delen_len_cl[2:])
+
+
 def _cache_splines(F_L_path, bi_typ, lss_cls, iter):
     global F_L_spline, C_inv_splines
     sample_Ls, F_L = _get_cached_F_L(F_L_path, bi_typ, iter)
@@ -353,6 +373,8 @@ def _cache_splines(F_L_path, bi_typ, lss_cls, iter):
     C_inv_splines = _build_C_inv_splines(C_inv, bi_typ)
 
     _cache_lss_cls(lss_cls, iter)
+    if iter:
+        _setup_delen_cmb_cls()
 
 def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir=omegaqe.DATA_DIR, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False, noise=True, lss_cls=None):
 
