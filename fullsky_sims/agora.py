@@ -178,3 +178,36 @@ class Agora:
     
     def get_PK(self):
         return self.cosmo.get_matter_PK(typ="matter")
+    
+    def create_fg_maps(self, nu, tsz, ksz, cib, rad, gauss):
+    
+        npix = self.sht.nside2npix(self.nside)
+        T_fg = np.zeros(npix)
+        Q_fg = np.zeros(npix)
+        U_fg = np.zeros(npix)
+        
+        if tsz:
+            T_fg += self.get_obs_tsz_map(nu)
+        if ksz:
+            T_fg += self.get_obs_ksz_map()
+        if cib:
+            T_fg += self.get_obs_cib_map(nu, muK=True)
+        if rad:
+            T_rad, Q_rad, U_rad = self.get_obs_rad_maps(nu)
+            T_fg += T_rad
+            Q_fg += Q_rad
+            U_fg += U_rad
+
+        
+        # TODO: create seperate method to include cross-correlations (also between freqs?) 
+        if gauss:
+            cl_T_fg = self.sht.map2cl(T_fg)
+            fg_lm_gauss = self.sht.synalm(cl_T_fg, self.sht.lmax)
+            T_fg = self.sht.alm2map(fg_lm_gauss)
+
+            cl_E_fg, cl_B_fg = self.sht.map2cl_spin((Q_fg, U_fg), 2)
+            E_fg_lm_gauss = self.sht.synalm(cl_E_fg, self.sht.lmax)
+            B_fg_lm_gauss = self.sht.synalm(cl_B_fg, self.sht.lmax)
+            Q_fg, U_fg = self.sht.alm2map_spin((E_fg_lm_gauss, B_fg_lm_gauss), 2)
+            
+        return T_fg, Q_fg, U_fg

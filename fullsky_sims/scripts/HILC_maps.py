@@ -4,6 +4,7 @@ import sys
 import os
 from omegaqe.tools import mpi, none_or_str, parse_boolean
 from fullsky_sims.agora import Agora
+from copy import deepcopy
 
 
 def setup_dir(full_dir):
@@ -68,23 +69,28 @@ def main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, nthreads, _id)
     wE = _get_smoothed_weights(exp, "E")
     wB = _get_smoothed_weights(exp, "B")
     freqs = [95, 150, 220]
+    Ts_fg = np.empty((3, ag.sht.nside2npix(ag.nside)))
+    Qs_fg = np.empty((3, ag.sht.nside2npix(ag.nside)))
+    Us_fg = np.empty((3, ag.sht.nside2npix(ag.nside)))
+    for iii, freq in enumerate(freqs):
+        T_fg, Q_fg, U_fg = ag.create_fg_maps(freq, tsz, ksz, cib, rad, gauss)
+        Ts_fg[iii,:] = T_fg
+        Qs_fg[iii,:] = Q_fg
+        Us_fg[iii,:] = U_fg
     for sim in np.arange(start, end):
         mpi.output(f"Sim: {sim}", 0, _id)
         
         Ts = np.empty((3, ag.sht.nside2npix(ag.nside)))
         Qs = np.empty((3, ag.sht.nside2npix(ag.nside)))
         Us = np.empty((3, ag.sht.nside2npix(ag.nside)))
+        T, Q, U = ag.sht.read_map(f"{ag.sims_dir}/unlensed/TQU_{sim}.fits")
         for iii, freq in enumerate(freqs):
-            T, Q, U = ag.sht.read_map(f"{ag.sims_dir}/{deflect_typ}/foreground_maps_{freq}{dir_name_ext}/TQU_{sim}.fits")
-            Ts[iii,:] = T
-            Qs[iii,:] = Q
-            Us[iii,:] = U
+            Ts[iii,:] = T + deepcopy(Ts_fg[iii,:])
+            Qs[iii,:] = Q + deepcopy(Qs_fg[iii,:])
+            Us[iii,:] = U + deepcopy(Us_fg[iii,:])
         T_ilc = _get_Tilc(Ts, wT)
         Q_ilc, U_ilc = _get_EBilc(Qs, Us, wE, wB)
         ag.sht.write_map(f"{dir_name}/TQU_{sim}.fits", (T_ilc, Q_ilc, U_ilc))
-
-        
-
         
 
 if __name__ == '__main__':
