@@ -38,8 +38,8 @@ def main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, nbody_label, nt
         dir_name += "_cib"
     if rad:
         T_fg += T_rad
-        # Q_fg += Q_rad
-        # U_fg += U_rad
+        Q_fg += Q_rad
+        U_fg += U_rad
         dir_name += "_rad"
 
     full_dir = f"{nbody.sims_dir}/{deflect_typ}/{dir_name}"
@@ -52,10 +52,17 @@ def main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, nbody_label, nt
             cl_T_fg = nbody.sht.map2cl(T_fg)
             fg_lm_gauss = nbody.sht.synalm(cl_T_fg, nbody.sht.lmax)
             T += nbody.sht.alm2map(fg_lm_gauss)
+
+            cl_E_fg, cl_B_fg = nbody.sht.map2cl_spin((Q_fg, U_fg), 2)
+            E_fg_lm_gauss = nbody.sht.synalm(cl_E_fg, nbody.sht.lmax)
+            B_fg_lm_gauss = nbody.sht.synalm(cl_B_fg, nbody.sht.lmax)
+            Q_fg, U_fg = nbody.sht.alm2map_spin((E_fg_lm_gauss, B_fg_lm_gauss), 2)
+            Q += Q_fg
+            U += U_fg
         else:           
             T += T_fg
-            # Q += Q_fg
-            # U += U_fg
+            Q += Q_fg
+            U += U_fg
         nbody.sht.write_map(f"{full_dir}/TQU_{sim}.fits", (T, Q, U))
 
 if __name__ == '__main__':

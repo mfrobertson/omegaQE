@@ -104,6 +104,13 @@ class Spherical:
         alm1 = self.map2alm(map1, lmax, nthreads)
         alm2 = self.map2alm(map2, lmax, nthreads) if map2 is not None else alm1
         return self.alm2cl(alm1, alm2, lmax_out, lmax, pix_corr, smoothing_nbins)
+    
+    def map2cl_spin(self, maps1, maps2=None, spin=2, lmax_out=None, lmax=None, nthreads=None, pix_corr=None, smoothing_nbins=None):
+        alm1_e, alm1_b = self.map2alm_spin(maps1, lmax, nthreads)
+        alm2_e, alm2_b = self.map2alm_spin(maps2, lmax, nthreads) if maps2 is not None else alm1_e, alm1_b
+        cl_e = self.alm2cl(alm1_e, alm2_e, lmax_out, lmax, pix_corr, smoothing_nbins)
+        cl_b = self.alm2cl(alm1_b, alm2_b, lmax_out, lmax, pix_corr, smoothing_nbins)
+        return cl_e, cl_b
 
     def synfast(self, Cl, lmax=None):
         lmax = self._get_lmax(lmax)
