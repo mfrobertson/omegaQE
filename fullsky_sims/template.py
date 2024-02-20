@@ -4,7 +4,7 @@ import datetime
 
 class Template:
 
-    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False, gmv=True, cmb_noise=True):
+    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False, gmv=True, bh=False, cmb_noise=True):
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
@@ -30,7 +30,7 @@ class Template:
             else:
                 iter=False
                 mc_corr = np.ones(self.Lmax_map+1)
-            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter, gmv=gmv, cmb_noise=cmb_noise)
+            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter, gmv=gmv, bias_hard=bh, cmb_noise=cmb_noise)
             self.kappa_rec = self.sht.almxfl(self.kappa_rec, 1/mc_corr)
         self._populate_a_bars(tracer_noise, neg_tracers)
     
@@ -54,10 +54,22 @@ class Template:
         elif cmb_lens_qe_typ == "EB_iter":
             qe_typ = "gmv_iter"
             fields = "EB"
+        elif cmb_lens_qe_typ == "T_iter":
+            qe_typ = "single_iter"
+            fields = "TT"
         else:
             raise ValueError(f"Supplied cmb_lens_qe_typ {cmb_lens_qe_typ} not of supported typs; T, EB, TEB, TEB_iter, or EB_iter")
         Ls = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
         F_L = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
+        
+        # # tmp 
+        # C_omega_old = np.load(f"{self.fields.nbody.cache_dir}/_C_omega/C_omega.npy")
+        # omega_Ls_old = np.load(f"{self.fields.nbody.cache_dir}/_C_omega/Ls.npy")
+        # C_omega = self.fields.nbody.sht.map2cl(self.fields.nbody.get_omega_map(), smoothing_nbins=150)  #tmp
+        # omega_Ls = np.arange(np.size(C_omega))  #tmp
+        # fac = InterpolatedUnivariateSpline(omega_Ls, C_omega_old/C_omega)(Ls)
+        # F_L *= fac
+
         iter=True if "_iter" in qe_typ else False 
         self.fields.setup_noise(qe=fields, iter=iter, gmv=qe_typ!="single")
         C_inv = self._fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)

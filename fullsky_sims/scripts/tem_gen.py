@@ -4,7 +4,7 @@ import sys
 import os
 
 
-def save_tem_map(tem_map, tem_dir, sim, tracer_noise, kappa_rec, kappa_qe_typ, gauss_lss, len_lss, iter_mc_corr, gmv, cmb_noise, sht):
+def save_tem_map(tem_map, tem_dir, sim, tracer_noise, kappa_rec, kappa_qe_typ, gauss_lss, len_lss, iter_mc_corr, gmv, bh, cmb_noise, sht):
     if not os.path.exists(tem_dir):
         os.makedirs(tem_dir)
     filename = f"omega_tem_{sim}"
@@ -21,14 +21,16 @@ def save_tem_map(tem_map, tem_dir, sim, tracer_noise, kappa_rec, kappa_qe_typ, g
         extension += "_nN"
     if gmv:
         extension += "_gmv"
+    if bh:
+        extension += "_bh"
     full_path = f"{tem_dir}/{filename}{extension}.fits"
     mpi.output(f"Saving template to {full_path}", 0, _id)
     sht.write_map(f"{full_path}", tem_map)
 
 
-def main(exp, field_typs, Nchi, tracer_noise, start, end, kappa_rec, kappa_qe_typ, deflect_typ, gauss_lss, len_lss, iter_mc_corr, gmv, cmb_noise, nbody, nthreads, _id):
+def main(exp, field_typs, Nchi, tracer_noise, start, end, kappa_rec, kappa_qe_typ, deflect_typ, gauss_lss, len_lss, iter_mc_corr, gmv, bh, cmb_noise, nbody, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"exp: {exp}, fields: {field_typs}, Nchi: {Nchi}, start: {start}, end: {end}, tracer_noise: {tracer_noise}, kappa_rec: {kappa_rec}, kappa_qe_typ: {kappa_qe_typ}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, len_lss: {len_lss}, nthreads: {nthreads}, iter_mc_corr: {iter_mc_corr}, gmv: {gmv}, cmb_noise: {cmb_noise}, nbody: {nbody}", 0, _id)
+    mpi.output(f"exp: {exp}, fields: {field_typs}, Nchi: {Nchi}, start: {start}, end: {end}, tracer_noise: {tracer_noise}, kappa_rec: {kappa_rec}, kappa_qe_typ: {kappa_qe_typ}, deflect_typ: {deflect_typ}, gauss_lss: {gauss_lss}, len_lss: {len_lss}, nthreads: {nthreads}, iter_mc_corr: {iter_mc_corr}, gmv: {gmv}, bh: {bh}, cmb_noise: {cmb_noise}, nbody: {nbody}", 0, _id)
 
     deflect_typs = ["pbdem_dem", "pbdem_zero"] if deflect_typ is None else [deflect_typ]
     for sim in range(start, end):
@@ -44,17 +46,17 @@ def main(exp, field_typs, Nchi, tracer_noise, start, end, kappa_rec, kappa_qe_ty
             mpi.output(f"  type: {deflect_typ}", 0, _id)
             neg_tracers = True if deflect_typ=="npbdem_dem" else False
             kappa_rec_iii = False if deflect_typ == "zero_dem" else kappa_rec
-            omega_tem = fields.omega_template(Nchi, tracer_noise=tracer_noise, use_kappa_rec=kappa_rec_iii, kappa_rec_qe_typ=kappa_qe_typ, neg_tracers=neg_tracers, iter_mc_corr=iter_mc_corr, gmv=gmv, cmb_noise=cmb_noise)
+            omega_tem = fields.omega_template(Nchi, tracer_noise=tracer_noise, use_kappa_rec=kappa_rec_iii, kappa_rec_qe_typ=kappa_qe_typ, neg_tracers=neg_tracers, iter_mc_corr=iter_mc_corr, gmv=gmv, bh=bh, cmb_noise=cmb_noise)
             tem_map = fields.sht.alm2map(omega_tem, nthreads=fields.nthreads)
             tem_dir = f"{fields.nbody.cache_dir}/_tems/{deflect_typ}/{exp}/{field_typs}"
-            save_tem_map(tem_map, tem_dir, sim, tracer_noise, kappa_rec_iii, kappa_qe_typ, gauss_lss, len_lss, iter_mc_corr, gmv, cmb_noise, fields.sht)
+            save_tem_map(tem_map, tem_dir, sim, tracer_noise, kappa_rec_iii, kappa_qe_typ, gauss_lss, len_lss, iter_mc_corr, gmv, bh, cmb_noise, fields.sht)
 
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 17:
+    if len(args) != 18:
         raise ValueError(
-            "Must supply arguments: exp fields Nchi tracer_noise start end kappa_rec kappa_qe_typ deflect_typ gauss_lss len_lss iter_mc_corr gmv cmb_noise nbody nthreads _id")
+            "Must supply arguments: exp fields Nchi tracer_noise start end kappa_rec kappa_qe_typ deflect_typ gauss_lss len_lss iter_mc_corr gmv bh cmb_noise nbody nthreads _id")
     exp = str(args[0])
     fields = str(args[1])
     Nchi = int(args[2])
@@ -68,8 +70,9 @@ if __name__ == '__main__':
     len_lss = parse_boolean(args[10])
     iter_mc_corr = parse_boolean(args[11])
     gmv = parse_boolean(args[12])
-    cmb_noise = parse_boolean(args[13])
-    nbody = str(args[14])
-    nthreads = int(args[15])
-    _id = str(args[16])
-    main(exp, fields, Nchi, tracer_noise, start, end, kappa_rec, kappa_qe_typ, deflect_typ, gauss_lss, len_lss, iter_mc_corr, gmv, cmb_noise, nbody, nthreads, _id)
+    bh = parse_boolean(args[13])
+    cmb_noise = parse_boolean(args[14])
+    nbody = str(args[15])
+    nthreads = int(args[16])
+    _id = str(args[17])
+    main(exp, fields, Nchi, tracer_noise, start, end, kappa_rec, kappa_qe_typ, deflect_typ, gauss_lss, len_lss, iter_mc_corr, gmv, bh, cmb_noise, nbody, nthreads, _id)

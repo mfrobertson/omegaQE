@@ -20,6 +20,7 @@ from delensalot.core.opfilt.MAP_opfilt_iso_t import alm_filter_nlev_wl as alm_fi
 from delensalot.utility import utils_steps
 from delensalot.core.iterator.cs_iterator_multi import iterator_cstmf
 from delensalot.core.iterator.statics import rec as Rec
+from delensalot.core import cachers
 from lensitbiases import n1_fft
 from scipy.interpolate import InterpolatedUnivariateSpline
 import copy
@@ -145,14 +146,15 @@ class Reconstruction:
     def _raise_typ_error(self, typ):
         raise ValueError(f"QE type {typ} not recognized. Recognized types included TEB (for mv), EB (for pol only), or T.")
 
-    def _get_qe_key(self, typ, curl=False):
+    def _get_qe_key(self, typ, curl=False, bias_hard=False):
         potential = "x" if curl else "p"
+        bh_ext = "_bh_s" if bias_hard else "" # If bias_hard it will mitigate aganst point sources
         if typ == "TEB":
-            return potential
+            return potential + bh_ext
         if typ == "T":
-            return potential + "tt"
+            return potential + "tt" + bh_ext
         if typ == "EB":
-            return potential + "_p"
+            return potential + "_p" + bh_ext
         self._raise_typ_error(typ)
 
     def _get_cov(self, cl_dict, iii, jjj, noise):
@@ -205,12 +207,12 @@ class Reconstruction:
         if gmv:
             filt_matrix = self._get_filt_matrix(self.cl_len, noise=True)
             weighted_maps_lib = filt_simple.library_fullsky_alms_jTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf, filt_matrix)
-            self.qlms_lib = qest.library_jtTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.nbody.nside, lmax_qlm=self.Lmax_map)
             self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, filt_matrix, self.Lmax_map)
+            self.qlms_lib = qest.library_jtTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.nbody.nside, lmax_qlm=self.Lmax_map, resplib=self.qresp_lib)
         else:
             weighted_maps_lib = filt_simple.library_fullsky_alms_sepTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
-            self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, cl_wf['te'], self.nbody.nside, lmax_qlm=self.Lmax_map)
             self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, self.filt_dict, self.Lmax_map)
+            self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, cl_wf['te'], self.nbody.nside, lmax_qlm=self.Lmax_map, resplib=self.qresp_lib)
         self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, cl_wf, self.Lmax_map)
         self.setup = True
 
@@ -330,18 +332,19 @@ class Reconstruction:
         self.iter_rec_data = Rec.load_plms(lib_dir_iterator, iters)
         self.iter_typ = typ
         self.niters = itmax
+        self.iter_lib = lib_dir_iterator
 
-    def get_phi_rec(self, typ):
+    def get_phi_rec(self, typ, bias_hard=False):
         self._check_setup()
-        qe_key = self._get_qe_key(typ, curl=False)
+        qe_key = self._get_qe_key(typ, curl=False, bias_hard=bias_hard)
         qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
         resp = self.get_response(typ)
         qnorm = utils.cli(resp)
         return self.sht.almxfl(qlm, qnorm)
 
-    def get_curl_rec(self, typ):
+    def get_curl_rec(self, typ, bias_hard=False):
         self._check_setup()
-        qe_key = self._get_qe_key(typ, curl=True)
+        qe_key = self._get_qe_key(typ, curl=True, bias_hard=bias_hard)
         qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
         resp = self.get_response(typ, True)
         qnorm = utils.cli(resp)
@@ -367,6 +370,7 @@ class Reconstruction:
     
     def get_wiener(self, typ, qe_typ, iter):
         Cl = self._get_Cl_curl() if typ == "curl" else self._get_Cl_phi()
+        qe_typ = "TT" if qe_typ == "T" else qe_typ
         N0 = self.noise.get_N0(typ, self.Lmax_map, qe=qe_typ, gmv=True, exp=self.exp, T_Lmin=self.L_cuts[0], T_Lmax=self.L_cuts[1], P_Lmin=self.L_cuts[2], P_Lmax=self.L_cuts[3], iter=iter, recalc_N0=True)
         return Cl/(Cl + N0)
 
