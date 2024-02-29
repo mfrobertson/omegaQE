@@ -34,11 +34,15 @@ class Bispectra:
         self._M_splines = dict.fromkeys(self._mode.get_M_types())
 
     def _triangle_dot_product(self, mag1, mag2, mag3):
-        return (mag1**2 + mag2**2 - mag3**2)/2
+        res = (mag1**2 + mag2**2 - mag3**2)/2
+        res[np.isnan(res)] = 0  # tmp
+        return res
 
     def _triangle_cross_product(self, mag1, mag2, mag3):
         s = (mag1 + mag2 + mag3)/2
-        return 2 * np.sqrt(s*(s-mag1)*(s-mag2)*(s-mag3))
+        res = 2 * np.sqrt(s*(s-mag1)*(s-mag2)*(s-mag3))
+        res[np.isnan(res)] = 0   # tmp
+        return res
 
     def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
         L12_dot = None
@@ -58,7 +62,9 @@ class Bispectra:
         M1, M2, L12_dot = self._bispectra_prep("kkk", L1, L2, L3, M_spline, zmin, zmax)
         L13_dot = self._triangle_dot_product(L1, L3, L2)
         L23_dot = self._triangle_dot_product(L2, L3, L1)
-        return 2*L12_dot*(L13_dot*M1 + L23_dot*M2)/(L1**2 * L2**2)
+        res = 2*L12_dot*(L13_dot*M1 + L23_dot*M2)/(L1**2 * L2**2)
+        res[np.isnan(res)] = 0
+        return res
 
     def _kappa1_kappa2_kappa1(self, L1, L2, L3, M_spline, zmin, zmax):
         return self._kappa1_kappa1_kappa2(L3, L1, L2, M_spline, zmin, zmax)
