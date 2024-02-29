@@ -184,6 +184,10 @@ class Fisher:
             dx = cosmo._pars.DarkEnergy.wa * default_dx if dx is None else dx
             if dx == 0: dx = default_dx
             cosmo._pars.DarkEnergy.wa += dx
+        if param == "sig8":
+            dx = np.sqrt(cosmo._pars.InitPower.As * default_dx) if dx is None else dx
+            if dx == 0: dx = default_dx
+            cosmo._pars.InitPower.As += dx
         matter_PK = cosmo.get_matter_PK(typ="matter")
         weyl_PK = cosmo.get_matter_PK(typ="weyl")
         matter_weyl_PK = cosmo.get_matter_PK(typ="matter-weyl")
@@ -198,13 +202,13 @@ class Fisher:
         param, dx = param_dx
         if param is None:
             return self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro)
-        dx = self.change_cosmology(param, dx, True)
+        self.change_cosmology(param, dx, True)
         bi_x_h_minus = self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro)
         self.change_cosmology()
-        dx = self.change_cosmology(param, dx)
+        h = self.change_cosmology(param, dx)
         bi_x_h = self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro)
         self.change_cosmology()
-        return (bi_x_h - bi_x_h_minus)/(2*dx)
+        return (bi_x_h - bi_x_h_minus)/(2*h)
 
     def _get_thetas(self, Ntheta):
         dTheta = np.pi / Ntheta
