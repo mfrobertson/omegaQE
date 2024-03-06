@@ -1,4 +1,4 @@
-#declare -a arr=("kk" "gg" "gk" "kg" "II" "Ik" "kI" "gI" "Ig")
+declare -a arr=("kk" "gg" "gk" "kg" "II" "Ik" "kI" "gI" "Ig")
 #declare -a arr=("II" "Ik" "kI" "gI" "Ig")
 #declare -a arr=("ss")
 declare -a arr=("kk")

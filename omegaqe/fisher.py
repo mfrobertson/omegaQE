@@ -1,5 +1,5 @@
 import numpy as np
-
+from camb import constants
 import omegaqe
 from omegaqe.bispectra import Bispectra
 from omegaqe.covariance import Covariance
@@ -151,22 +151,33 @@ class Fisher:
         cosmo = self.bi._mode._powerspectra.cosmo
         if param is None:
             cosmo.set_cosmology()
+        default_H0 = cosmo._pars.H0
+        default_ombh2 = cosmo._pars.ombh2
+        default_omch2 = cosmo._pars.omch2
+        default_omk = cosmo._pars.omk
+        default_mnu = 0.06
+        default_tau = cosmo._pars.Reion.optical_depth
+        cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
         if param == "H0":
             dx = cosmo._pars.H0 * default_dx if dx is None else dx
-            cosmo._pars.H0 += dx
+            cosmo._pars.set_cosmology(H0=default_H0+dx, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
         if param == "ombh2":
             dx = cosmo._pars.ombh2 * default_dx if dx is None else dx
-            cosmo._pars.ombh2 += dx
+            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2+dx, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
         if param == "omch2":
             dx = cosmo._pars.omch2 * default_dx if dx is None else dx
-            cosmo._pars.omch2 += dx
+            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2+dx, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
         if param == "omk":
             dx = cosmo._pars.omk * default_dx if dx is None else dx
             if dx == 0: dx = default_dx
-            cosmo._pars.omk += dx
+            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk+dx, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+        if param == "mnu":
+            dx = default_mnu * default_dx if dx is None else dx
+            if dx == 0: dx = default_dx
+            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu+dx, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
         if param == "tau":
             dx = cosmo._pars.Reion.optical_depth * default_dx if dx is None else dx
-            cosmo._pars.Reion.optical_depth += dx
+            cosmo._pars.set_cosmology(H0=default_H0+dx, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau+dx, nnu=3.046, standard_neutrino_neff=3.046)
         if param == "As":
             dx = cosmo._pars.InitPower.As * default_dx if dx is None else dx
             cosmo._pars.InitPower.As += dx
@@ -185,9 +196,12 @@ class Fisher:
             if dx == 0: dx = default_dx
             cosmo._pars.DarkEnergy.wa += dx
         if param == "sig8":
-            dx = np.sqrt(cosmo._pars.InitPower.As * default_dx) if dx is None else dx
+            sig8 = cosmo._results.get_sigma8_0()
+            As = cosmo._pars.InitPower.As
+            dx = As * default_dx if dx is None else dx
             if dx == 0: dx = default_dx
             cosmo._pars.InitPower.As += dx
+            dx = sig8 * np.sqrt(dx/As)
         matter_PK = cosmo.get_matter_PK(typ="matter")
         weyl_PK = cosmo.get_matter_PK(typ="weyl")
         matter_weyl_PK = cosmo.get_matter_PK(typ="matter-weyl")
@@ -196,6 +210,8 @@ class Fisher:
         self.bi._mode._powerspectra.weyl_PK = weyl_PK
         self.bi._mode._powerspectra.matter_weyl_PK = matter_weyl_PK
         self.bi._M_splines = dict.fromkeys(self.bi._mode.get_M_types())
+        self.covariance.power = self.bi._mode._powerspectra
+        self.power = self.covariance.power
         return dx
 
     def _get_bispectrum(self, typ, L1, L2, L3=None, theta=None, param_dx=(None, None), zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
@@ -508,6 +524,44 @@ class Fisher:
         if param is not None and Ls is not None:
             raise RuntimeWarning("Are you sure you want to do param Fisher using sample method?")
         return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ls, dL2, Ntheta, f_sky, verbose, nu, gal_bins, save_array, only_bins, gal_distro=gal_distro, param=param, dx=dx)
+
+    def get_kappa_ps_Fisher(self, Lmax, f_sky=1, auto=True, Lmin=30, param=None, dx=None):
+        """
+        TODO: Check equation !!!!!!!!!!!
+        Parameters
+        ----------
+        Lmax
+        f_sky
+        auto
+
+        Returns
+        -------
+
+        """
+        def _get_dCl(param, dx):
+            self.change_cosmology(param, dx, True)
+            Cl_x_h_minus = self.power.get_kappa_ps(ells)
+            h = self.change_cosmology(param, dx)
+            Cl_x_h = self.power.get_kappa_ps(ells)
+            self.change_cosmology()
+            return (Cl_x_h - Cl_x_h_minus) / (2 * h)
+
+        ells = np.arange(Lmin, Lmax + 1)
+        Cl_kk = self.power.get_kappa_ps(ells)
+        if param is None:
+            Cl_1 = Cl_2 = Cl_kk
+        else:
+            if np.size(param) == 2:
+                Cl_1 = _get_dCl(param[0], dx)
+                Cl_2 = _get_dCl(param[1], dx)
+            else:
+                Cl_1 = Cl_2 = _get_dCl(param, dx)
+        N0 = self.covariance.noise.get_N0("kappa", Lmax)
+        if auto:
+            var = 2 / (2 * ells + 1) * (Cl_kk + N0[ells]) ** 2
+        else:
+            var = 2 / (2 * ells + 1) * (Cl_kk**2 + 0.5*(N0[ells] * Cl_kk))
+        return f_sky * np.sum(Cl_1 * Cl_2 / var)
 
     def get_rotation_ps_Fisher(self, Lmax, M_path, f_sky=1, auto=True, camb=False, cmb=True, Lmin=30, n=40):
         """

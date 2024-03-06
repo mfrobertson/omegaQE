@@ -3,7 +3,9 @@ import omegaqe
 import omegaqe.tools as tools
 import sys
 from omegaqe.modecoupling import Modecoupling
+from DEMNUnii.demnunii import Demnunii
 
+dm = Demnunii(nthreads=8)
 cache_dir = omegaqe.CACHE_DIR
 
 def M_matrix(mode, ells, star, typ):
@@ -19,7 +21,7 @@ def M_matrix(mode, ells, star, typ):
 
 def save(ells, M, star, typ):
     sep = tools.getFileSep()
-    folder = cache_dir + sep + "_M" + sep + typ + sep + f"{ellmax}_{Nells}"
+    folder = cache_dir + sep + "_M_dm" + sep + typ + sep + f"{ellmax}_{Nells}"
     if star:
         folder += "_s"
     filename_M = "M.npy"
@@ -32,6 +34,9 @@ def save(ells, M, star, typ):
 
 def main(ellmax, Nells, star, typ):
     mode = Modecoupling()
+    matter_PK = dm.get_PK()
+    mode.matter_PK = matter_PK
+    mode._powerspectra.matter_PK = matter_PK
     ells = mode.generate_sample_ells(ellmax, Nells)
     M = M_matrix(mode, ells, star, typ)
     save(ells, M, star, typ)

@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 import vector
 from omegaqe.tools import getFileSep, path_exists
-from fullsky_sims.demnunii import Demnunii
+# from fullsky_sims.demnunii import Demnunii
 from camb.correlations import lensed_cls
 
 def _get_Cl_spline(typ):
@@ -382,9 +382,9 @@ def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps=
     global_fish = Fisher(exp, qe_fields, gmv, ps, L_cuts, iter, False, data_dir, setup_bispectra=True)
     
     # DEMNUnii runs only ----------------
-    dm = Demnunii()
-    global_fish.covariance.power = dm.power
-    global_fish.covariance.noise.full_sky = True
+    # dm = Demnunii()
+    # global_fish.covariance.power = dm.power
+    # global_fish.covariance.noise.full_sky = True
     # DEMNUnii runs only ----------------
     
     # global_fish.setup_noise(exp, qe_fields, gmv, ps, L_cuts, iter, data_dir)

@@ -39,6 +39,8 @@ class Cosmology:
             return "DEMNUnii_params.ini"
         if name.lower() == "agora":
             return "AGORA_params.ini"
+        if name.lower() == "planck":
+            return "Planck_2018.ini"
         return name
 
     def _get_pars(self, filename):

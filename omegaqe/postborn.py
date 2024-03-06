@@ -16,7 +16,7 @@ def _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax):
         return mode.spline(ells_sample, M)
     print("Generating new M_ww... ")
     mode_typ = "kk" if cmb else "ss"
-    return mode.spline(ells_sample=mode.generate_sample_ells(Lmax, 100), typ=mode_typ, star=False, zmin=zmin, zmax=zmax)
+    return mode.spline(ells_sample=mode.generate_sample_ells(M_ellmax, M_Nell), typ=mode_typ, star=False, zmin=zmin, zmax=zmax)
 
 
 def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb, zmin=0, zmax=None):

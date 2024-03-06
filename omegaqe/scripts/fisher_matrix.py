@@ -45,10 +45,12 @@ def _main(exp, typs, params, dir, _id):
 
 
     start_time = MPI.Wtime()
-    F = np.empty(my_end-my_start)
+    F_bi = np.empty(my_end-my_start)
+    F_kk = np.empty(my_end - my_start)
     for _i, idx in enumerate(np.arange(my_start, my_end)):
         iii, jjj = all_indices[idx]
-        F[_i] = fish.get_optimal_bispectrum_Fisher(typs, f_sky=0.4, param=(params[iii], params[jjj]), dx=None)
+        F_bi[_i] = fish.get_optimal_bispectrum_Fisher(typs, Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=None)
+        F_kk[_i] = fish.get_kappa_ps_Fisher(Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=None)
 
     end_time = MPI.Wtime()
 
@@ -57,25 +59,33 @@ def _main(exp, typs, params, dir, _id):
     if my_rank == 0:
         print("Fisher matrix time: " + str(end_time - start_time))
         mpi.output("Fisher matrix time: " + str(end_time - start_time), my_rank, _id)
-        F_arr = np.ones(N_param_combos)
-        F_arr[my_start: my_end] = F
+        F_arr_bi = np.ones(N_param_combos)
+        F_arr_kk = np.ones(N_param_combos)
+        F_arr_bi[my_start: my_end] = F_bi
+        F_arr_kk[my_start: my_end] = F_kk
         for rank in range(1, world_size):
             start, end = mpi.get_start_end(rank, workloads)
-            F = np.empty(end - start)
-            world_comm.Recv([F, MPI.DOUBLE], source=rank, tag=77)
-            F_arr[start: end] = F
+            F_bi = np.empty(end - start)
+            world_comm.Recv([F_bi, MPI.DOUBLE], source=rank, tag=77)
+            F_arr_bi[start: end] = F_bi
+
+            F_kk = np.empty(end - start)
+            world_comm.Recv([F_kk, MPI.DOUBLE], source=rank, tag=77)
+            F_arr_kk[start: end] = F_kk
         param_str = ""
         for p in params:
-            param_str += "_" + p 
+            param_str += "_" + p
         dir += f"{exp}/{typs}/{param_str}"
         if not os.path.isdir(dir):
             os.makedirs(dir)
-        np.save(dir + "/F", F_arr)
+        np.save(dir + "/F_bi", F_bi)
+        np.save(dir + "/F_kk", F_kk)
         end_time_tot = MPI.Wtime()
         print("Total time: " + str(end_time_tot - start_time_tot))
         mpi.output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
     else:
-        world_comm.Send([F, MPI.DOUBLE], dest=0, tag=77)
+        world_comm.Send([F_bi, MPI.DOUBLE], dest=0, tag=77)
+        world_comm.Send([F_kk, MPI.DOUBLE], dest=0, tag=77)
 
 
 if __name__ == '__main__':

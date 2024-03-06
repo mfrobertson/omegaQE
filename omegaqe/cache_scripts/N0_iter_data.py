@@ -36,11 +36,15 @@ def save_N0(exps, powerspectra, fields, convert=False):
             df_curl.to_csv(f"{dir}{sep}N0_curl_{ps}_T30-3000_P30-5000.csv", sep=" ", float_format='{:,.6e}'.format)
 
 def main():
-    fields = ["TT", "EB", "TEB"]
-    exps = np.array(["SO_base", "SO_goal", "S4_base", "S4_dp"])
+    fields = ["EB", "TEB"]
+    # fields = ["TT"]
+    exps = np.array(["SO_goal", "S4_base"])
     powerspectra = ["gradient"]
     save_N0(exps, powerspectra, fields)
 
+    fields = ["EB"]
+    exps = np.array(["S4_dp"])
+    # save_N0(exps, powerspectra, fields)
 
 if __name__ == '__main__':
 

@@ -53,22 +53,25 @@ def save_N(exps, fields):
         df_N.to_csv(f"{dir}{sep}N.csv", sep=" ", float_format='{:,.6e}'.format)
 
 def main():
-    single_fields = ["TT", "TE", "TB", "EE", "EB"]
-    gmv_fields = ["TE", "EB", "TEB"]
-    exps = np.array(["SO", "SO_base", "SO_goal","S4", "S4_base", "HD"])
+    # single_fields = ["TT", "TE", "TB", "EE", "EB"]
+    single_fields = ["TT"]
+    # gmv_fields = ["TE", "EB", "TEB"]
+    gmv_fields = ["TEB", "EB"]
+    # exps = np.array(["SO", "SO_base", "SO_goal","S4", "S4_base", "HD"])
+    exps = np.array(["SO_goal","S4_base"])
     powerspectra = ["gradient"]
     save_N0(exps, powerspectra, single_fields, gmv_fields, (30, 3000, 30, 5000))
-    exps = np.array(["SO_base", "SO_goal", "S4_base"])
-    powerspectra = ["lensed"]
-    gmv_fields = ["EB", "TEB"]
-    save_N0(exps, powerspectra, single_fields, gmv_fields, (30, 3000, 30, 5000), convert=True)
+    # exps = np.array(["SO_base", "SO_goal", "S4_base"])
+    # powerspectra = ["lensed"]
+    # gmv_fields = ["EB", "TEB"]
+    # save_N0(exps, powerspectra, single_fields, gmv_fields, (30, 3000, 30, 5000), convert=True)
 
-    fields = ["T", "E", "B"]
-    save_N(exps, fields)
+    # fields = ["T", "E", "B"]
+    # save_N(exps, fields)
 
-    save_N0(["SO_goal"], ["gradient"], ["TT"], ["EB", "TEB"], (40, 3000, 40, 3000))
-    save_N0(["S4_test"], ["gradient"], ["TT"], ["EB", "TEB"], (2, 4000, 2, 4000))
-    save_N0(["S4_dp"], ["gradient"], ["TT"], ["EB", "TEB"], (30, 3000, 30, 5000))
+    # save_N0(["SO_goal"], ["gradient"], ["TT"], ["EB", "TEB"], (40, 3000, 40, 3000))
+    # save_N0(["S4_test"], ["gradient"], ["TT"], ["EB", "TEB"], (2, 4000, 2, 4000))
+    # save_N0(["S4_dp"], ["gradient"], ["TT"], ["EB", "TEB"], (30, 3000, 30, 5000))
 
 
 if __name__ == '__main__':

@@ -30,9 +30,9 @@ def main(exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax):
     else:
         noise_cls = {idx.lower(): np.sqrt(noise.get_cmb_gaussian_N(idx.upper(), None, None, ellmax=5000, exp=exp)) / arc_to_rad * np.sqrt(fac) for idx in indices}
     indices = ["TT", "EE", "TE", "TB", "EB", "BB"]
-    my_len_cls = {idx.lower(): fac * noise.cosmo.get_lens_ps(idx) for idx in indices}
-    my_cls_grad = {idx.lower(): fac * noise.cosmo.get_grad_lens_ps(idx) for idx in indices}
-    N0_dict = get_N0(0, noise_cls["tt"], noise_cls["ee"],{'t': T_Lmax, 'e': P_Lmax, 'b': P_Lmax}, T_Lmin, 5000, my_len_cls, my_cls_grad, my_len_cls, my_cls_grad,joint_TP=False)
+    len_cls = {idx.lower(): fac * noise.cosmo.get_lens_ps(idx) for idx in indices}
+    grad_cls = {idx.lower(): fac * noise.cosmo.get_grad_lens_ps(idx) for idx in indices}
+    N0_dict = get_N0(0, noise_cls["tt"], noise_cls["ee"],{'t': T_Lmax, 'e': P_Lmax, 'b': P_Lmax}, T_Lmin, 5000, len_cls, grad_cls, grad_cls, len_cls, joint_TP=True)
     save((N0_dict[0]['p'][2:], N0_dict[1]['p'][2:]), "TEB", True, "gradient", exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
     save((N0_dict[0]['p_p'][2:], N0_dict[1]['p_p'][2:]), "EB", True, "gradient", exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
     save((N0_dict[0]['ptt'][2:], N0_dict[1]['ptt'][2:]), "TT", False, "gradient", exp, T_Lmin, T_Lmax, P_Lmin, P_Lmax)
