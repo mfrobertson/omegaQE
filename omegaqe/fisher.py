@@ -527,7 +527,6 @@ class Fisher:
 
     def get_kappa_ps_Fisher(self, Lmax, f_sky=1, auto=True, Lmin=30, param=None, dx=None):
         """
-        TODO: Check equation !!!!!!!!!!!
         Parameters
         ----------
         Lmax
