@@ -19,14 +19,16 @@ class Cosmology:
         Constructor.
         """
 
-        self.set_cosmology(paramfile)
+        self.paramfile = paramfile
+        self.set_cosmology(self.paramfile)
         self.cib_norms = None
         self.dn_dz_splines = None
         self.dn_dz_tot_spline = None
         self.gal_biases = None
         self.agora = False
 
-    def set_cosmology(self, paramfile=omegaqe.CAMB_FILE):
+    def set_cosmology(self, paramfile=None):
+        paramfile = self.paramfile if paramfile is None else paramfile
         self._pars = self._get_pars(self._get_param_file(paramfile))
         self._results = camb.get_results(self._pars)
 
