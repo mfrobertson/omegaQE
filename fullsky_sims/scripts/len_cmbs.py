@@ -167,7 +167,6 @@ def main(nsims, nthreads, loc, nbody, use_cache_diff, unl_loc):
                        "diff_zero": (glm_diff, np.zeros(np.size(glm_diff))),
                        "zero_dem":(np.zeros(np.size(glm_diff)), clm_dem)
                        }
-    deflect_configs = {"pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb)))}
     unl_cmb_spectra = get_unlensed_cmb_ps()
     for sim in range(nsims):
         unl_alms = get_unlensed_alms(unl_cmb_spectra, sim, unl_loc)
