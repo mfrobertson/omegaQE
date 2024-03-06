@@ -253,10 +253,12 @@ def _alpha(typs, L1, L2, theta12, nu, no_k=False):
         for q in typs:
             if q == "k" and no_k is True:      # Get rid of this if not calculating N1 kk terms separately
                 continue
-            kq = "k" + q
+            kq = "k" + q                       #TODO: should q="k" term be halved?
             cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(combos[iii]+kq, typs)
             Cl_qk_spline = _get_Cl_spline(q + "k")
             mixed_bi_element = bi_ij * cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_qk_spline(L2)
+            if q == "k":
+                mixed_bi_element /= 2
             if mixed_bi is None:
                 mixed_bi = mixed_bi_element
             else:
@@ -336,7 +338,8 @@ def _cache_lss_cls(lss_cls, iter):
     ellmax = 5000
     rho = global_fish.covariance.get_delens_corr(Lmax=5000) if iter else 0
     Cl_kk = global_fish.covariance.get_Cl("kk", ellmax=ellmax) if lss_cls is None else lss_cls["kk"]
-    Cl_kk *= 1-rho**2
+    # Cl_kk *= 1-rho**2
+    Cl_kk *= np.sqrt(1-rho**2)
     Ls_sample = np.arange(np.size(Cl_kk))
     Cl_kk_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_kk[1:])
     Cl_gk = global_fish.covariance.get_Cl("kg", ellmax=ellmax) if lss_cls is None else lss_cls["gk"]
@@ -355,7 +358,7 @@ def _setup_delen_cmb_cls():
     cl2dl = Ls * (Ls + 1) / (2 * np.pi)
     for iii, typ in enumerate(typs):
         unl_cls[:, iii] = global_qe.cosmo.get_unlens_ps(typ, Lmax)[:Lmax+1] * cl2dl
-    delen_len_cls = lensed_cls(unl_cls, Cl_kk_spline(Ls))
+    delen_len_cls = lensed_cls(unl_cls, Cl_kk_spline(Ls) * 4/(2*np.pi))
 
     for iii, typ in enumerate(typs):
         delen_len_cl = delen_len_cls[:, iii] / cl2dl

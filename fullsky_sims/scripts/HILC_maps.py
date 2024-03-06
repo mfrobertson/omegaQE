@@ -45,9 +45,9 @@ def _get_EBilc(Qs, Us, wE, wB):
             B_ilc += B_lm
     return ag.sht.alm2map_spin((E_ilc, B_ilc), 2)
 
-def main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, nthreads, _id):
+def main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, point_mask, cluster_mask, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f"start: {start}, end: {end},  deflect_typ: {deflect_typ}, exp: {exp}, tsz: {tsz}, ksz: {ksz}, cib: {cib}, rad: {rad}, gauss: {gauss}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f"start: {start}, end: {end},  deflect_typ: {deflect_typ}, exp: {exp}, tsz: {tsz}, ksz: {ksz}, cib: {cib}, rad: {rad}, gauss: {gauss}, point_mask: {point_mask}, cluster_mask: {cluster_mask}, nthreads: {nthreads}", 0, _id)
 
     global ag
     ag = Agora(nthreads=nthreads)
@@ -61,6 +61,10 @@ def main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, nthreads, _id)
         dir_name_ext += "_cib"
     if rad:
         dir_name_ext += "_rad"
+    if point_mask:
+        dir_name_ext += "_pm"
+    if cluster_mask:
+        dir_name_ext += "_cm"
 
     dir_name = f"{ag.sims_dir}/{deflect_typ}/HILC{dir_name_ext}"
     setup_dir(dir_name)
@@ -73,7 +77,7 @@ def main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, nthreads, _id)
     Qs_fg = np.empty((3, ag.sht.nside2npix(ag.nside)))
     Us_fg = np.empty((3, ag.sht.nside2npix(ag.nside)))
     for iii, freq in enumerate(freqs):
-        T_fg, Q_fg, U_fg = ag.create_fg_maps(freq, tsz, ksz, cib, rad, gauss)
+        T_fg, Q_fg, U_fg = ag.create_fg_maps(freq, tsz, ksz, cib, rad, gauss, point_mask, cluster_mask)
         Ts_fg[iii,:] = T_fg
         Qs_fg[iii,:] = Q_fg
         Us_fg[iii,:] = U_fg
@@ -83,7 +87,7 @@ def main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, nthreads, _id)
         Ts = np.empty((3, ag.sht.nside2npix(ag.nside)))
         Qs = np.empty((3, ag.sht.nside2npix(ag.nside)))
         Us = np.empty((3, ag.sht.nside2npix(ag.nside)))
-        T, Q, U = ag.sht.read_map(f"{ag.sims_dir}/unlensed/TQU_{sim}.fits")
+        T, Q, U = ag.sht.read_map(f"{ag.sims_dir}/{deflect_typ}/TQU_{sim}.fits")
         for iii, freq in enumerate(freqs):
             Ts[iii,:] = T + deepcopy(Ts_fg[iii,:])
             Qs[iii,:] = Q + deepcopy(Qs_fg[iii,:])
@@ -95,9 +99,9 @@ def main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, nthreads, _id)
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 11:
+    if len(args) != 13:
         raise ValueError(
-            "Must supply arguments: start end deflect_typ exp tsz ksz cib rad gauss nthreads _id")
+            "Must supply arguments: start end deflect_typ exp tsz ksz cib rad gauss point_mask cluster_mask nthreads _id")
     start = int(args[0])
     end = int(args[1])
     deflect_typ = none_or_str(args[2])
@@ -107,6 +111,8 @@ if __name__ == '__main__':
     cib = parse_boolean(args[6])
     rad = parse_boolean(args[7])
     gauss = parse_boolean(args[8])
-    nthreads  = int(args[9])
-    _id = str(args[10])
-    main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, nthreads, _id)
+    point_mask = parse_boolean(args[9])
+    cluster_mask = parse_boolean(args[10])
+    nthreads  = int(args[11])
+    _id = str(args[12])
+    main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, point_mask, cluster_mask, nthreads, _id)

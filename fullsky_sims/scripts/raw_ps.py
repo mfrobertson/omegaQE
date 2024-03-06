@@ -30,23 +30,14 @@ def _get_iter_mc_corr_w(exp, qe_typ, gmv):
 def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_noise, gmv, bh, nthreads, qe_typ):
     mpi.output(f"  sim: 0", 0, _id)
     nbody.sht.nthreads = nthreads
-    if not cmb_noise:
-        ext = "_nN"
-        if gmv:
-            ext += "_gmv"
-        if bh:
-            ext += "_bh"            
-    elif gmv:
-        ext = "__gmv"
-        if bh:
-            ext += "_bh" 
-    elif bh:
-        ext = "_bh"
-    else:
-        ext = "_"
+    ext = "nN" if not cmb_noise else ""
+    if gmv:
+        ext += "_gmv"
+    if bh:
+        ext += "_bh"
 
     omega_tem = nbody.sht.read_map(f"{nbody.cache_dir}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{0}{tem_ext}.fits")
-    omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{0}{ext}.fits")
+    omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{0}_{ext}.fits")
     if iter_mc_corr:
         mc_corr = _get_iter_mc_corr_w(exp, qe_typ, gmv)
         omega_rec = nbody.sht.alm2map(nbody.sht.almxfl(nbody.sht.map2alm(omega_rec), 1/mc_corr))
@@ -54,7 +45,7 @@ def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_n
     for sim in range(1,nsims):
         mpi.output(f"  sim: {sim}", 0, _id)
         omega_tem = nbody.sht.read_map(f"{nbody.cache_dir}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{sim}{tem_ext}.fits")
-        omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{sim}{ext}.fits")
+        omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{sim}_{ext}.fits")
         if iter_mc_corr:
             omega_rec = nbody.sht.alm2map(nbody.sht.almxfl(nbody.sht.map2alm(omega_rec), 1/mc_corr))
         Cl_ww += nbody.sht.map2cl(omega_tem, omega_rec, nthreads=nthreads)

@@ -6,7 +6,8 @@ from omegaqe.tools import parse_boolean, mpi
 import os
 import sys
 from scipy.interpolate import InterpolatedUnivariateSpline
-
+from fullsky_sims.demnunii import Demnunii
+# from fullsky_sims.agora import Agora
 
 def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, iter, out_dir, _id):
     # get basic information about the MPI communicator
@@ -27,15 +28,28 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
     nu = 353e9
 
     mpi.output("Initialising Fisher object...", my_rank, _id)
-    fish = Fisher(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=iter, iter_ext=False, data_dir=f"{omegaqe.DATA_DIR}")
-
+    dm = Demnunii()
+    # dm.power.cosmo._pars.NonLinearModel.set_params(halofit_version='mead') #tmp
+    # dm.power.matter_PK = dm.power.cosmo.get_matter_PK(typ="matter")  #tmp
+    fish = Fisher(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=iter, iter_ext=False, data_dir=f"{omegaqe.DATA_DIR}", cosmology=dm.cosmo)
+    fish.covariance.power = dm.power
+    fish.power = dm.power
+    
+    # ag = Agora()
+    # fish = Fisher(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=iter, iter_ext=False, data_dir=f"{omegaqe.DATA_DIR}"+"_ag", cosmology=ag.cosmo)
+    # fish.bi._mode.use_LSST_abcde = True
+    # fish.covariance.use_LSST_abcde = True
+    # fish.covariance.shot_noise = [2.25, 3.11, 3.09, 2.61, 2.00]
+    # fish.covariance.noise.full_sky = True
 
     mpi.output("Setting up bispectra splines...", my_rank, _id)
-    fish.setup_bispectra(Nell=200)
+    fish.setup_bispectra(Nell=200,path=f"{omegaqe.CACHE_DIR}/_M")
+    # fish.setup_bispectra(Nell=200,path=f"{omegaqe.CACHE_DIR}_ag/_M_dm")
 
     mpi.output("    Preparing C_inv...", my_rank, _id)
     if my_rank == 0:
-        C_inv = fish.covariance.get_C_inv(typ, Lmax, nu)
+        # C_inv = fish.covariance.get_C_inv(typ, Lmax, nu, gal_distro="agora")
+        C_inv = fish.covariance.get_C_inv(typ, Lmax, nu, gal_distro="LSST_gold")
     else:
         N_typs = np.size(list(typ))
         C_inv = np.empty((N_typs, N_typs, Lmax + 1), dtype='d')
@@ -47,6 +61,8 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
     mpi.output("    Storing C_omega_spline...", my_rank, _id)
     C_omega = np.load(f"{omegaqe.CACHE_DIR}/_C_omega/C_omega.npy")
     omega_Ls = np.load(f"{omegaqe.CACHE_DIR}/_C_omega/Ls.npy")
+    # C_omega = np.load(f"{omegaqe.CACHE_DIR}_ag/_C_omega/C_omega.npy")
+    # omega_Ls = np.load(f"{omegaqe.CACHE_DIR}_ag/_C_omega/Ls.npy")
     fish.C_omega_spline = InterpolatedUnivariateSpline(omega_Ls, C_omega)
 
     mpi.output("Setting up parallelisation of workload...", my_rank, _id)
@@ -60,6 +76,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
 
     start_time = MPI.Wtime()
     _, F_L = fish.get_F_L(typ, Ls_samp[my_start: my_end], dL2=dL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True, Lmin=Lcut_min, Lmax=Lcut_max)
+    # _, F_L = fish.get_F_L(typ, Ls_samp[my_start: my_end], dL2=dL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="agora", use_cache=True, Lmin=Lcut_min, Lmax=Lcut_max)
     end_time = MPI.Wtime()
 
     mpi.output("Broadcasting results...", my_rank, _id)

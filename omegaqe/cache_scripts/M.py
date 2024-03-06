@@ -1,12 +1,12 @@
 import numpy as np
-import omegaqe
 import omegaqe.tools as tools
 import sys
 from omegaqe.modecoupling import Modecoupling
-from DEMNUnii.demnunii import Demnunii
+from fullsky_sims.agora import Agora
+# from fullsky_sims.demnunii import Demnunii
 
-dm = Demnunii(nthreads=8)
-cache_dir = omegaqe.CACHE_DIR
+
+cache_dir = "/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/cache/"
 
 def M_matrix(mode, ells, star, typ):
     Nells = np.size(ells)
@@ -15,7 +15,8 @@ def M_matrix(mode, ells, star, typ):
     for iii, ell in enumerate(ells):
         print('\r', end='')
         print(f"{iii}/{Nells}", end='')
-        M[iii, :] = mode.components(np.ones(Nells) * ell, ells, typ=typ, star=star)
+        # M[iii, :] = mode.components(np.ones(Nells) * ell, ells, typ=typ, star=star, gal_distro="LSST_gold")
+        M[iii, :] = mode.components(np.ones(Nells) * ell, ells, typ=typ, star=star, gal_distro="agora")
     return M
 
 
@@ -33,10 +34,18 @@ def save(ells, M, star, typ):
 
 
 def main(ellmax, Nells, star, typ):
-    mode = Modecoupling()
-    matter_PK = dm.get_PK()
-    mode.matter_PK = matter_PK
-    mode._powerspectra.matter_PK = matter_PK
+    ag = Agora()
+    power =ag.power
+    mode = Modecoupling(powerspectra=power)
+    mode.use_LSST_abcde = False
+
+    # dm = Demnunii(nthreads=11)
+    # PK = dm.get_PK()
+    # power = dm.power
+    # power.matter_PK = PK
+    # mode = Modecoupling(powerspectra=power)
+    # mode._powerspectra.matter_PK = PK
+    # mode.matter_PK = PK
     ells = mode.generate_sample_ells(ellmax, Nells)
     M = M_matrix(mode, ells, star, typ)
     save(ells, M, star, typ)

@@ -18,7 +18,7 @@ def save_N0(exps, powerspectra, fields, convert=False):
             for iii, col in enumerate(columns):
                 for typ in ["iter", "iter_ext"]:
                     fields = col
-                    N0_phi, N0_curl = np.load(f"{cache_dir}_N0{sep}{exp}{sep}{typ}{sep}N0_{fields}_T30-3000_P30-5000.npy")
+                    N0_phi, N0_curl = np.load(f"{cache_dir}{sep}_N0{sep}{exp}{sep}{typ}{sep}N0_{fields}_T30-3000_P30-5000.npy")
                     col_name = col + "_" + typ
                     if convert:
                         Ls = np.arange(2, 5001)
@@ -36,8 +36,9 @@ def save_N0(exps, powerspectra, fields, convert=False):
             df_curl.to_csv(f"{dir}{sep}N0_curl_{ps}_T30-3000_P30-5000.csv", sep=" ", float_format='{:,.6e}'.format)
 
 def main():
-    fields = ["EB", "TEB"]
-    # fields = ["TT"]
+    # fields = ["TT", "EB", "TEB"]
+    fields = ["TT"]
+    # exps = np.array(["SO_base", "SO_goal", "S4_base", "S4_dp"])
     exps = np.array(["SO_goal", "S4_base"])
     powerspectra = ["gradient"]
     save_N0(exps, powerspectra, fields)

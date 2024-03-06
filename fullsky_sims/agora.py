@@ -21,6 +21,12 @@ class Agora:
         self.cosmo.agora = True
         self._setup_dndz_splines()
         self.power = Powerspectra(cosmology=self.cosmo)
+        self.point_mask_idx = None
+        self.cluster_mask_idx = None
+
+    def calc_masks(self, threshold=6e-3, Nsources=10000):
+        self.point_mask_idx = self._get_point_mask_indices(threshold)
+        self.cluster_mask_idx = self._get_cluster_mask_indices(Nsources)
 
     def _setup_dndz_splines(self):
         nbins = 5
@@ -70,7 +76,7 @@ class Agora:
         if pixel_corr: gal_map = self._apply_pixel_correction(gal_map)
         return gal_map
     
-    def get_obs_cib_map(self, nu=353, pixel_corr=True, lensed=True, verbose=False, muK=False):
+    def get_obs_cib_map(self, nu=353, pixel_corr=True, lensed=True, verbose=False, muK=False, point_mask=False):
         if not lensed:
             raise ValueError("AGORA products are all lensed.")
         if nu == 95:
@@ -83,6 +89,9 @@ class Agora:
             cib_map *= self.Jy_to_muK(nu*1e9)
         if not muK:
             cib_map /= self.Jy_to_muK(nu*1e9) * 1e6   # Converting to MJy
+        if point_mask:
+            mask_idx = self._get_point_mask_indices() if self.point_mask_idx is None else self.point_mask_idx
+            cib_map = self._mask_point(cib_map, mask_idx)
         if pixel_corr: cib_map = self._apply_pixel_correction(cib_map)
         return cib_map
     
@@ -91,8 +100,11 @@ class Agora:
         dndz = np.loadtxt(f"{self.data_dir}/gal/nz_y1_lens_5bins_srd.dat", usecols=bin, skiprows=2)
         return zs, dndz
     
-    def get_obs_ksz_map(self, pixel_corr=True, lensed=True, agn_T_pow=80):
+    def get_obs_ksz_map(self, pixel_corr=True, lensed=True, agn_T_pow=80, point_mask=False):
         ksz = self.sht.read_map(f"{self.data_dir}/ksz/agora_lkszNG_bahamas{agn_T_pow}_bnd_unb_1.0e+12_1.0e+18_lensed.fits")
+        if point_mask:
+            mask_idx = self._get_point_mask_indices() if self.point_mask_idx is None else self.point_mask_idx
+            ksz = self._mask_point(ksz, mask_idx)
         if pixel_corr: ksz = self._apply_pixel_correction(ksz)
         return ksz
     
@@ -146,13 +158,23 @@ class Agora:
         if pixel_corr: y_map = self._apply_pixel_correction(y_map)
         return y_map
     
-    def get_obs_tsz_map(self, nu, pixel_corr=True, lensed=True, agn_T_pow=80):
-        return self.get_obs_y_map(pixel_corr, lensed, agn_T_pow) * self.y_to_muK(nu*1e9)
+    def get_obs_tsz_map(self, nu, pixel_corr=True, lensed=True, agn_T_pow=80, point_mask=False, cluster_mask=False):
+        tsz = self.get_obs_y_map(False, lensed, agn_T_pow) * self.y_to_muK(nu*1e9)
+        if point_mask:
+            mask_idx = self._get_point_mask_indices() if self.point_mask_idx is None else self.point_mask_idx
+            tsz = self._mask_point(tsz, mask_idx)
+        if cluster_mask:
+            mask_idx = self._get_cluster_mask_indices() if self.cluster_mask_idx is None else self.cluster_mask_idx
+            tsz = self._mask_cluster(tsz, mask_idx)
+        if pixel_corr: tsz = self._apply_pixel_correction(tsz)
+        return tsz
     
-    def get_obs_rad_map(self, nu, pixel_corr=True, lensed=True):
+    def get_obs_rad_map(self, nu, pixel_corr=True, lensed=True, point_mask=False):
         rad = self.sht.read_map(f"{self.data_dir}/radio/agora_radiomap_len_universemachine_trinity_{nu}ghz_randflux_datta2018_truncgauss.0.fits", field=0)
-        rad[rad*self.sht.nside2pixarea()>6e-3]=0
         rad *= self.Jy_to_muK(nu*1e9, alpha=-0.75)
+        if point_mask:
+            mask_idx = self._get_point_mask_indices() if self.point_mask_idx is None else self.point_mask_idx
+            rad = self._mask_point(rad, mask_idx)
         if pixel_corr: rad = self._apply_pixel_correction(rad)
         return rad
     
@@ -164,22 +186,66 @@ class Agora:
             return [6e-3, 1.68e-3, 1.68e-3]
         if nu == 220:
             return [6e-3, 4.45e-3, 4.45e-3]
-    
-    def get_obs_rad_maps(self, nu, pixel_corr=True, lensed=True):
+                
+    def get_obs_rad_maps(self, nu, pixel_corr=True, lensed=True, point_mask=False):
         # B-mode radio sources not correct (but seem unimportant anyway 1911.09466)
         T, Q, U = self.sht.read_map(f"{self.data_dir}/radio/agora_radiomap_len_universemachine_trinity_{nu}ghz_randflux_datta2018_truncgauss.0.fits")
-        T_tmp = copy.deepcopy(T)
         mask_limits = self.get_mask_limits(nu)
         for iii, field in enumerate([T, Q, U]):
-            field[np.abs(T_tmp*self.sht.nside2pixarea())>mask_limits[iii]]=0
+            if point_mask:
+                if iii == 0 and self.point_mask_idx is not None:
+                    mask_idx = self.point_mask_idx
+                else:
+                    mask_idx = self._get_point_mask_indices(mask_limits[iii])
+                field = self._mask_point(field, mask_idx)
             field *= self.Jy_to_muK(nu*1e9, alpha=-0.75)
             if pixel_corr: field = self._apply_pixel_correction(field)
         return T, Q, U
     
     def get_PK(self):
         return self.cosmo.get_matter_PK(typ="matter")
+
+    def _get_point_mask_indices(self, threshold=6e-3):
+        nu = 150
+        field = self.get_obs_rad_map(nu,False)
+        field += self.get_obs_cib_map(nu, False, muK=True)
+        # field += self.get_obs_tsz_map(nu, False)
+        # field += self.get_obs_ksz_map(False)
+        field /= self.Jy_to_muK(nu*1e9)
+        return np.where(np.abs(field*self.sht.nside2pixarea()) > threshold)
     
-    def create_fg_maps(self, nu, tsz, ksz, cib, rad, gauss):
+    def _get_cluster_mask_indices(self, Nsources=10000):
+        nu = 95
+        field = self.get_obs_tsz_map(nu, False)
+        return np.argsort(np.abs(field))[-Nsources:]
+
+    def _mask_point(self, field, mask_idx, typ="median"):
+        median = np.median(field)
+        if typ == "zerod":
+            field[mask_idx] = 0
+        elif typ == "median":
+            field[mask_idx] = median
+        elif typ == "median_nb":
+            nb_idx = hp.get_all_neighbours(self.sht.nside, mask_idx)
+            field_copy = copy.deepcopy(field)
+            for iii, idx in enumerate(mask_idx):
+                field[idx] = np.median(field_copy[nb_idx[:,iii]])
+        return field
+    
+    def _mask_cluster(self, field, mask_idx, typ="median", size=5):
+        nb_idx = hp.get_all_neighbours(self.sht.nside, mask_idx).ravel()
+        for _ in np.arange(1, np.round(size)):
+            nb_idx = np.append(nb_idx, hp.get_all_neighbours(self.sht.nside, nb_idx).ravel())
+        median = np.median(field)
+        if typ == "zerod":
+            field[mask_idx] = 0
+            field[nb_idx] = 0
+        elif typ == "median":
+            field[mask_idx] = median
+            field[nb_idx] = median
+        return field
+    
+    def create_fg_maps(self, nu, tsz, ksz, cib, rad, gauss, point_mask, cluster_mask):
     
         npix = self.sht.nside2npix(self.nside)
         T_fg = np.zeros(npix)
@@ -187,13 +253,13 @@ class Agora:
         U_fg = np.zeros(npix)
         
         if tsz:
-            T_fg += self.get_obs_tsz_map(nu)
+            T_fg += self.get_obs_tsz_map(nu, point_mask=point_mask, cluster_mask=cluster_mask)
         if ksz:
             T_fg += self.get_obs_ksz_map()
         if cib:
-            T_fg += self.get_obs_cib_map(nu, muK=True)
+            T_fg += self.get_obs_cib_map(nu, muK=True, point_mask=point_mask)
         if rad:
-            T_rad, Q_rad, U_rad = self.get_obs_rad_maps(nu)
+            T_rad, Q_rad, U_rad = self.get_obs_rad_maps(nu, point_mask=point_mask)
             T_fg += T_rad
             Q_fg += Q_rad
             U_fg += U_rad

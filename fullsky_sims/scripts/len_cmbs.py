@@ -52,7 +52,7 @@ def get_glm(nthreads, deflect_typ, cache_diff_loc=None):
             kappa_map = wrapper.sht.read_map(f"{cache_diff_loc}/kappa_diff.fits")
         else:
             kappa_map = wrapper.get_kappa_map(pb=True)
-        Cl_kappa = wrapper.sht.map2cl(kappa_map, lmax=LMAX_MAP, lmax_out=LMAX_MAP, nthreads=nthreads)
+        Cl_kappa = wrapper.sht.map2cl(kappa_map, lmax=LMAX_MAP, lmax_out=LMAX_MAP, nthreads=nthreads) * 2
         Cl_kappa_smooth = wrapper.sht.smoothed_cl(Cl_kappa, nbins=150, zerod=False)
         klm = wrapper.sht.synalm(Cl_kappa_smooth, lmax=LMAX_MAP)
     return wrapper.sht.almxfl(klm, lensing_fac)
@@ -82,6 +82,11 @@ def get_unlensed_cmb_ps():
     Tcmb = 2.7255
     indices = ["TT", "EE", "BB", "TE"]
     return {idx.lower(): wrapper.cosmo.get_unlens_ps(idx, ellmax=LMAX_MAP)[:LMAX_MAP + 1] * (Tcmb * 1e6) ** 2 for idx in indices}
+
+def get_lensed_cmb_ps():
+    Tcmb = 2.7255
+    indices = ["TT", "EE", "BB", "TE"]
+    return {idx.lower(): wrapper.cosmo.get_lens_ps(idx, ellmax=LMAX_MAP)[:LMAX_MAP + 1] * (Tcmb * 1e6) ** 2 for idx in indices}
 
 
 def get_unlensed_alms(unl_cmb_spectra, sim, unl_loc):
@@ -156,16 +161,17 @@ def main(nsims, nthreads, loc, nbody, use_cache_diff, unl_loc):
     clm_dem = get_clm(nthreads, "dem")
     clm_diff = get_clm(nthreads, "diff", cache_diff_loc)
 
-    deflect_configs = {"pbdem_dem":(glm_pb, clm_dem),
-                       "pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb))),
-                       "npbdem_dem": (-glm_pb, clm_dem),
-                       "diff_zero": (glm_diff, np.zeros(np.size(glm_diff))),
-                       "zero_dem":(np.zeros(np.size(glm_diff)), clm_dem)
-                       }
+    # deflect_configs = {"pbdem_dem":(glm_pb, clm_dem),
+    #                    "pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb))),
+    #                    "npbdem_dem": (-glm_pb, clm_dem),
+    #                    "diff_zero": (glm_diff, np.zeros(np.size(glm_diff))),
+    #                    "zero_dem":(np.zeros(np.size(glm_diff)), clm_dem)
+    #                    }
+    deflect_configs = {"pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb)))}
     unl_cmb_spectra = get_unlensed_cmb_ps()
     for sim in range(nsims):
         unl_alms = get_unlensed_alms(unl_cmb_spectra, sim, unl_loc)
-        _save_unl_cmbs(loc, unl_alms, sim, nthreads)
+        # _save_unl_cmbs(loc, unl_alms, sim, nthreads)
         for deflect_typ in deflect_configs:
             glm, clm = deflect_configs[deflect_typ]
             dlm = np.array([glm, clm])
@@ -174,8 +180,8 @@ def main(nsims, nthreads, loc, nbody, use_cache_diff, unl_loc):
             len_maps = get_lensed_maps(dlm, unl_alms, nthreads)
             save_lens_maps(outdir, len_maps, sim)
 
-    _save_kappa_diff(loc, glm_diff, nthreads)
-    _save_omega_diff(loc, clm_diff, nthreads)
+    # _save_kappa_diff(loc, glm_diff, nthreads)
+    # _save_omega_diff(loc, clm_diff, nthreads)
 
 
 if __name__ == '__main__':

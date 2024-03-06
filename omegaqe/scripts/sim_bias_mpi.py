@@ -24,8 +24,8 @@ def _C_inv_splines(field_labels, C_inv, L_max, L_min_cut, L_max_cut):
 
 def _F_L(fields_labels, exp, gmv, fields):
     gmv_str = "gmv" if gmv else "single"
-    Ls = np.load(f"{omegaqe.RESULTS_DIR}/F_L_results/{fields_labels}/{exp}/{gmv_str}/{fields}/30_3000/1_2000/Ls.npy")
-    F_L = np.load(f"{omegaqe.RESULTS_DIR}/F_L_results/{fields_labels}/{exp}/{gmv_str}/{fields}/30_3000/1_2000/F_L.npy")
+    Ls = np.load(f"{omegaqe.RESULTS_DIR}/_F_L/{fields_labels}/{exp}/{gmv_str}/{fields}/30_3000/1_2000/Ls.npy")
+    F_L = np.load(f"{omegaqe.RESULTS_DIR}/_F_L/{fields_labels}/{exp}/{gmv_str}/{fields}/30_3000/1_2000/F_L.npy")
     return Ls, F_L
 
 

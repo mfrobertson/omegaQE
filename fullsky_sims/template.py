@@ -58,7 +58,7 @@ class Template:
             qe_typ = "single_iter"
             fields = "TT"
         else:
-            raise ValueError(f"Supplied cmb_lens_qe_typ {cmb_lens_qe_typ} not of supported typs; T, EB, TEB, TEB_iter, or EB_iter")
+            raise ValueError(f"Supplied cmb_lens_qe_typ {cmb_lens_qe_typ} not of supported typs; T, EB, TEB, TEB_iter, EB_iter, T_iter")
         Ls = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
         F_L = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
         

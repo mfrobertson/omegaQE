@@ -367,7 +367,16 @@ class Reconstruction:
         normalisation = 1/self.get_wiener("curl", self.iter_typ, iter=True)
         normalisation[0] = 0
         return self.sht.almxfl(curl_lm, normalisation)
-    
+
+    def get_delens_field(self, iter):
+        if self.iter_rec_data is None:
+            raise ValueError("No iterative reconstruction found, run calc_iter_rec first.")
+        lib_dir = os.path.abspath(self.iter_lib)
+        cacher = cachers.cacher_npy(lib_dir)
+        fname = os.path.join(lib_dir, 'wflms', 'wflm_%s_it%s' % ('p', iter))
+        assert cacher.is_cached(fname), 'cant load ' + fname
+        return cacher.load(fname)  
+
     def get_wiener(self, typ, qe_typ, iter):
         Cl = self._get_Cl_curl() if typ == "curl" else self._get_Cl_phi()
         qe_typ = "TT" if qe_typ == "T" else qe_typ
