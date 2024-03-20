@@ -30,7 +30,10 @@ class Cosmology:
     def set_cosmology(self, paramfile=None):
         paramfile = self.paramfile if paramfile is None else paramfile
         self._pars = self._get_pars(self._get_param_file(paramfile))
-        self._results = camb.get_results(self._pars)
+        self._results = self.calc_results()
+
+    def calc_results(self):
+        return camb.get_results(self._pars)
 
     def _get_param_file(self, name):
         if name.lower() == "lensit":

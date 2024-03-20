@@ -6,6 +6,7 @@ from omegaqe.covariance import Covariance
 from omegaqe.postborn import omega_ps
 from scipy.interpolate import InterpolatedUnivariateSpline
 from omegaqe.tools import getFileSep, path_exists
+from copy import deepcopy
 import copy
 import warnings
 import vector
@@ -145,12 +146,13 @@ class Fisher:
         return cov_inv1, cov_inv2, cov3
 
     def change_cosmology(self, param=None, dx=None, minus=False):
-        default_dx = 0.001
+        default_dx = 0.01
         if minus: default_dx *= -1
         if dx is not None and minus: dx *= -1
         cosmo = self.bi._mode._powerspectra.cosmo
         if param is None:
             cosmo.set_cosmology()
+            cosmo.calc_results()
         default_H0 = cosmo._pars.H0
         default_ombh2 = cosmo._pars.ombh2
         default_omch2 = cosmo._pars.omch2
@@ -177,13 +179,13 @@ class Fisher:
             cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu+dx, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
         if param == "tau":
             dx = cosmo._pars.Reion.optical_depth * default_dx if dx is None else dx
-            cosmo._pars.set_cosmology(H0=default_H0+dx, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau+dx, nnu=3.046, standard_neutrino_neff=3.046)
+            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau+dx, nnu=3.046, standard_neutrino_neff=3.046)
         if param == "As":
             dx = cosmo._pars.InitPower.As * default_dx if dx is None else dx
             cosmo._pars.InitPower.As += dx
         if param == "ns":
             dx = cosmo._pars.InitPower.ns * default_dx if dx is None else dx
-            cosmo._pars.cosmo._pars.InitPower.ns += dx
+            cosmo._pars.InitPower.ns += dx
         if param == "omnuh2":
             dx = cosmo._pars.omnuh2 * default_dx if dx is None else dx
             if dx == 0: dx = default_dx
@@ -201,7 +203,8 @@ class Fisher:
             dx = As * default_dx if dx is None else dx
             if dx == 0: dx = default_dx
             cosmo._pars.InitPower.As += dx
-            dx = sig8 * np.sqrt(dx/As)
+            dx = sig8 * np.sqrt(np.abs(dx/As))
+        cosmo._results = cosmo.calc_results()
         matter_PK = cosmo.get_matter_PK(typ="matter")
         weyl_PK = cosmo.get_matter_PK(typ="weyl")
         matter_weyl_PK = cosmo.get_matter_PK(typ="matter-weyl")
@@ -224,7 +227,7 @@ class Fisher:
         h = self.change_cosmology(param, dx)
         bi_x_h = self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro)
         self.change_cosmology()
-        return (bi_x_h - bi_x_h_minus)/(2*h)
+        return (bi_x_h - bi_x_h_minus)/(2*np.abs(h))
 
     def _get_thetas(self, Ntheta):
         dTheta = np.pi / Ntheta
@@ -483,6 +486,7 @@ class Fisher:
 
         """
         self.bi.check_type(typ)
+        self.change_cosmology()
         if Ls is not None:
             if param is not None:
                 raise RuntimeWarning("Are you sure you want to do param Fisher using sample method?")
@@ -521,9 +525,67 @@ class Fisher:
 
         """
         typs = list(typs)
+        self.change_cosmology()
         if param is not None and Ls is not None:
             raise RuntimeWarning("Are you sure you want to do param Fisher using sample method?")
         return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ls, dL2, Ntheta, f_sky, verbose, nu, gal_bins, save_array, only_bins, gal_distro=gal_distro, param=param, dx=dx)
+
+    def get_cmb_Fisher(self, Lmax, f_sky=1, Lmin=2, param=None, dx=None):
+        """
+
+        Parameters
+        ----------
+        Lmax
+        fsky
+        Lmin
+        param
+        dx
+
+        Returns
+        -------
+
+        """
+        def _get_dCl(param, dx):
+            mat = np.zeros((Lmax + 1 - Lmin, 2, 2))
+            self.change_cosmology(param, dx, True)
+            Cl_t_x_h_minus = self.covariance.power.cosmo.get_lens_ps("TT")[Lmin:Lmax + 1]
+            Cl_te_x_h_minus = self.covariance.power.cosmo.get_lens_ps("TE")[Lmin:Lmax + 1]
+            Cl_e_x_h_minus = self.covariance.power.cosmo.get_lens_ps("EE")[Lmin:Lmax + 1]
+            self.change_cosmology()
+            h = self.change_cosmology(param, dx)
+            Cl_t_x_h = self.covariance.power.cosmo.get_lens_ps("TT")[Lmin:Lmax + 1]
+            Cl_te_x_h = self.covariance.power.cosmo.get_lens_ps("TE")[Lmin:Lmax + 1]
+            Cl_e_x_h = self.covariance.power.cosmo.get_lens_ps("EE")[Lmin:Lmax + 1]
+            self.change_cosmology()
+            mat[:,0,0] = Cl_t_x_h - Cl_t_x_h_minus
+            mat[:, 1, 1] = Cl_e_x_h - Cl_e_x_h_minus
+            mat[:, 1, 0] = mat[:, 0, 1] = Cl_te_x_h - Cl_te_x_h_minus
+            mat /= (2 * np.abs(h))
+            return mat
+
+        self.change_cosmology()
+        cov_mat = np.zeros((Lmax + 1 - Lmin, 2, 2))
+        N_t = self.covariance.noise.get_cmb_gaussian_N("TT", None, None, ellmax=Lmax, exp=self.exp)
+        N_e = self.covariance.noise.get_cmb_gaussian_N("EE", None, None, ellmax=Lmax, exp=self.exp)
+        cov_mat[:, 0, 0] = self.covariance.power.cosmo.get_lens_ps("TT")[Lmin:Lmax + 1]
+        cov_mat[:, 1, 1] = self.covariance.power.cosmo.get_lens_ps("EE")[Lmin:Lmax + 1]
+        cov_mat[:, 0, 1] = cov_mat[:, 1, 0] = self.covariance.power.cosmo.get_lens_ps("TE", Lmax)[Lmin:Lmax + 1]
+        if param is None:
+            Cl_1 = Cl_2 = deepcopy(cov_mat)
+        elif np.size(param) == 2:
+            Cl_1 = _get_dCl(param[0], dx)
+            Cl_2 = _get_dCl(param[1], dx)
+        else:
+            Cl_1 = Cl_2 = _get_dCl(param, dx)
+        cov_mat[:, 0, 0] += N_t[Lmin:Lmax + 1]
+        cov_mat[:, 1, 1] += N_e[Lmin:Lmax + 1]
+        inv_cov_mat = np.linalg.pinv(cov_mat)
+        leg1 = np.matmul(inv_cov_mat, Cl_1)
+        leg2 = np.matmul(inv_cov_mat, Cl_2)
+        res = np.matmul(leg1, leg2)
+        trace = res[:,0,0] + res[:,1,1]
+        ells = np.arange(Lmin, Lmax + 1)
+        return f_sky * np.sum(trace * (ells + 0.5))
 
     def get_kappa_ps_Fisher(self, Lmax, f_sky=1, auto=True, Lmin=30, param=None, dx=None):
         """
@@ -540,11 +602,13 @@ class Fisher:
         def _get_dCl(param, dx):
             self.change_cosmology(param, dx, True)
             Cl_x_h_minus = self.power.get_kappa_ps(ells)
+            self.change_cosmology()
             h = self.change_cosmology(param, dx)
             Cl_x_h = self.power.get_kappa_ps(ells)
             self.change_cosmology()
-            return (Cl_x_h - Cl_x_h_minus) / (2 * h)
+            return (Cl_x_h - Cl_x_h_minus) / (2 * np.abs(h))
 
+        self.change_cosmology()
         ells = np.arange(Lmin, Lmax + 1)
         Cl_kk = self.power.get_kappa_ps(ells)
         if param is None:
