@@ -365,8 +365,14 @@ class Fisher:
         if np.size(param) == 2:
             param1 = param[0]
             param2 = param[1]
+            if dx is not None and np.size(dx)==2:
+                dx1 = dx[1]
+                dx2 = dx[2]
+            else:
+                dx1 = dx2 = dx
         else:
             param1 = param2 = param
+            dx1 = dx2 = dx
         for iii, L3 in enumerate(Ls):
             L2 = Ls2[None, :]
             L3_vec = vector.obj(rho=L3, phi=0)
@@ -379,8 +385,8 @@ class Fisher:
             thetas12 = L1_vec.deltaphi(L2_vec)
             # bi1 = self.bi.get_bispectrum(typ[4:6] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
             # bi2 = self.bi.get_bispectrum(typ[6:] + "w", L1, L2, theta=thetas12, M_spline=True, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-            bi1 = self._get_bispectrum(typ[4:6] + "w", L1, L2, theta=thetas12, param_dx=(param1, dx), nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-            bi2 = self._get_bispectrum(typ[6:] + "w", L1, L2, theta=thetas12, param_dx=(param2, dx), nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+            bi1 = self._get_bispectrum(typ[4:6] + "w", L1, L2, theta=thetas12, param_dx=(param1, dx1), nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
+            bi2 = self._get_bispectrum(typ[6:] + "w", L1, L2, theta=thetas12, param_dx=(param2, dx2), nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
             covs = C1_spline(L1) * C2_spline(L2) / C3_spline(L3)
             I_tmp = dL2 * 2 * np.sum(L2 * w * dTheta * bi1 * bi2 * covs)
             I[iii] = 2 * np.pi * L3 * I_tmp
@@ -596,8 +602,12 @@ class Fisher:
         if param is None:
             Cl_1 = Cl_2 = deepcopy(cov_mat)
         elif np.size(param) == 2:
-            Cl_1 = _get_dCl(param[0], dx)
-            Cl_2 = _get_dCl(param[1], dx)
+            if dx is not None and np.size(dx)==2:
+                Cl_1 = _get_dCl(param[0], dx[0])
+                Cl_2 = _get_dCl(param[1], dx[1])
+            else:
+                Cl_1 = _get_dCl(param[0], dx)
+                Cl_2 = _get_dCl(param[1], dx)
         else:
             Cl_1 = Cl_2 = _get_dCl(param, dx)
         cov_mat[:, 0, 0] += N_t[Lmin:Lmax + 1]
@@ -637,15 +647,15 @@ class Fisher:
         Cl_kk = self.power.get_kappa_ps(ells)
         if param is None:
             Cl_1 = Cl_2 = Cl_kk
-        else:
-            if np.size(param) == 2:
-                if param[0] != param[1]:
-                    Cl_1 = _get_dCl(param[0], dx)
-                    Cl_2 = _get_dCl(param[1], dx)
-                else:
-                    Cl_1 = Cl_2 = _get_dCl(param[0], dx)
+        elif np.size(param) == 2:
+            if dx is not None and np.size(dx) == 2:
+                Cl_1 = _get_dCl(param[0], dx[0])
+                Cl_2 = _get_dCl(param[1], dx[1])
             else:
-                Cl_1 = Cl_2 = _get_dCl(param, dx)
+                Cl_1 = _get_dCl(param[0], dx)
+                Cl_2 = _get_dCl(param[1], dx)
+        else:
+            Cl_1 = Cl_2 = _get_dCl(param, dx)
         N0 = self.covariance.noise.get_N0("kappa", Lmax)
         if auto:
             var = 2 / (2 * ells + 1) * (Cl_kk + N0[ells]) ** 2
