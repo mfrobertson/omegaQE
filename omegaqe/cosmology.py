@@ -9,6 +9,7 @@ from pathlib import Path
 import os
 from scipy.interpolate import InterpolatedUnivariateSpline
 
+
 class Cosmology:
     """
     Container for useful cosmological functionality. All CAMB functionality is initialised with parameters from Lensit.
@@ -28,12 +29,15 @@ class Cosmology:
         self.agora = False
 
     def set_cosmology(self, paramfile=None):
-        paramfile = self.paramfile if paramfile is None else paramfile
-        self._pars = self._get_pars(self._get_param_file(paramfile))
+        self._pars = self.get_params(paramfile)
         self._results = self.calc_results()
 
     def calc_results(self):
         return camb.get_results(self._pars)
+
+    def get_params(self, paramfile=None):
+        paramfile = self.paramfile if paramfile is None else paramfile
+        return self._get_pars(self._get_param_file(paramfile))
 
     def _get_param_file(self, name):
         if name.lower() == "lensit":
@@ -68,7 +72,7 @@ class Cosmology:
         Chi2 : int or float
             Comiving radial distance [Mpc]. Usually the limit, and Chi2 > Chi1.
         heaviside : bool
-            Perform a Heaviside step where Chi1 > Chi2. 
+            Perform a Heaviside step where Chi1 > Chi2.
 
         Returns
         -------
@@ -170,8 +174,8 @@ class Cosmology:
     def _gal_z_LSST_distribution(self, z):
         # 1705.02332 equation 14 and B1
         z0 = 0.311
-        return 1/(2*z0) * (z/z0)**2 * np.exp(-z/z0)
-    
+        return 1 / (2 * z0) * (z / z0) ** 2 * np.exp(-z / z0)
+
     def _agora_dist(self, z):
         # z0 = 0.13
         # alpha = 0.78
@@ -187,17 +191,15 @@ class Cosmology:
         # return InterpolatedUnivariateSpline(zs, n_tot)(z)
         return self.dn_dz_tot_spline(z)
 
-
-
     def _gal_z_CMB_distribution(self, z):
-        return self.cmb_lens_window(self.z_to_Chi(z), self.get_chi_star())/self.get_hubble(z)
+        return self.cmb_lens_window(self.z_to_Chi(z), self.get_chi_star()) / self.get_hubble(z)
 
     def _gal_z_flat_distribution(self, z):
         Chi_distro = np.ones(np.shape(z))
         z_str = self.Chi_to_z(self.get_chi_star())
-        Chi_distro[z>z_str] = 0
-        Chi_distro[z<0] = 0
-        return Chi_distro/self.get_hubble(z)
+        Chi_distro[z > z_str] = 0
+        Chi_distro[z < 0] = 0
+        return Chi_distro / self.get_hubble(z)
 
     def _check_z_distr_typ(self, typ):
         typs = ["LSST_gold", "LSST_gold_bias_unity", "CMB", "flat", "flat_bias_unity", "perfect"]
@@ -236,28 +238,28 @@ class Cosmology:
             return 1
         if typ == "flat_bias_unity" or typ == "LSST_gold_bias_unity" or typ == "perfect":
             return 1
-        if typ == "LSST_a": 
+        if typ == "LSST_a":
             return self.gal_biases[0]
-        if typ == "LSST_b": 
+        if typ == "LSST_b":
             return self.gal_biases[1]
-        if typ == "LSST_c": 
+        if typ == "LSST_c":
             return self.gal_biases[2]
-        if typ == "LSST_d": 
+        if typ == "LSST_d":
             return self.gal_biases[3]
-        if typ == "LSST_e": 
+        if typ == "LSST_e":
             return self.gal_biases[4]
         if typ == "agora":
             if np.size(z) == 1:
                 z = np.array([z])
-            bias = 1 + (0.84*z)
-            bias[np.logical_and(z>0.2, z<0.4)]=self.gal_biases[0]
-            bias[np.logical_and(z>0.4, z<0.6)]=self.gal_biases[1]
-            bias[np.logical_and(z>0.6, z<0.8)]=self.gal_biases[2]
-            bias[np.logical_and(z>0.8, z<1.0)]=self.gal_biases[3]
-            bias[np.logical_and(z>1.0, z<1.2)]=self.gal_biases[4]
+            bias = 1 + (0.84 * z)
+            bias[np.logical_and(z > 0.2, z < 0.4)] = self.gal_biases[0]
+            bias[np.logical_and(z > 0.4, z < 0.6)] = self.gal_biases[1]
+            bias[np.logical_and(z > 0.6, z < 0.8)] = self.gal_biases[2]
+            bias[np.logical_and(z > 0.8, z < 1.0)] = self.gal_biases[3]
+            bias[np.logical_and(z > 1.0, z < 1.2)] = self.gal_biases[4]
             return bias
-        return 1 + (0.84*z)
-    
+        return 1 + (0.84 * z)
+
     def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         """
         1705.02332 equation 14 and B1 (originally from 0912.0201)
@@ -275,7 +277,7 @@ class Cosmology:
         zmin = 0 if zmin is None else zmin
         zmax = self.Chi_to_z(self.get_chi_star()) if zmax is None else zmax
         zs = np.linspace(zmin, zmax, 10000)
-        dz = zs[1] - zs[0] 
+        dz = zs[1] - zs[0]
         norm = 1 if typ == "perfect" else np.sum(dz * z_distr_func(zs))
         window = (dn_dz * b) / norm
         return maths.rectangular_pulse_steps(z, zmin, zmax) * window
@@ -334,52 +336,52 @@ class Cosmology:
         return I / I_total
 
     def _SED_func(self, nu):
-        #"1801.05396 uses 857 GHz (pg. 2)"
-        #"1705.02332 uses 353 GHz (pg. 4)"
+        # "1801.05396 uses 857 GHz (pg. 2)"
+        # "1705.02332 uses 353 GHz (pg. 4)"
         nu_prim = 4955e9  # according to 1705.02332 this is in 1502.01591 (also in  Planck lensing 2015)
-        alpha = 2       # 0912.4315 and Planck 2015 appendix D
+        alpha = 2  # 0912.4315 and Planck 2015 appendix D
         beta = 2
         power = beta + 3
         T = 34
         h = Planck
         k_B = physical_constants["Boltzmann constant"][0]
-        exponent = np.asarray((h*nu)/(k_B*T), dtype=np.double)
-        exponent[exponent>700] = np.double(700)
+        exponent = np.asarray((h * nu) / (k_B * T), dtype=np.double)
+        exponent[exponent > 700] = np.double(700)
         small_nu = (np.exp(exponent) - 1) ** -1 * nu ** power
-        big_nu = (np.exp(exponent) - 1)**-1 * nu_prim**power * (nu/nu_prim)**-alpha
+        big_nu = (np.exp(exponent) - 1) ** -1 * nu_prim ** power * (nu / nu_prim) ** -alpha
         if np.shape(nu) != ():
             w1 = np.zeros(np.shape(nu))
             w2 = np.zeros(np.shape(nu))
-            w1[nu<=nu_prim] = 1
-            w2[nu>nu_prim] = 1
-            return w1*small_nu + w2*big_nu
-        if nu<=nu_prim:
+            w1[nu <= nu_prim] = 1
+            w2[nu > nu_prim] = 1
+            return w1 * small_nu + w2 * big_nu
+        if nu <= nu_prim:
             return small_nu
         return big_nu
 
     def _get_cib_norm(self, nu):
         if self.cib_norms is None:
-            self.cib_norms = np.load(Path(__file__).parent/"data/planck_cib/b_c.npy")
+            self.cib_norms = np.load(Path(__file__).parent / "data/planck_cib/b_c.npy")
         if nu == 353e9:
-            if self.agora: return 6.48e-65*1e-6   # My fit of AGORA cib between ell of 110 and 2000
-            return 5.28654e-65*1e-6  # From Toshiya, matching 1705.02332 and 2110.09730
+            if self.agora: return 6.48e-65 * 1e-6  # My fit of AGORA cib between ell of 110 and 2000
+            return 5.28654e-65 * 1e-6  # From Toshiya, matching 1705.02332 and 2110.09730
             # return 7.75714689e-65* 1e-6
             # return self.cib_norms[0]
 
-            #return 8.24989321e-71
+            # return 8.24989321e-71
             # b_c = 8.71253313e-65 * 1e-6   # 1e-6 to change units of window to MJy/sr
         if nu == 545e9:
             return self.cib_norms[1]
-            #return 7.52485062e-71
+            # return 7.52485062e-71
             # b_c = 8.76989271e-65 * 1e-6
         if nu == 857e9:
             return self.cib_norms[2]
-            #return 5.71686654e-71
+            # return 5.71686654e-71
             # b_c = 7.68698899e-65 * 1e-6
 
     def _cib_window_z_sSED(self, z, nu, b_c=None):
-        #"1801.05396 uses 857 GHz (pg. 2)"
-        #"1705.02332 uses 353 GHz (pg. 4)"
+        # "1801.05396 uses 857 GHz (pg. 2)"
+        # "1705.02332 uses 353 GHz (pg. 4)"
         """
         1705.02332 equation 12 (originally from 0912.4315)
         Parameters
@@ -396,12 +398,13 @@ class Cosmology:
         H = self.get_hubble(z)
         z_c = 2
         sig_z = 2
-        window = (Chi ** 2) / (H * (1 + z) ** 2) * np.exp(-((z - z_c) ** 2) / (2 * sig_z ** 2)) * self._SED_func(nu*(z + 1))
-        return b_c*window
+        window = (Chi ** 2) / (H * (1 + z) ** 2) * np.exp(-((z - z_c) ** 2) / (2 * sig_z ** 2)) * self._SED_func(
+            nu * (z + 1))
+        return b_c * window
 
     def _cib_window_Chi_sSED(self, Chi, nu=353e9, b_c=None):
-        #"1801.05396 uses 857 GHz (pg. 2)"
-        #"1705.02332 uses 353 GHz (pg. 4)"
+        # "1801.05396 uses 857 GHz (pg. 2)"
+        # "1705.02332 uses 353 GHz (pg. 4)"
         z = self.Chi_to_z(Chi)
         return self._cib_window_z_sSED(z, nu, b_c) * self.get_hubble(z)
 
@@ -410,7 +413,6 @@ class Cosmology:
 
     def cib_window_z(self, z, nu=353e9, b_c=None):
         return self._cib_window_z_sSED(z, nu, b_c)
-
 
     def get_chi_star(self):
         """
@@ -421,7 +423,6 @@ class Cosmology:
             The comoving radial distance [Mpc] of the surface of last scattering.
         """
         return self.get_eta0() - self._results.tau_maxvis
-
 
     def get_eta0(self):
         """
@@ -601,9 +602,9 @@ class Cosmology:
         ps = PK.P(z, k, grid=False)
         if not weyl_scaled:
             if typ.lower() == "weyl":
-                ps *= k**-4
+                ps *= k ** -4
             elif typ.lower() == "matter-weyl" or typ.lower() == "weyl-matter":
-                ps *= k**-2
+                ps *= k ** -2
         if curly:
             return ps * k ** 3 / (2 * np.pi ** 2)
         return ps
@@ -632,8 +633,9 @@ class Cosmology:
         -------
 
         """
-        cmb_ps = self._results.get_cmb_power_spectra(self._pars, lmax=ellmax, spectra=['total'],CMB_unit="muK", raw_cl=True)
-        return cmb_ps['total'][:,0]
+        cmb_ps = self._results.get_cmb_power_spectra(self._pars, lmax=ellmax, spectra=['total'], CMB_unit="muK",
+                                                     raw_cl=True)
+        return cmb_ps['total'][:, 0]
 
     def get_grad_lens_ps(self, typ, ellmax=6000):
         """
@@ -663,9 +665,8 @@ class Cosmology:
             raise ValueError(f"Type {typ} does not exist.")
         spectra = self._results.get_lensed_gradient_cls(ellmax, raw_cl=True)
         if return_zeros:
-            return np.zeros(np.shape(spectra[:,0]))
-        return spectra[:,index]
-
+            return np.zeros(np.shape(spectra[:, 0]))
+        return spectra[:, index]
 
     def get_lens_ps(self, typ, ellmax=6000):
         """
@@ -693,8 +694,8 @@ class Cosmology:
             raise ValueError(f"Type {typ} does not exist.")
         spectra = self._results.get_lensed_scalar_cls(lmax=ellmax + 10, raw_cl=True)
         if return_zeros:
-            return np.zeros(np.shape(spectra[:,0]))
-        return spectra[:,index]
+            return np.zeros(np.shape(spectra[:, 0]))
+        return spectra[:, index]
 
     def get_unlens_ps(self, typ, ellmax=6000):
         """
@@ -722,6 +723,6 @@ class Cosmology:
             raise ValueError(f"Type {typ} does not exist.")
         spectra = self._results.get_unlensed_scalar_cls(lmax=ellmax + 10, raw_cl=True)
         if return_zeros:
-            return np.zeros(np.shape(spectra[:,0]))
-        return spectra[:,index]
+            return np.zeros(np.shape(spectra[:, 0]))
+        return spectra[:, index]
 

@@ -145,73 +145,96 @@ class Fisher:
         cov3 = N0_omega_spline
         return cov_inv1, cov_inv2, cov3
 
-    def change_cosmology(self, param=None, dx=None, minus=False):
+    def change_cosmology(self, param=None, dx=None, minus=False, useH0=False):
         default_dx = 0.01
-        if minus: default_dx *= -1
-        if dx is not None and minus: dx *= -1
+        dx = default_dx if dx is None else dx
+        if minus: dx *= -1
         cosmo = self.bi._mode._powerspectra.cosmo
-        if param is None:
-            cosmo.set_cosmology()
-            cosmo.calc_results()
+        cosmo._pars = cosmo.get_params()
         default_H0 = cosmo._pars.H0
+        default_thetastar = cosmo._results.get_derived_params()["thetastar"]/100
         default_ombh2 = cosmo._pars.ombh2
         default_omch2 = cosmo._pars.omch2
         default_omk = cosmo._pars.omk
         default_mnu = 0.06
         default_tau = cosmo._pars.Reion.optical_depth
-        cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
-        if param == "H0":
-            dx = cosmo._pars.H0 * default_dx if dx is None else dx
+        if param is None:
+            cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+        elif param == "H0":
+            if not useH0:
+                raise ValueError("Trying to alter H0 with useH0=False")
+            dx *= default_H0
             cosmo._pars.set_cosmology(H0=default_H0+dx, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
-        if param == "ombh2":
-            dx = cosmo._pars.ombh2 * default_dx if dx is None else dx
-            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2+dx, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
-        if param == "omch2":
-            dx = cosmo._pars.omch2 * default_dx if dx is None else dx
-            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2+dx, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
-        if param == "omk":
-            dx = cosmo._pars.omk * default_dx if dx is None else dx
+        elif param == "thetastar" or param == "100thetastar":
+            if useH0:
+                raise ValueError("Trying to alter thetastar with useH0=True")
+            dx *= default_thetastar
+            cosmo._pars.set_cosmology(thetastar=default_thetastar+dx, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            if param == "100thetastar": dx *= 100
+        elif param == "ombh2" or param == "lnombh2":
+            dx *= default_ombh2
+            if useH0:
+                cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2+dx, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            else:
+                cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2+dx, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            if param == "lnombh2": dx = np.log((default_ombh2 + dx)/default_ombh2)
+        elif param == "omch2" or param == "lnomch2":
+            dx *= default_omch2
+            if useH0:
+                cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2+dx, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            else:
+                cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2+dx, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            if param == "lnomch2": dx = np.log((default_omch2 + dx)/default_omch2)
+        elif param == "omk":
+            dx *= default_omk
             if dx == 0: dx = default_dx
-            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk+dx, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
-        if param == "mnu":
-            dx = default_mnu * default_dx if dx is None else dx
+            if useH0:
+                cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk+dx, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            else:
+                cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk+dx, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+        elif param == "mnu":
+            dx *= default_mnu
             if dx == 0: dx = default_dx
-            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu+dx, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
-        if param == "tau":
-            dx = cosmo._pars.Reion.optical_depth * default_dx if dx is None else dx
-            cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau+dx, nnu=3.046, standard_neutrino_neff=3.046)
-        if param == "As":
-            dx = cosmo._pars.InitPower.As * default_dx if dx is None else dx
+            if useH0:
+                cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu+dx, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            else:
+                cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu+dx, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+        elif param == "tau":
+            dx *= default_tau
+            if useH0:
+                cosmo._pars.set_cosmology(H0=default_H0, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau+dx, nnu=3.046, standard_neutrino_neff=3.046)
+            else:
+                cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau+dx, nnu=3.046, standard_neutrino_neff=3.046)
+        elif param == "As":
+            dx *= cosmo._pars.InitPower.As
             cosmo._pars.InitPower.As += dx
-        if param == "ns":
-            dx = cosmo._pars.InitPower.ns * default_dx if dx is None else dx
+        elif param == "ns":
+            dx *= cosmo._pars.InitPower.ns
             cosmo._pars.InitPower.ns += dx
-        if param == "omnuh2":
-            dx = cosmo._pars.omnuh2 * default_dx if dx is None else dx
+        elif param == "omnuh2":
+            dx *= cosmo._pars.omnuh2
             if dx == 0: dx = default_dx
             cosmo._pars.omnuh2 += dx
-        if param == "w":
-            dx = cosmo._pars.DarkEnergy.w * default_dx if dx is None else dx
+        elif param == "w":
+            dx *= cosmo._pars.DarkEnergy.w
             cosmo._pars.DarkEnergy.w += dx
-        if param == "wa":
-            dx = cosmo._pars.DarkEnergy.wa * default_dx if dx is None else dx
+        elif param == "wa":
+            dx *= cosmo._pars.DarkEnergy.wa
             if dx == 0: dx = default_dx
             cosmo._pars.DarkEnergy.wa += dx
-        if param == "sig8":
+        elif param == "sig8":
             sig8 = cosmo._results.get_sigma8_0()
             As = cosmo._pars.InitPower.As
-            dx = As * default_dx if dx is None else dx
+            dx *= As
             if dx == 0: dx = default_dx
             cosmo._pars.InitPower.As += dx
-            dx = sig8 * np.sqrt(np.abs(dx/As))
+            dx = sig8 * dx / (2*As)
+        else:
+            raise ValueError(f"Parameter '{param}' unexpected.")
         cosmo._results = cosmo.calc_results()
         matter_PK = cosmo.get_matter_PK(typ="matter")
-        weyl_PK = cosmo.get_matter_PK(typ="weyl")
-        matter_weyl_PK = cosmo.get_matter_PK(typ="matter-weyl")
         self.bi._mode.matter_PK = matter_PK
         self.bi._mode._powerspectra.matter_PK = matter_PK
-        self.bi._mode._powerspectra.weyl_PK = weyl_PK
-        self.bi._mode._powerspectra.matter_weyl_PK = matter_weyl_PK
         self.bi._M_splines = dict.fromkeys(self.bi._mode.get_M_types())
         self.covariance.power = self.bi._mode._powerspectra
         self.power = self.covariance.power
@@ -223,7 +246,7 @@ class Fisher:
             return self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro)
         self.change_cosmology(param, dx, True)
         bi_x_h_minus = self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro)
-        self.change_cosmology()
+        # self.change_cosmology()
         h = self.change_cosmology(param, dx)
         bi_x_h = self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro)
         self.change_cosmology()
@@ -551,12 +574,12 @@ class Fisher:
             Cl_t_x_h_minus = self.covariance.power.cosmo.get_lens_ps("TT")[Lmin:Lmax + 1]
             Cl_te_x_h_minus = self.covariance.power.cosmo.get_lens_ps("TE")[Lmin:Lmax + 1]
             Cl_e_x_h_minus = self.covariance.power.cosmo.get_lens_ps("EE")[Lmin:Lmax + 1]
-            self.change_cosmology()
+            # self.change_cosmology()
             h = self.change_cosmology(param, dx)
             Cl_t_x_h = self.covariance.power.cosmo.get_lens_ps("TT")[Lmin:Lmax + 1]
             Cl_te_x_h = self.covariance.power.cosmo.get_lens_ps("TE")[Lmin:Lmax + 1]
             Cl_e_x_h = self.covariance.power.cosmo.get_lens_ps("EE")[Lmin:Lmax + 1]
-            self.change_cosmology()
+            # self.change_cosmology()
             mat[:,0,0] = Cl_t_x_h - Cl_t_x_h_minus
             mat[:, 1, 1] = Cl_e_x_h - Cl_e_x_h_minus
             mat[:, 1, 0] = mat[:, 0, 1] = Cl_te_x_h - Cl_te_x_h_minus
@@ -585,6 +608,7 @@ class Fisher:
         res = np.matmul(leg1, leg2)
         trace = res[:,0,0] + res[:,1,1]
         ells = np.arange(Lmin, Lmax + 1)
+        self.change_cosmology()
         return f_sky * np.sum(trace * (ells + 0.5))
 
     def get_kappa_ps_Fisher(self, Lmax, f_sky=1, auto=True, Lmin=30, param=None, dx=None):
@@ -602,10 +626,10 @@ class Fisher:
         def _get_dCl(param, dx):
             self.change_cosmology(param, dx, True)
             Cl_x_h_minus = self.power.get_kappa_ps(ells)
-            self.change_cosmology()
+            # self.change_cosmology()
             h = self.change_cosmology(param, dx)
             Cl_x_h = self.power.get_kappa_ps(ells)
-            self.change_cosmology()
+            # self.change_cosmology()
             return (Cl_x_h - Cl_x_h_minus) / (2 * np.abs(h))
 
         self.change_cosmology()
@@ -615,8 +639,11 @@ class Fisher:
             Cl_1 = Cl_2 = Cl_kk
         else:
             if np.size(param) == 2:
-                Cl_1 = _get_dCl(param[0], dx)
-                Cl_2 = _get_dCl(param[1], dx)
+                if param[0] != param[1]:
+                    Cl_1 = _get_dCl(param[0], dx)
+                    Cl_2 = _get_dCl(param[1], dx)
+                else:
+                    Cl_1 = Cl_2 = _get_dCl(param[0], dx)
             else:
                 Cl_1 = Cl_2 = _get_dCl(param, dx)
         N0 = self.covariance.noise.get_N0("kappa", Lmax)
@@ -624,6 +651,7 @@ class Fisher:
             var = 2 / (2 * ells + 1) * (Cl_kk + N0[ells]) ** 2
         else:
             var = 2 / (2 * ells + 1) * (Cl_kk**2 + 0.5*(N0[ells] * Cl_kk))
+        self.change_cosmology()
         return f_sky * np.sum(Cl_1 * Cl_2 / var)
 
     def get_rotation_ps_Fisher(self, Lmax, M_path, f_sky=1, auto=True, camb=False, cmb=True, Lmin=30, n=40):
