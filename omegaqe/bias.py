@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 import vector
 from omegaqe.tools import getFileSep, path_exists
-# from fullsky_sims.demnunii import Demnunii
+from fullsky_sims.demnunii import Demnunii
 from camb.correlations import lensed_cls
 
 def _get_Cl_spline(typ):
@@ -257,8 +257,8 @@ def _alpha(typs, L1, L2, theta12, nu, no_k=False):
             cov_inv1_spline, cov_inv2_spline = _get_cov_inv_spline(combos[iii]+kq, typs)
             Cl_qk_spline = _get_Cl_spline(q + "k")
             mixed_bi_element = bi_ij * cov_inv1_spline(L1) * cov_inv2_spline(L2) * Cl_qk_spline(L2)
-            if q == "k":
-                mixed_bi_element /= 2
+            # if q == "k":
+                # mixed_bi_element /= 2
             if mixed_bi is None:
                 mixed_bi = mixed_bi_element
             else:
@@ -363,9 +363,11 @@ def _setup_delen_cmb_cls():
     for iii, typ in enumerate(typs):
         delen_len_cl = delen_len_cls[:, iii] / cl2dl
         global_qe.cmb[typ].lenCl_spline = InterpolatedUnivariateSpline(Ls[2:], delen_len_cl[2:])
+        global_qe.cmb[typ].gradCl_spline = InterpolatedUnivariateSpline(Ls[2:], delen_len_cl[2:])
 
         if typ[0] != typ[1]:
             global_qe.cmb[typ[::-1]].lenCl_spline = InterpolatedUnivariateSpline(Ls[2:], delen_len_cl[2:])
+            global_qe.cmb[typ[::-1]].gradCl_spline = InterpolatedUnivariateSpline(Ls[2:], delen_len_cl[2:])
 
 
 def _cache_splines(F_L_path, bi_typ, lss_cls, iter):
@@ -385,9 +387,9 @@ def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps=
     global_fish = Fisher(exp, qe_fields, gmv, ps, L_cuts, iter, False, data_dir, setup_bispectra=True)
     
     # DEMNUnii runs only ----------------
-    # dm = Demnunii()
-    # global_fish.covariance.power = dm.power
-    # global_fish.covariance.noise.full_sky = True
+    dm = Demnunii()
+    global_fish.covariance.power = dm.power
+    global_fish.covariance.noise.full_sky = True
     # DEMNUnii runs only ----------------
     
     # global_fish.setup_noise(exp, qe_fields, gmv, ps, L_cuts, iter, data_dir)
