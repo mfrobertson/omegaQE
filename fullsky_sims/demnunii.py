@@ -110,12 +110,16 @@ class Demnunii:
     def _get_chi(self, snap):
         return self.cosmo.z_to_Chi(self._get_z(snap))
 
-    def _window_LSST(self, z, zmin, zmax):
-        return self.cosmo.gal_window_z(z, zmin=zmin, zmax=zmax)
+    def _window_LSST(self, z, zmin, zmax, bias_unity):
+        return self.cosmo.gal_window_z(z, zmin=zmin, zmax=zmax, bias_unity=bias_unity)
     
     def _window_LSST_mu(self, z):
         # Need to divide by H(z) to convert window into function of z and not chi
         return self.cosmo.gal_lens_window_matter(self.cosmo.z_to_Chi(z), self.cosmo.get_chi_star())/self.cosmo.get_hubble(z)
+    
+    def _window_LSST_rsd(self, z):
+        # Need to divide by H(z) to convert window into function of z and not chi
+        return self.cosmo.rsd_window_constChi(self.cosmo.z_to_Chi(z), self.Lmax_map)/self.cosmo.get_hubble(z)
 
     def _window_Planck_cib(self, z):
         return self.cosmo.cib_window_z(z)
@@ -137,15 +141,17 @@ class Demnunii:
 
 
 
-    def _window(self, snap, typ, gal_zmin=None, gal_zmax=None):
+    def _window(self, snap, typ, gal_zmin=None, gal_zmax=None, bias_unity=False):
         zmin = self._get_zmin(snap)
         zmax = self._get_zmax(snap)
         zs = np.linspace(zmin, zmax, 1000)
         dz = zs[1] - zs[0]
         if typ == "LSST":
-            return np.sum(self._window_LSST(zs, gal_zmin, gal_zmax)) * dz
+            return np.sum(self._window_LSST(zs, gal_zmin, gal_zmax, bias_unity)) * dz
         if typ == "LSST_mu":
             return np.sum(self._window_LSST_mu(zs)) * dz
+        if typ == "LSST_rsd":
+            return self._window_LSST_rsd(self._get_z(snap))
         if typ == "Planck_cib":
             return np.sum(self._window_Planck_cib(zs)) * dz
         if typ == "CMB":
@@ -160,7 +166,7 @@ class Demnunii:
         alm_corr = self.sht.almxfl(alm, 1/self.sht.pixwin)
         return self.sht.alm2map(alm_corr)
 
-    def get_obs_gal_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
+    def get_obs_gal_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False, bias_unity=False):
         window="LSST"
         if verbose: print(f"DEMNUnii: Constructing gal map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}, lensed={lensed}")
         npix = self.sht.nside2npix()
@@ -169,14 +175,14 @@ class Demnunii:
         t0 = datetime.datetime.now()
         for iii, snap in enumerate(snaps):
             if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
-            gal += self._window(snap, window, zmin, zmax) * self.get_density_snap(snap, lensed)
+            gal += self._window(snap, window, zmin, zmax, bias_unity=bias_unity) * self.get_density_snap(snap, lensed)
             if verbose: print('\r', end='')
         if verbose: print("")
         if pixel_corr: gal = self._apply_pixel_correction(gal)
         return gal
     
     def get_obs_mag_bias_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
-        # TODO: This assumes s=0.2 
+        # TODO: This assumes s=1
         window="LSST_mu"
         if verbose: print(f"DEMNUnii: Constructing mag bias map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}, lensed={lensed}")
         npix = self.sht.nside2npix()
@@ -184,12 +190,32 @@ class Demnunii:
         snaps = self.get_snaps_z(zmin, zmax)
         t0 = datetime.datetime.now()
         for iii, snap in enumerate(snaps):
+            if snap == 62:
+                continue
             if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
             gal += self._window(snap, window) * self.get_density_snap(snap, lensed)
             if verbose: print('\r', end='')
         if verbose: print("")
         if pixel_corr: gal = self._apply_pixel_correction(gal)
-        return gal
+        return 3 * gal   # assums s=1
+    
+    def get_obs_rsd_map(self, zmin=0, zmax=20, verbose=False, pixel_corr=True, lensed=False):
+        #TODO: see 2309.00052
+        window="LSST_rsd"
+        if verbose: print(f"DEMNUnii: Constructing rsd map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}, lensed={lensed}")
+        npix = self.sht.nside2npix()
+        gal = np.zeros(npix)
+        snaps = self.get_snaps_z(zmin, zmax)
+        t0 = datetime.datetime.now()
+        for iii, snap in enumerate(snaps):
+            if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
+            gal_lm = self.sht.map2alm(self.get_density_snap(snap, lensed))
+            gal_lm = self.sht.almxfl(gal_lm, self._window(snap, window))
+            gal += self.sht.alm2map(gal_lm)
+            if verbose: print('\r', end='')
+        if verbose: print("")
+        if pixel_corr: gal = self._apply_pixel_correction(gal)
+        return -gal
 
     def get_obs_cib_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
         window = "Planck_cib"
