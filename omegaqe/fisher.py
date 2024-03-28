@@ -158,6 +158,10 @@ class Fisher:
         default_omk = cosmo._pars.omk
         default_mnu = 0.06
         default_tau = cosmo._pars.Reion.optical_depth
+        default_w = cosmo._pars.DarkEnergy.w
+        default_wa = cosmo._pars.DarkEnergy.wa
+        default_As = cosmo._pars.InitPower.As
+        default_ns = cosmo._pars.InitPower.ns
         if param is None:
             cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
         elif param == "H0":
@@ -207,28 +211,28 @@ class Fisher:
                 cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau+dx, nnu=3.046, standard_neutrino_neff=3.046)
         elif param == "As":
             if not dx_absolute: dx *= cosmo._pars.InitPower.As
-            cosmo._pars.InitPower.As += dx
+            cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            cosmo._pars.InitPower.As = default_As + dx
         elif param == "ns":
             if not dx_absolute: dx *= cosmo._pars.InitPower.ns
-            cosmo._pars.InitPower.ns += dx
-        elif param == "omnuh2":
-            if not dx_absolute: dx *= cosmo._pars.omnuh2
-            if dx == 0: dx = default_dx
-            cosmo._pars.omnuh2 += dx
+            cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            cosmo._pars.InitPower.ns = default_ns + dx      
         elif param == "w":
             if not dx_absolute: dx *= cosmo._pars.DarkEnergy.w
-            cosmo._pars.DarkEnergy.w += dx
+            cosmo._pars.set_dark_energy(w=default_w + dx)
+            cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
         elif param == "wa":
             if not dx_absolute: dx *= cosmo._pars.DarkEnergy.wa
             if dx == 0: dx = default_dx
-            cosmo._pars.DarkEnergy.wa += dx
+            cosmo._pars.set_dark_energy(wa=default_wa + dx)
+            cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
         elif param == "sig8":
             sig8 = cosmo._results.get_sigma8_0()
-            As = cosmo._pars.InitPower.As
-            if not dx_absolute: dx *= As
+            if not dx_absolute: dx *= default_As
             if dx == 0: dx = default_dx
-            cosmo._pars.InitPower.As += dx
-            dx = sig8 * dx / (2*As)
+            cosmo._pars.set_cosmology(thetastar=default_thetastar, ombh2=default_ombh2, omch2=default_omch2, omk=default_omk, mnu=default_mnu, tau=default_tau, nnu=3.046, standard_neutrino_neff=3.046)
+            cosmo._pars.InitPower.As = default_As + dx
+            dx = sig8 * dx / (2*default_As)
         else:
             raise ValueError(f"Parameter '{param}' unexpected.")
         cosmo._results = cosmo.calc_results()

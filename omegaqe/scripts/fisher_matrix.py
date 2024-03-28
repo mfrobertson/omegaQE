@@ -42,7 +42,8 @@ def _main(exp, typs, params, condition, dir, _id):
 
     cosmo = Cosmology(paramfile="Planck")
     fish = Fisher(exp=exp, qe="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, iter_ext=False, data_dir=f"{omegaqe.dir_path}/data_planck/", cosmology=cosmo)
-
+    
+    param_str = ""
     for p in params:
         param_str += "_" + p
     condition_dir = f"{dir}/condition/{param_str}"
@@ -93,7 +94,6 @@ def _main(exp, typs, params, condition, dir, _id):
             F_cmb = np.empty(end - start)
             world_comm.Recv([F_cmb, MPI.DOUBLE], source=rank, tag=77)
             F_arr_cmb[start: end] = F_cmb
-        param_str = ""
         dir += f"{exp}/{typs}/{param_str}"
         if not os.path.isdir(dir):
             os.makedirs(dir)
