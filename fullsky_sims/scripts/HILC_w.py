@@ -102,19 +102,19 @@ def _get_w(c_inv, constrained=False):
     denom = np.matmul(np.matmul(a.T, c_inv),a)[:,None]
     return num/denom
 
-def _fg_maps(tsz, ksz, cib, rad, planck):
+def _fg_maps(tsz, ksz, cib, rad, planck, point, cluster):
     Nfreqs = len(freqs)
     if planck: Nfreqs += 1
     Ts_fg = np.empty((Nfreqs, ag.sht.nside2npix(ag.nside)))
     Qs_fg = np.empty((Nfreqs, ag.sht.nside2npix(ag.nside)))
     Us_fg = np.empty((Nfreqs, ag.sht.nside2npix(ag.nside)))
     for iii, freq in enumerate(freqs):
-        T_fg, Q_fg, U_fg = ag.create_fg_maps(freq, tsz, ksz, cib, rad, False)
+        T_fg, Q_fg, U_fg = ag.create_fg_maps(freq, tsz, ksz, cib, rad, False, point, cluster)
         Ts_fg[iii,:] = T_fg
         Qs_fg[iii,:] = Q_fg
         Us_fg[iii,:] = U_fg
     if planck:
-        T_pl, Q_pl, U_pl = ag.create_fg_maps(545, tsz, ksz, cib, False, False)
+        T_pl, Q_pl, U_pl = ag.create_fg_maps(545, tsz, ksz, cib, False, False, point, cluster)
         Ts_fg[-1,:] = T_pl
         Qs_fg[-1,:] = Q_pl
         Us_fg[-1,:] = U_pl
@@ -170,13 +170,18 @@ def setup_dir(full_dir):
     if not os.path.exists(full_dir):
         os.makedirs(full_dir)
 
-def save_ws(exp, w_T, w_E, w_B, constrained, planck):
-    dir_name = "HILC_weights"
+def save_ws(exp, w_T, w_E, w_B, constrained, planck, point, cluster):
+    dir_name = "HILC_weights_new"
     if constrained:
         dir_name += "_constrained"
     if planck:
         dir_name += "_planck"
-    full_dir = f"{ag.cache_dir}/_{dir_name}/{exp}/"
+    mask = ""
+    if point:
+        mask += "_point"
+    if cluster:
+        mask += "_cluster"
+    full_dir = f"{ag.cache_dir}/_{dir_name}/{exp}/{mask}"
     setup_dir(full_dir)
     filename = "weights"
     for nu in freqs:
@@ -185,9 +190,9 @@ def save_ws(exp, w_T, w_E, w_B, constrained, planck):
     np.save(f"{full_dir}/{filename}_E", w_E)
     np.save(f"{full_dir}/{filename}_B", w_B)
 
-def main(exp, tsz, ksz, cib, rad, constrained, planck, nthreads, _id):
+def main(exp, tsz, ksz, cib, rad, constrained, planck, point, cluster, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
-    mpi.output(f" tsz: {tsz}, ksz: {ksz}, cib: {cib}, rad: {rad}, constrained: {constrained}, planck: {planck}, nthreads: {nthreads}", 0, _id)
+    mpi.output(f" tsz: {tsz}, ksz: {ksz}, cib: {cib}, rad: {rad}, constrained: {constrained}, planck: {planck}, point: {point}, cluster: {cluster}, nthreads: {nthreads}", 0, _id)
 
     global ag, noise
     ag = Agora(nthreads=nthreads)
@@ -195,7 +200,7 @@ def main(exp, tsz, ksz, cib, rad, constrained, planck, nthreads, _id):
     noise.full_sky = True
 
 
-    Ts, Qs, Us = _fg_maps(tsz, ksz, cib, rad, planck)
+    Ts, Qs, Us = _fg_maps(tsz, ksz, cib, rad, planck, point, cluster)
 
     N_Ts, N_Ps = _noise_cls(exp, planck)
 
@@ -206,14 +211,14 @@ def main(exp, tsz, ksz, cib, rad, constrained, planck, nthreads, _id):
     w_E = _get_w(C_E_inv, constrained)
     w_B = _get_w(C_B_inv, constrained)
 
-    save_ws(exp, w_T, w_E, w_B, constrained, planck)
+    save_ws(exp, w_T, w_E, w_B, constrained, planck, point, cluster)
 
     
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 9:
+    if len(args) != 11:
         raise ValueError(
-            "Must supply arguments: exp tsz ksz cib rad constrained planck nthreads _id")
+            "Must supply arguments: exp tsz ksz cib rad constrained planck point cluster nthreads _id")
     exp = str(args[0])
     tsz = parse_boolean(args[1])
     ksz = parse_boolean(args[2])
@@ -221,6 +226,8 @@ if __name__ == '__main__':
     rad = parse_boolean(args[4])
     constrained = parse_boolean(args[5])
     planck = parse_boolean(args[6])
-    nthreads  = int(args[7])
-    _id = str(args[8])
-    main(exp, tsz, ksz, cib, rad, constrained, planck, nthreads, _id)
+    point_mask = parse_boolean(args[7])
+    cluster_mask = parse_boolean(args[8])
+    nthreads  = int(args[9])
+    _id = str(args[10])
+    main(exp, tsz, ksz, cib, rad, constrained, planck, point_mask, cluster_mask, nthreads, _id)

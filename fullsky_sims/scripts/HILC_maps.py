@@ -11,8 +11,13 @@ def setup_dir(full_dir):
     if not os.path.exists(full_dir):
         os.makedirs(full_dir)
 
-def _get_smoothed_weights(exp, typ):
-    w = np.load(f"{ag.cache_dir}/_HILC_weights/{exp}/weights_95_150_220_{typ}.npy")
+def _get_smoothed_weights(exp, typ, pm, cm):
+    mask_str = ""
+    if pm:
+        mask_str += "_point"
+    if cm:
+        mask_str += "_cluster"
+    w = np.load(f"{ag.cache_dir}/_HILC_weights_new/{exp}/{mask_str}/weights_95_150_220_{typ}.npy")
     w_shape = np.shape(w)
     w_sm = np.zeros(w_shape)
     for iii in np.arange(w_shape[1]):
@@ -69,9 +74,9 @@ def main(start, end, deflect_typ, exp, tsz, ksz, cib, rad, gauss, point_mask, cl
     dir_name = f"{ag.sims_dir}/{deflect_typ}/HILC{dir_name_ext}"
     setup_dir(dir_name)
 
-    wT = _get_smoothed_weights(exp, "T")
-    wE = _get_smoothed_weights(exp, "E")
-    wB = _get_smoothed_weights(exp, "B")
+    wT = _get_smoothed_weights(exp, "T", point_mask, cluster_mask)
+    wE = _get_smoothed_weights(exp, "E", point_mask, cluster_mask)
+    wB = _get_smoothed_weights(exp, "B", point_mask, cluster_mask)
     freqs = [95, 150, 220]
     Ts_fg = np.empty((3, ag.sht.nside2npix(ag.nside)))
     Qs_fg = np.empty((3, ag.sht.nside2npix(ag.nside)))
