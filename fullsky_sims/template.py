@@ -72,7 +72,9 @@ class Template:
 
         iter=True if "_iter" in qe_typ else False 
         self.fields.setup_noise(qe=fields, iter=iter, gmv=qe_typ!="single")
-        C_inv = self._fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9)
+        gal_distro = "agora" if self._cosmo.agora else "LSST_gold"
+        print(gal_distro)
+        C_inv = self._fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9, gal_distro=gal_distro)
         F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
         Ls_sample = np.arange(self.Lmax_map+1)
         F_L = F_L_spline(Ls_sample)
