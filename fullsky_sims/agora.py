@@ -24,9 +24,9 @@ class Agora:
         self.point_mask_idx = None
         self.cluster_mask_idx = None
 
-    def calc_masks(self, threshold=6e-3, Nsources=10000):
-        self.point_mask_idx = self._get_point_mask_indices(threshold)
-        self.cluster_mask_idx = self._get_cluster_mask_indices(Nsources)
+    def calc_masks(self, threshold=10e-3, Nsources=60000):
+        self.point_mask_idx = self._get_point_mask_indices(threshold, cib=True)
+        self.cluster_mask_idx, self.cluster_mask_rads = self._get_cluster_mask_indices(Nsources)
 
     def _setup_dndz_splines(self):
         nbins = 5
@@ -173,30 +173,19 @@ class Agora:
         rad = self.sht.read_map(f"{self.data_dir}/radio/agora_radiomap_len_universemachine_trinity_{nu}ghz_randflux_datta2018_truncgauss.0.fits", field=0)
         rad *= self.Jy_to_muK(nu*1e9, alpha=-0.75)
         if point_mask:
-            mask_idx = self._get_point_mask_indices() if self.point_mask_idx is None else self.point_mask_idx
+            mask_idx = self._get_point_mask_indices(cib=False) if self.point_mask_idx is None else self.point_mask_idx
             rad = self._mask_point(rad, mask_idx)
         if pixel_corr: rad = self._apply_pixel_correction(rad)
         return rad
     
-    @staticmethod
-    def get_mask_limits(nu):
-        if nu == 95:
-            return [6e-3, 1.12e-3, 1.12e-3]
-        if nu == 150:
-            return [6e-3, 1.68e-3, 1.68e-3]
-        if nu == 220:
-            return [6e-3, 4.45e-3, 4.45e-3]
                 
     def get_obs_rad_maps(self, nu, pixel_corr=True, lensed=True, point_mask=False):
         # B-mode radio sources not correct (but seem unimportant anyway 1911.09466)
         T, Q, U = self.sht.read_map(f"{self.data_dir}/radio/agora_radiomap_len_universemachine_trinity_{nu}ghz_randflux_datta2018_truncgauss.0.fits")
-        mask_limits = self.get_mask_limits(nu)
+        # mask_limits = self.get_mask_limits(nu)
         for iii, field in enumerate([T, Q, U]):
             if point_mask:
-                if iii == 0 and self.point_mask_idx is not None:
-                    mask_idx = self.point_mask_idx
-                else:
-                    mask_idx = self._get_point_mask_indices(mask_limits[iii])
+                mask_idx = self._get_point_mask_indices(cib=False) if self.point_mask_idx is None else self.point_mask_idx
                 field = self._mask_point(field, mask_idx)
             field *= self.Jy_to_muK(nu*1e9, alpha=-0.75)
             if pixel_corr: field = self._apply_pixel_correction(field)
@@ -205,19 +194,33 @@ class Agora:
     def get_PK(self):
         return self.cosmo.get_matter_PK(typ="matter")
 
-    def _get_point_mask_indices(self, threshold=6e-3):
-        nu = 150
-        field = self.get_obs_rad_map(nu,False)
-        field += self.get_obs_cib_map(nu, False, muK=True)
-        # field += self.get_obs_tsz_map(nu, False)
-        # field += self.get_obs_ksz_map(False)
-        field /= self.Jy_to_muK(nu*1e9)
-        return np.where(np.abs(field*self.sht.nside2pixarea()) > threshold)
+    def _get_point_mask_indices(self, threshold=10e-3, cib=False, cib_threshold=7e-3):
+        rad_nu = 95
+        field = self.get_obs_rad_map(rad_nu,False)
+        field /= self.Jy_to_muK(rad_nu*1e9)
+        indices = np.where(np.abs(field*self.sht.nside2pixarea()) > threshold)
+        if cib:
+            cib_nu = 220
+            field = self.get_obs_cib_map(cib_nu, False, muK=True)
+            field /= self.Jy_to_muK(cib_nu*1e9)
+            indices_cib = np.where(np.abs(field*self.sht.nside2pixarea()) > cib_threshold)
+            indices_tot = np.concatenate((indices[0], indices_cib[0]))
+            return np.unique(indices_tot)
+        return indices
+
     
-    def _get_cluster_mask_indices(self, Nsources=10000):
-        nu = 95
-        field = self.get_obs_tsz_map(nu, False)
-        return np.argsort(np.abs(field))[-Nsources:]
+    def _get_cluster_mask_indices(self, Nsources=60000):
+        mass = np.load(f"{self.data_dir}/halocat/mass.npy")
+        indices = np.argsort(mass)[::-1][:Nsources]
+        ra = np.load(f"{self.data_dir}/halocat/ra.npy")[indices]
+        dec = np.load(f"{self.data_dir}/halocat/dec.npy")[indices]
+        rad = np.load(f"{self.data_dir}/halocat/rvir.npy")[indices]
+        z = np.load(f"{self.data_dir}/halocat/z.npy")[indices]
+        idx = hp.pixelfunc.ang2pix(self.nside, np.radians(90-dec), np.radians(ra), lonlat=False)
+        h = self.cosmo._pars.H0 / 100
+        chi = self.cosmo.z_to_Chi(z)*1000/h    # [kpc/h]
+        theta = rad/chi   # [radians]
+        return idx, theta
 
     def _mask_point(self, field, mask_idx, typ="median"):
         median = np.median(field)
@@ -232,34 +235,38 @@ class Agora:
                 field[idx] = np.median(field_copy[nb_idx[:,iii]])
         return field
     
-    def _mask_cluster(self, field, mask_idx, typ="median", size=5):
-        nb_idx = hp.get_all_neighbours(self.sht.nside, mask_idx).ravel()
-        for _ in np.arange(1, np.round(size)):
-            nb_idx = np.append(nb_idx, hp.get_all_neighbours(self.sht.nside, nb_idx).ravel())
+    def _mask_cluster(self, field, mask_idx, typ="median"):
         median = np.median(field)
-        if typ == "zerod":
-            field[mask_idx] = 0
-            field[nb_idx] = 0
-        elif typ == "median":
-            field[mask_idx] = median
-            field[nb_idx] = median
+        for iii, pix in enumerate(mask_idx):
+            vec = hp.pixelfunc.pix2vec(self.sht.nside, pix)
+            rad = self.cluster_mask_rads[iii]
+            disk_idx = hp.query_disc(self.sht.nside, vec, rad*1.5)
+            if typ == "zerod":
+                field[disk_idx] = 0
+            elif typ == "median":
+                field[disk_idx] = median
         return field
     
-    def create_fg_maps(self, nu, tsz, ksz, cib, rad, gauss, point_mask, cluster_mask):
+    def create_fg_maps(self, nu, tsz, ksz, cib, rad, gauss, point_mask=False, cluster_mask=False):
     
         npix = self.sht.nside2npix(self.nside)
         T_fg = np.zeros(npix)
         Q_fg = np.zeros(npix)
         U_fg = np.zeros(npix)
+
+        if point_mask:
+            self.point_mask_idx = self._get_point_mask_indices(cib=True)
+        if cluster_mask:
+            self.cluster_mask_idx, self.cluster_mask_rads = self._get_cluster_mask_indices()
         
         if tsz:
-            T_fg += self.get_obs_tsz_map(nu, point_mask=point_mask, cluster_mask=cluster_mask)
+            T_fg += self.get_obs_tsz_map(nu,  point_mask=point_mask, cluster_mask=cluster_mask)
         if ksz:
             T_fg += self.get_obs_ksz_map()
         if cib:
             T_fg += self.get_obs_cib_map(nu, muK=True, point_mask=point_mask)
         if rad:
-            T_rad, Q_rad, U_rad = self.get_obs_rad_maps(nu, point_mask=point_mask)
+            T_rad, Q_rad, U_rad = self.get_obs_rad_maps(nu, point_mask=True)
             T_fg += T_rad
             Q_fg += Q_rad
             U_fg += U_rad
