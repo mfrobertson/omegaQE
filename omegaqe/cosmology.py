@@ -39,6 +39,27 @@ class Cosmology:
         paramfile = self.paramfile if paramfile is None else paramfile
         return self._get_pars(self._get_param_file(paramfile))
 
+    def get_pars_dict(self, pars: camb.model.CAMBparams):
+        return {"thetastar": 0.010410837983195698,
+                "ombh2": pars.ombh2,
+                "omch2": pars.omch2,
+                "omk": pars.omk,
+                "mnu": 0.06,
+                "tau": pars.Reion.optical_depth,
+                "w": pars.DarkEnergy.w,
+                "wa": pars.DarkEnergy.wa,
+                "As": pars.InitPower.As,
+                "ns": pars.InitPower.ns,
+                "sig8": 0.8123981609602227,
+                }
+
+    def modify_params(self, pars, mod_dict):
+        self._pars = camb.set_params(cp=pars, thetastar=mod_dict["thetastar"], ombh2=mod_dict["ombh2"], omch2=mod_dict["omch2"],
+                        omk=mod_dict["omk"], mnu=mod_dict["mnu"], tau=mod_dict["tau"], nnu=3.046,
+                        standard_neutrino_neff=3.046, w=mod_dict["w"], wa=mod_dict["wa"], As=mod_dict["As"],
+                        ns=mod_dict["ns"])
+        self._results = self.calc_results()
+
     def _get_param_file(self, name):
         if name.lower() == "lensit":
             return "Lensit_fiducial_flatsky_params.ini"
@@ -154,7 +175,7 @@ class Cosmology:
         poisson_fac = self.poisson_factor(zs)
         win = self.gal_lens_window(Chi1, Chi2, heaviside) * poisson_fac
         return win
-    
+
     def rsd_window_constChi(self, Chi, ellmax, typ="LSST_gold", zmin=0, zmax=None):
         """
         Reference 2309.00052
@@ -170,14 +191,14 @@ class Cosmology:
 
         """
         ells = np.arange(9, ellmax + 1)
-        L0 = ((2*ells**2) + (2*ells) -1) / ((2*ells - 1)*(2*ells + 3))
-        L_m1 = - ((ells * (ells - 1))/((2*ells - 1)*np.sqrt((2*ells - 3)*(2*ells + 1))))
-        L_p1 = - (((ells + 1)*(ells + 2))/((2*ells + 3)*np.sqrt((2*ells + 1)*(2*ells+5))))
+        L0 = ((2 * ells ** 2) + (2 * ells) - 1) / ((2 * ells - 1) * (2 * ells + 3))
+        L_m1 = - ((ells * (ells - 1)) / ((2 * ells - 1) * np.sqrt((2 * ells - 3) * (2 * ells + 1))))
+        L_p1 = - (((ells + 1) * (ells + 2)) / ((2 * ells + 3) * np.sqrt((2 * ells + 1) * (2 * ells + 5))))
         L_facs = np.array([L_m1, L0, L_p1])
         res = np.zeros(np.size(ells))
         for iii, L_fac in enumerate(L_facs):
             iii -= 1
-            Chi_scaled = (2*ells + 1 + 4*iii)/(2*ells + 1) * Chi
+            Chi_scaled = (2 * ells + 1 + 4 * iii) / (2 * ells + 1) * Chi
             n = self.gal_window_Chi(Chi_scaled, typ=typ, zmin=zmin, zmax=zmax, bias_unity=True)
             f = self.get_f(self.Chi_to_z(Chi_scaled))
             res += L_fac * n * f
@@ -569,15 +590,14 @@ class Cosmology:
             elif z.ndim == 3:
                 return self._z_to_Chi_3dim(z)
         return self._results.comoving_radial_distance(z)
-    
+
     def get_f(self, z):
         # Reference 1807.06209
         Om_c = self._results.get_Omega("cdm", z)
-        Om_b = self._results.get_Omega("baryon", z)  
+        Om_b = self._results.get_Omega("baryon", z)
         Om_nu_mass = self._results.get_Omega("nu", z)
         Om_nu = self._results.get_Omega("neutrino", z)
-        return (Om_c+Om_b+Om_nu+Om_nu_mass)**0.55
-    
+        return (Om_c + Om_b + Om_nu + Om_nu_mass) ** 0.55
 
     def _get_ps_variables(self, typ):
         weyl = "Weyl"
