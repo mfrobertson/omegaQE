@@ -40,17 +40,23 @@ class Cosmology:
         return self._get_pars(self._get_param_file(paramfile))
 
     def get_pars_dict(self, pars: camb.model.CAMBparams):
-        return {"thetastar": 0.010410837983195698,
+        thetastar = 0.010410837983195698
+        mnu = 0.06
+        sig8 = 0.8123981609602227
+        return {"thetastar": thetastar,
+                "100thetastar": 100*thetastar,
                 "ombh2": pars.ombh2,
                 "omch2": pars.omch2,
+                "lnombh2": np.log(pars.ombh2),
+                "lnomch2": np.log(pars.omch2),
                 "omk": pars.omk,
-                "mnu": 0.06,
+                "mnu": mnu,
                 "tau": pars.Reion.optical_depth,
                 "w": pars.DarkEnergy.w,
                 "wa": pars.DarkEnergy.wa,
                 "As": pars.InitPower.As,
                 "ns": pars.InitPower.ns,
-                "sig8": 0.8123981609602227,
+                "sig8": sig8,
                 }
 
     def modify_params(self, pars, mod_dict):

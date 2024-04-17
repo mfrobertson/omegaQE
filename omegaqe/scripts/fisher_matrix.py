@@ -57,6 +57,7 @@ def _main(exp, typs, params, condition, dir, _id):
     F_bi = np.empty(my_end-my_start)
     F_kk = np.empty(my_end - my_start)
     F_cmb = np.empty(my_end - my_start)
+    F_kkk = np.empty(my_end - my_start)
     for _i, idx in enumerate(np.arange(my_start, my_end)):
         iii, jjj = all_indices[idx]
         if condition:
@@ -67,6 +68,7 @@ def _main(exp, typs, params, condition, dir, _id):
             F_bi[_i] = fish.get_optimal_bispectrum_Fisher(typs, Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=None)
             F_kk[_i] = fish.get_kappa_ps_Fisher(Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=None)
             F_cmb[_i] = fish.get_cmb_Fisher(Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=None)
+            F_kkk[_i] = fish.get_bispectrum_Fisher("kkk", Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=None)
 
     end_time = MPI.Wtime()
 
@@ -78,9 +80,11 @@ def _main(exp, typs, params, condition, dir, _id):
         F_arr_bi = np.ones(N_param_combos)
         F_arr_kk = np.ones(N_param_combos)
         F_arr_cmb = np.ones(N_param_combos)
+        F_arr_kkk = np.ones(N_param_combos)
         F_arr_bi[my_start: my_end] = F_bi
         F_arr_kk[my_start: my_end] = F_kk
         F_arr_cmb[my_start: my_end] = F_cmb
+        F_arr_kkk[my_start: my_end] = F_kkk
         for rank in range(1, world_size):
             start, end = mpi.get_start_end(rank, workloads)
             F_bi = np.empty(end - start)
@@ -94,12 +98,17 @@ def _main(exp, typs, params, condition, dir, _id):
             F_cmb = np.empty(end - start)
             world_comm.Recv([F_cmb, MPI.DOUBLE], source=rank, tag=77)
             F_arr_cmb[start: end] = F_cmb
+
+            F_kkk = np.empty(end - start)
+            world_comm.Recv([F_kkk, MPI.DOUBLE], source=rank, tag=77)
+            F_arr_kkk[start: end] = F_kkk
         dir += f"{exp}/{typs}/{param_str}"
         if not os.path.isdir(dir):
             os.makedirs(dir)
         np.save(dir + "/F_bi", F_arr_bi)
         np.save(dir + "/F_kk", F_arr_kk)
         np.save(dir + "/F_cmb", F_arr_cmb)
+        np.save(dir + "/F_kkk", F_arr_kkk)
         end_time_tot = MPI.Wtime()
         print("Total time: " + str(end_time_tot - start_time_tot))
         mpi.output("Total time: " + str(end_time_tot - start_time_tot), my_rank, _id)
@@ -107,6 +116,7 @@ def _main(exp, typs, params, condition, dir, _id):
         world_comm.Send([F_bi, MPI.DOUBLE], dest=0, tag=77)
         world_comm.Send([F_kk, MPI.DOUBLE], dest=0, tag=77)
         world_comm.Send([F_cmb, MPI.DOUBLE], dest=0, tag=77)
+        world_comm.Send([F_kkk, MPI.DOUBLE], dest=0, tag=77)
 
 
 if __name__ == '__main__':
