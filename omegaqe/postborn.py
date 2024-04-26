@@ -6,8 +6,8 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 import vector
 
 
-def _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax):
-    mode = Modecoupling()
+def _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax, powerspectra):
+    mode = Modecoupling(powerspectra=powerspectra)
     if zmin == 0 and zmax is None:
         sep = getFileSep()
         mode_typ = "ww" if cmb else "rr"
@@ -19,10 +19,10 @@ def _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax):
     return mode.spline(ells_sample=mode.generate_sample_ells(M_ellmax, M_Nell), typ=mode_typ, star=False, zmin=zmin, zmax=zmax)
 
 
-def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb, zmin=0, zmax=None):
+def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb, zmin=0, zmax=None, powerspectra=None):
     Lmin = np.min(Ls)
     Lmax = 2*np.max(Ls)
-    M_spline = _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax)
+    M_spline = _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax, powerspectra)
     dTheta = np.pi / Ntheta
     thetas = np.linspace(dTheta, np.pi, Ntheta, dtype=float)
     floaty = Lmax / 1000
@@ -47,7 +47,7 @@ def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb,
     return 4 * I / ((2 * np.pi) ** 2)
 
 
-def omega_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None):
+def omega_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
     """
 
     Parameters
@@ -60,4 +60,4 @@ def omega_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500,
     -------
 
     """
-    return _get_postborn_omega_ps(ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax)
+    return _get_postborn_omega_ps(ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)

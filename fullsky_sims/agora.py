@@ -50,7 +50,22 @@ class Agora:
         return kappa_map
     
     def get_omega_map(self):
-        raise ValueError("AGORA has no omega map.")
+        omega_map = self.sht.read_map(f"{self.data_dir}/omega/raytrace16384_ip20_cmbkappa.zs1.omega_highzadded.fits")
+        return omega_map
+    
+    def get_omega_map_original(self, pixel_corr=True, high_z_gauss=False):
+        omega_map = self.sht.read_map(f"{self.data_dir}/omega/raytrace16384_ip20_cmbkappa.zs1.omega.fits")
+        if pixel_corr: omega_map = self._apply_pixel_correction(omega_map)
+        if high_z_gauss:
+            zlim = 8.6251
+            print(f"Creating new Gaussian realization for omega at z>{zlim}")
+            import omegaqe.postborn as postborn
+            from scipy.interpolate import InterpolatedUnivariateSpline
+            Ls = np.geomspace(1,self.Lmax_map + 1,100)
+            omega_zmin = postborn.omega_ps(Ls, zmin=zlim, powerspectra=self.power)
+            cl_w_add = InterpolatedUnivariateSpline(Ls, omega_zmin)(np.arange(self.Lmax_map + 1))
+            omega_map += self.sht.synfast(cl_w_add)
+        return omega_map
 
     def get_gal_bin_map(self, bin=1):
         return self.sht.read_map(f"{self.data_dir}/gal/agora_biaseddensity_lsst_y1_lens_zbin{bin}_fullsky.fits")
@@ -207,7 +222,6 @@ class Agora:
             indices_tot = np.concatenate((indices[0], indices_cib[0]))
             return np.unique(indices_tot)
         return indices
-
     
     def _get_cluster_mask_indices(self, Nsources=60000):
         mass = np.load(f"{self.data_dir}/halocat/mass.npy")
