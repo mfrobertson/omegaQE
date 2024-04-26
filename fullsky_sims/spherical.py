@@ -131,3 +131,9 @@ class Spherical:
     def get_alm_size(self, lmax=None):
         lmax = self._get_lmax(lmax)
         return hp.Alm.getsize(lmax)
+    
+    def rotate_map(self, map, rot, lmax=None, nthreads=None):
+        rotator = hp.Rotator(rot=rot, inv=True)
+        alm = self.map2alm(map, lmax, nthreads)
+        alm_rot = rotator.rotate_alm(alm, self.lmax, self.lmax)
+        return self.alm2map(alm_rot, lmax, nthreads)
