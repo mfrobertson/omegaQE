@@ -182,7 +182,7 @@ class Demnunii:
         return gal
     
     def get_obs_mag_bias_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
-        # TODO: This assumes s=1
+        # TODO: This assumes s=1 (could use estimated euclid s 1506.01369)
         window="LSST_mu"
         if verbose: print(f"DEMNUnii: Constructing mag bias map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}, lensed={lensed}")
         npix = self.sht.nside2npix()
