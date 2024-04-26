@@ -10,7 +10,7 @@ def main():
         if not os.path.exists(f"{ag.cache_dir}/_fg_cls/{freq}"):
             os.makedirs(f"{ag.cache_dir}/_fg_cls/{freq}")
 
-        T, Q, U = ag.get_obs_rad_maps(freq)
+        T, Q, U = ag.get_obs_rad_maps(freq, point_mask=True)
         cl_rad = ag.sht.map2cl(T)
         alm_e, alm_b = ag.sht.map2alm_spin(np.array([Q, U]),2)
         cl_rad_e = ag.sht.alm2cl(alm_e)
@@ -28,7 +28,7 @@ def main():
         np.save(f"{ag.cache_dir}/_fg_cls/{freq}/tsz.npy", cl_tsz)
 
 
-        cib = ag.get_obs_cib_map(freq)
+        cib = ag.get_obs_cib_map(freq, muK=True)
         cl_cib = ag.sht.map2cl(cib)
         np.save(f"{ag.cache_dir}/_fg_cls/{freq}/cib.npy", cl_cib)
 
