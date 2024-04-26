@@ -534,7 +534,7 @@ class Fisher:
         typs = list(typs)
         return self._get_F_L(typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax)
 
-    def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=1, Ls=None, dL2=2, Ntheta=20, f_sky=1,
+    def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1,
                                       verbose=False, nu=353e9, gal_bins=(None, None, None, None), save_array=False,
                                       only_bins=False, gal_distro="LSST_gold", param=None, dx=None):
         """
@@ -550,6 +550,7 @@ class Fisher:
         -------
 
         """
+        # NOTE: if Ntyps>1 and param1!=param2 then Fisher will be wrong
         typs = list(typs)
         self.change_cosmology()
         if param is not None and Ls is not None:
@@ -572,7 +573,7 @@ class Fisher:
         -------
 
         """
-
+        #astro-ph/0603019
         def _get_dCl(param, dx):
             mat = np.zeros((Lmax + 1 - Lmin, 2, 2))
             self.change_cosmology(param, dx, True)

@@ -124,7 +124,6 @@ class Noise:
     def get_cib_shot_N(self, nu, ellmax=4000):
         # 1309.0382 Table 9
         ones = np.ones(ellmax + 1)
-        print(self.agora)
         if nu == 353e9:
             if self.agora: return 426e-12  # My fit of AGORA cib between ell of 110 and 2000
             # N = 262 * 1e-12    # 1e-12 to change units to MJy^2/sr
