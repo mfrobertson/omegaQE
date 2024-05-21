@@ -148,7 +148,7 @@ class Fisher:
         cov3 = N0_omega_spline
         return cov_inv1, cov_inv2, cov3
 
-    def change_cosmology(self, param=None, dx=None, minus=False, dx_absolute=False):
+    def change_cosmology(self, param=None, dx=None, minus=False, dx_absolute=False, H0=False):
         default_dx = 0.01
         dx = default_dx if dx is None else dx
         if minus: dx *= -1
@@ -170,7 +170,7 @@ class Fisher:
             if not dx_absolute: dx *= default_param
             if dx == 0: dx = default_dx
             pars_dict[param] += dx
-        cosmo.modify_params(cosmo._pars, pars_dict)
+        cosmo.modify_params(cosmo._pars, pars_dict, H0)
         matter_PK = cosmo.get_matter_PK(typ="matter")
         self.bi._mode.matter_PK = matter_PK
         self.bi._mode._powerspectra.matter_PK = matter_PK
@@ -505,7 +505,8 @@ class Fisher:
 
         """
         self.bi.check_type(typ)
-        self.change_cosmology()
+        if param is not None:
+            self.change_cosmology()
         if Ls is not None:
             if param is not None:
                 raise RuntimeWarning("Are you sure you want to do param Fisher using sample method?")
@@ -552,7 +553,8 @@ class Fisher:
         """
         # NOTE: if Ntyps>1 and param1!=param2 then Fisher will be wrong
         typs = list(typs)
-        self.change_cosmology()
+        if param is not None:
+            self.change_cosmology()
         if param is not None and Ls is not None:
             raise RuntimeWarning("Are you sure you want to do param Fisher using sample method?")
         return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ls, dL2, Ntheta, f_sky, verbose, nu, gal_bins,
@@ -619,7 +621,7 @@ class Fisher:
         self.change_cosmology()
         return f_sky * np.sum(trace * (ells + 0.5))
 
-    def get_kappa_ps_Fisher(self, Lmax, f_sky=1, auto=True, Lmin=30, param=None, dx=None):
+    def get_kappa_ps_Fisher(self, Lmax, f_sky=1, auto=True, Lmin=30, param=None, dx=None, H0=False):
         """
         Parameters
         ----------
@@ -633,13 +635,13 @@ class Fisher:
         """
 
         def _get_dCl(param, dx):
-            self.change_cosmology(param, dx, True)
+            self.change_cosmology(param, dx, True, H0=H0)
             Cl_x_h_minus = self.power.get_kappa_ps(ells)
-            h = self.change_cosmology(param, dx)
+            h = self.change_cosmology(param, dx, H0=H0)
             Cl_x_h = self.power.get_kappa_ps(ells)
             return (Cl_x_h - Cl_x_h_minus) / (2 * np.abs(h))
 
-        self.change_cosmology()
+        self.change_cosmology(H0=H0)
         ells = np.arange(Lmin, Lmax + 1)
         Cl_kk = self.power.get_kappa_ps(ells)
         if param is None:
@@ -658,7 +660,7 @@ class Fisher:
             var = 2 / (2 * ells + 1) * (Cl_kk + N0[ells]) ** 2
         else:
             var = 2 / (2 * ells + 1) * (Cl_kk ** 2 + 0.5 * (N0[ells] * Cl_kk))
-        self.change_cosmology()
+        self.change_cosmology(H0=H0)
         return f_sky * np.sum(Cl_1 * Cl_2 / var)
 
     def get_rotation_ps_Fisher(self, Lmax, M_path, f_sky=1, auto=True, camb=False, cmb=True, Lmin=30, n=40):

@@ -7,7 +7,8 @@ import vector
 
 
 def _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax, powerspectra):
-    mode = Modecoupling(powerspectra=powerspectra)
+    matter_PK = powerspectra.matter_PK if powerspectra is not None else None
+    mode = Modecoupling(powerspectra=powerspectra, matter_PK=matter_PK)
     if zmin == 0 and zmax is None:
         sep = getFileSep()
         mode_typ = "ww" if cmb else "rr"

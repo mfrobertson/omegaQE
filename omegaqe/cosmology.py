@@ -44,6 +44,7 @@ class Cosmology:
         mnu = 0.06
         sig8 = 0.8123981609602227
         return {"thetastar": thetastar,
+                "H0": pars.H0,
                 "100thetastar": 100*thetastar,
                 "ombh2": pars.ombh2,
                 "omch2": pars.omch2,
@@ -59,11 +60,17 @@ class Cosmology:
                 "sig8": sig8,
                 }
 
-    def modify_params(self, pars, mod_dict):
-        self._pars = camb.set_params(cp=pars, thetastar=mod_dict["thetastar"], ombh2=mod_dict["ombh2"], omch2=mod_dict["omch2"],
+    def modify_params(self, pars, mod_dict, H0=False):
+        if H0:
+            self._pars = camb.set_params(cp=pars, H0=mod_dict["H0"], ombh2=mod_dict["ombh2"], omch2=mod_dict["omch2"],
                         omk=mod_dict["omk"], mnu=mod_dict["mnu"], tau=mod_dict["tau"], nnu=3.046,
                         standard_neutrino_neff=3.046, w=mod_dict["w"], wa=mod_dict["wa"], As=mod_dict["As"],
                         ns=mod_dict["ns"])
+        else:
+            self._pars = camb.set_params(cp=pars, thetastar=mod_dict["thetastar"], ombh2=mod_dict["ombh2"], omch2=mod_dict["omch2"],
+                        omk=mod_dict["omk"], mnu=mod_dict["mnu"], tau=mod_dict["tau"], nnu=3.046,
+                        standard_neutrino_neff=3.046, w=mod_dict["w"], wa=mod_dict["wa"], As=mod_dict["As"],
+                        ns=mod_dict["ns"], theta_H0_range=(1, 1000))
         self._results = self.calc_results()
 
     def _get_param_file(self, name):
