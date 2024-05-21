@@ -327,17 +327,6 @@ class Demnunii:
         
         Nsnaps = 63
         snaps = np.arange(Nsnaps)
-        # ks = _get_k(snaps[-1])
-        # zs = np.array([self._get_z(snap) for snap in snaps[::-1]])
-        # ps = np.zeros((Nsnaps, np.size(ks)))
-        # kmin = 2e-3
-        # kmax = 1
-        # for iii, snap in enumerate(snaps[::-1]):
-        #     ks_ = _get_k(snap)
-        #     ps_ = _get_pk(snap)
-        #     ps_[ks_<kmin] = power.get_matter_ps("matter", self._get_z(snap), ks_[ks_<kmin])
-        #     ps_[ks_>kmax] = power.get_matter_ps("matter", self._get_z(snap), ks_[ks_>kmax])
-        #     ps[iii,:] = InterpolatedUnivariateSpline(ks_, ps_)(ks)
 
         ks = np.geomspace(1e-4,1e3,1000)
         zs = np.array([self._get_z(snap) for snap in snaps[::-1]])
