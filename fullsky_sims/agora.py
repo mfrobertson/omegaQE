@@ -51,7 +51,7 @@ class Agora:
     
     def get_omega_map(self):
         omega_map = self.sht.read_map(f"{self.data_dir}/omega/raytrace16384_ip20_cmbkappa.zs1.omega_highzadded.fits")
-        return omega_map
+        return -omega_map
     
     def get_omega_map_original(self, pixel_corr=True, high_z_gauss=False):
         omega_map = self.sht.read_map(f"{self.data_dir}/omega/raytrace16384_ip20_cmbkappa.zs1.omega.fits")
@@ -65,7 +65,7 @@ class Agora:
             omega_zmin = postborn.omega_ps(Ls, zmin=zlim, powerspectra=self.power)
             cl_w_add = InterpolatedUnivariateSpline(Ls, omega_zmin)(np.arange(self.Lmax_map + 1))
             omega_map += self.sht.synfast(cl_w_add)
-        return omega_map
+        return -omega_map
 
     def get_gal_bin_map(self, bin=1):
         return self.sht.read_map(f"{self.data_dir}/gal/agora_biaseddensity_lsst_y1_lens_zbin{bin}_fullsky.fits")
