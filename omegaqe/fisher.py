@@ -1,5 +1,4 @@
 import numpy as np
-from camb import constants
 import omegaqe
 from omegaqe.bispectra import Bispectra
 from omegaqe.covariance import Covariance
@@ -660,6 +659,65 @@ class Fisher:
             var = 2 / (2 * ells + 1) * (Cl_kk + N0[ells]) ** 2
         else:
             var = 2 / (2 * ells + 1) * (Cl_kk ** 2 + 0.5 * (N0[ells] * Cl_kk))
+        self.change_cosmology(H0=H0)
+        return f_sky * np.sum(Cl_1 * Cl_2 / var)
+    
+    def get_omega_ps_Fisher(self, Lmax, f_sky=1, auto=True, Lmin=30, param=None, dx=None, H0=False, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results"):
+        """
+        Parameters
+        ----------
+        Lmax
+        f_sky
+        auto
+
+        Returns
+        -------
+
+        """
+
+        def _get_dCl(param, dx):
+            self.change_cosmology(param, dx, True, H0=H0)
+            ells_w, cl = self.power.cosmo.get_postborn_omega_ps(acc=3)
+            # ells_w = np.geomspace(Lmin, Lmax, 20)
+            # cl = omega_ps(ells_w, zmin=0, zmax=1100, powerspectra=self.power)
+            Cl_x_h_minus = InterpolatedUnivariateSpline(ells_w, cl)(ells)
+            h = self.change_cosmology(param, dx, H0=H0)
+            ells_w, cl = self.power.cosmo.get_postborn_omega_ps(acc=3)
+            # cl = omega_ps(ells_w, zmin=0, zmax=1100, powerspectra=self.power)
+            Cl_x_h = InterpolatedUnivariateSpline(ells_w, cl)(ells)
+            return (Cl_x_h - Cl_x_h_minus) / (2 * np.abs(h))
+
+        self.change_cosmology(H0=H0)
+        ells = np.arange(Lmin, Lmax + 1)
+        ells_w, cl = self.power.cosmo.get_postborn_omega_ps(acc=3)
+        Cl_ww = InterpolatedUnivariateSpline(ells_w, cl)(ells)
+        # ells_w = np.geomspace(Lmin, Lmax, 20)
+        # cl = omega_ps(ells_w, zmin=0, zmax=1100, powerspectra=self.power)
+        # Cl_ww = InterpolatedUnivariateSpline(ells_w, cl)(ells)
+
+        gmv_str = "gmv" if self.gmv else "single"
+        full_F_L_path = f"{F_L_path}/kgI/{self.exp}/{gmv_str}/{self.qe}/{30}_{3000}/1_2000"
+        ells_fl = np.load(f"{full_F_L_path}/Ls.npy")
+        F_L = np.load(f"{full_F_L_path}/F_L.npy")
+        F_L = InterpolatedUnivariateSpline(ells_fl, F_L)(ells)
+        
+        if param is None:
+            Cl_1 = Cl_2 = Cl_ww
+        elif np.size(param) == 2:
+            if dx is not None and np.size(dx) == 2:
+                Cl_1 = _get_dCl(param[0], dx[0])
+                Cl_2 = _get_dCl(param[1], dx[1])
+            else:
+                Cl_1 = _get_dCl(param[0], dx)
+                Cl_2 = _get_dCl(param[1], dx)
+        else:
+            Cl_1 = Cl_2 = _get_dCl(param, dx)
+        N0 = self.covariance.noise.get_N0("omega", Lmax)
+        if auto:
+            var = 2 / (2 * ells + 1) * (Cl_ww + N0[ells]) ** 2
+        else:
+            # var = 1 / (2 * ells + 1) * (Cl_ww * N0[ells] / F_L)
+            var = 1 / (2 * ells + 1) * ((Cl_ww + N0[ells]) * Cl_ww / F_L + (Cl_ww**2))
         self.change_cosmology(H0=H0)
         return f_sky * np.sum(Cl_1 * Cl_2 / var)
 
