@@ -559,7 +559,7 @@ class Fisher:
         return self._get_optimal_bispectrum_Fisher(typs, Lmax, dL, Ls, dL2, Ntheta, f_sky, verbose, nu, gal_bins,
                                                    save_array, only_bins, gal_distro=gal_distro, param=param, dx=dx)
 
-    def get_cmb_Fisher(self, Lmax, f_sky=1, Lmin=2, param=None, dx=None):
+    def get_cmb_Fisher(self, Lmax, f_sky=1, Lmin=2, param=None, dx=None, H0=False):
         """
 
         Parameters
@@ -577,11 +577,11 @@ class Fisher:
         #astro-ph/0603019
         def _get_dCl(param, dx):
             mat = np.zeros((Lmax + 1 - Lmin, 2, 2))
-            self.change_cosmology(param, dx, True)
+            self.change_cosmology(param, dx, True, H0=H0)
             Cl_t_x_h_minus = self.covariance.power.cosmo.get_lens_ps("TT", ellmax=Lmax)[Lmin:Lmax + 1]
             Cl_te_x_h_minus = self.covariance.power.cosmo.get_lens_ps("TE", ellmax=Lmax)[Lmin:Lmax + 1]
             Cl_e_x_h_minus = self.covariance.power.cosmo.get_lens_ps("EE", ellmax=Lmax)[Lmin:Lmax + 1]
-            h = self.change_cosmology(param, dx)
+            h = self.change_cosmology(param, dx, H0=H0)
             Cl_t_x_h = self.covariance.power.cosmo.get_lens_ps("TT", ellmax=Lmax)[Lmin:Lmax + 1]
             Cl_te_x_h = self.covariance.power.cosmo.get_lens_ps("TE", ellmax=Lmax)[Lmin:Lmax + 1]
             Cl_e_x_h = self.covariance.power.cosmo.get_lens_ps("EE", ellmax=Lmax)[Lmin:Lmax + 1]
@@ -591,13 +591,16 @@ class Fisher:
             mat /= (2 * np.abs(h))
             return mat
 
-        self.change_cosmology()
+        self.change_cosmology(H0=H0)
         cov_mat = np.zeros((Lmax + 1 - Lmin, 2, 2))
         N_t = self.covariance.noise.get_cmb_gaussian_N("TT", None, None, ellmax=Lmax, exp=self.exp)
         N_e = self.covariance.noise.get_cmb_gaussian_N("EE", None, None, ellmax=Lmax, exp=self.exp)
         cov_mat[:, 0, 0] = self.covariance.power.cosmo.get_lens_ps("TT", ellmax=Lmax)[Lmin:Lmax + 1]
         cov_mat[:, 1, 1] = self.covariance.power.cosmo.get_lens_ps("EE", ellmax=Lmax)[Lmin:Lmax + 1]
         cov_mat[:, 0, 1] = cov_mat[:, 1, 0] = self.covariance.power.cosmo.get_lens_ps("TE", ellmax=Lmax)[Lmin:Lmax + 1]
+        cov_mat[:, 0, 0] += N_t[Lmin:Lmax + 1]
+        cov_mat[:, 1, 1] += N_e[Lmin:Lmax + 1]
+        inv_cov_mat = np.linalg.pinv(cov_mat)
         if param is None:
             Cl_1 = Cl_2 = deepcopy(cov_mat)
         elif np.size(param) == 2:
@@ -609,15 +612,63 @@ class Fisher:
                 Cl_2 = _get_dCl(param[1], dx)
         else:
             Cl_1 = Cl_2 = _get_dCl(param, dx)
-        cov_mat[:, 0, 0] += N_t[Lmin:Lmax + 1]
-        cov_mat[:, 1, 1] += N_e[Lmin:Lmax + 1]
-        inv_cov_mat = np.linalg.pinv(cov_mat)
         leg1 = np.matmul(inv_cov_mat, Cl_1)
         leg2 = np.matmul(inv_cov_mat, Cl_2)
         res = np.matmul(leg1, leg2)
         trace = res[:, 0, 0] + res[:, 1, 1]
         ells = np.arange(Lmin, Lmax + 1)
-        self.change_cosmology()
+        self.change_cosmology(H0=H0)
+        return f_sky * np.sum(trace * (ells + 0.5))
+    
+    def get_lss_Fisher(self, typs, Lmax, f_sky=1, Lmin=2, nu=353e9, gal_bins=(None, None, None, None), gal_distro="LSST_gold", param=None, dx=None, H0=False):
+        """
+
+        Parameters
+        ----------
+        Lmax
+        fsky
+        Lmin
+        param
+        dx
+
+        Returns
+        -------
+
+        """
+        #astro-ph/0603019
+        def _get_dCl(param, dx):
+            self.change_cosmology(param, dx, True, H0=H0)
+            cov_mat_x_h_minus = self.covariance.get_Cov_mat(typs, Lmax,  nu, gal_bins, gal_distro=gal_distro, noise=False)
+            h = self.change_cosmology(param, dx, H0=H0)
+            cov_mat_x_h = self.covariance.get_Cov_mat(typs, Lmax,  nu, gal_bins, gal_distro=gal_distro, noise=False)
+            return (cov_mat_x_h - cov_mat_x_h_minus) / (2 * np.abs(h))
+
+        self.change_cosmology(H0=H0)
+        cov_mat = self.covariance.get_Cov_mat(typs, Lmax,  nu, gal_bins, gal_distro=gal_distro, noise=False)
+        inv_cov_mat = self.covariance.get_C_inv(typs, Lmax, nu, gal_bins, gal_distro=gal_distro)
+        if param is None:
+            Cl_1 = Cl_2 = deepcopy(cov_mat)
+        elif np.size(param) == 2:
+            if dx is not None and np.size(dx) == 2:
+                Cl_1 = _get_dCl(param[0], dx[0])
+                Cl_2 = _get_dCl(param[1], dx[1])
+            else:
+                Cl_1 = _get_dCl(param[0], dx)
+                Cl_2 = _get_dCl(param[1], dx)
+        else:
+            Cl_1 = Cl_2 = _get_dCl(param, dx)
+        
+        old_shape = np.shape(inv_cov_mat)
+        new_shape = (old_shape[-1], old_shape[0], old_shape[0])
+        inv_cov_mat = inv_cov_mat.reshape(new_shape)[Lmin:Lmax + 1]
+        Cl_1 = Cl_1.reshape(new_shape)[Lmin:Lmax + 1]
+        Cl_2 = Cl_2.reshape(new_shape)[Lmin:Lmax + 1]
+        leg1 = np.matmul(inv_cov_mat, Cl_1)
+        leg2 = np.matmul(inv_cov_mat, Cl_2)
+        res = np.matmul(leg1, leg2)
+        trace = res[:, 0, 0] + res[:, 1, 1]
+        ells = np.arange(Lmin, Lmax + 1)
+        self.change_cosmology(H0=H0)
         return f_sky * np.sum(trace * (ells + 0.5))
 
     def get_kappa_ps_Fisher(self, Lmax, f_sky=1, auto=True, Lmin=30, param=None, dx=None, H0=False):

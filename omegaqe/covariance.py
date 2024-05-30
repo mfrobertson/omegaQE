@@ -108,7 +108,7 @@ class Covariance:
             typ = typ[0] + "g"
         return self._get_Cl(typ, ellmax, nu, (gal_win_zmin_1, gal_win_zmax_1, gal_win_zmin_2, gal_win_zmax_2), use_bins=True, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
 
-    def _get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold"):
+    def _get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold", noise=True):
         if typ[0] != typ[1]:
             if typ[0] in self.test_types and typ[1] in self.test_types:
                 return self._get_Cl_kappa(ellmax)
@@ -139,10 +139,27 @@ class Covariance:
             gal_win_zmax = gal_bins[index + 1]
             N = self.noise.get_gal_shot_N(ellmax=ellmax, zmin=gal_win_zmin, zmax=gal_win_zmax)
             # N = 1e-100
-            return self._get_Cl_gal(ellmax, gal_win_zmin, gal_win_zmax, gal_win_zmin, gal_win_zmax, gal_distro=gal_distro) + N
+            cl = self._get_Cl_gal(ellmax, gal_win_zmin, gal_win_zmax, gal_win_zmin, gal_win_zmax, gal_distro=gal_distro)
+            if noise:
+                return cl + N
+            return cl
         else:
             raise ValueError(f"Could not get Cov for type {typ}")
-        return self._get_Cl(typ, ellmax, nu, gal_bins, gal_distro=gal_distro) + N
+        cl = self._get_Cl(typ, ellmax, nu, gal_bins, gal_distro=gal_distro)
+        if noise:
+            return cl + N
+        return cl
+    
+    def _get_Cov_mat(self, typs, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold", noise=True):
+        typs = np.char.array(list(typs))
+        Ntyps = np.size(typs)
+        cov_mat = np.empty((Ntyps, Ntyps, ellmax+1))
+        for iii in np.arange(Ntyps):
+            for jjj in np.arange(iii, Ntyps):
+                cov = self._get_Cov(typs[iii]+typs[jjj], ellmax, nu, gal_bins, use_bins, gal_distro, noise)
+                cov_mat[iii, jjj, :] = cov_mat[jjj, iii, :] = cov 
+        return cov_mat
+
 
     def _get_n(self, typ):
         if self.shot_noise is None:
@@ -313,7 +330,7 @@ class Covariance:
         """
         return self._get_delens_rho(Lmax)
 
-    def get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None, None, None, None), use_bins=False, gal_distro="LSST_gold"):
+    def get_Cov(self, typ, ellmax, nu=353e9, gal_bins=(None, None, None, None), use_bins=False, gal_distro="LSST_gold", noise=True):
         """
 
         Parameters
@@ -328,7 +345,24 @@ class Covariance:
         -------
 
         """
-        return self._get_Cov(typ, ellmax, nu, gal_bins, use_bins, gal_distro=gal_distro)
+        return self._get_Cov(typ, ellmax, nu, gal_bins, use_bins, gal_distro=gal_distro, noise=noise)
+    
+    def get_Cov_mat(self, typs, ellmax, nu=353e9, gal_bins=(None, None, None, None), use_bins=False, gal_distro="LSST_gold", noise=True):
+        """
+
+        Parameters
+        ----------
+        typ
+        ellmax
+        nu
+        gal_bins
+        use_bins
+
+        Returns
+        -------
+
+        """
+        return self._get_Cov_mat(typs, ellmax, nu, gal_bins, use_bins, gal_distro=gal_distro, noise=noise)
 
     def get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None, None, None, None), use_bins=False, gal_distro="LSST_gold"):
         """
