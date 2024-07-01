@@ -7,7 +7,7 @@ from omegaqe.tools import parse_boolean, mpi, none_or_str, getFileSep
 import os
 import sys
 
-def _main(exp, typs, params, condition, dir, _id):
+def _main(exp, typs, params, condition, dir, _id, H0):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -54,9 +54,9 @@ def _main(exp, typs, params, condition, dir, _id):
     for _i, idx in enumerate(np.arange(my_start, my_end)):
         iii, jjj = all_indices[idx]
         if condition:
-            F_bi[_i] = fish.get_optimal_bispectrum_Fisher(typs, Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=(dx_bi[iii], dx_bi[jjj]), dx_absolute=True)
+            F_bi[_i] = fish.get_optimal_bispectrum_Fisher(typs, Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=(dx_bi[iii], dx_bi[jjj]), dx_absolute=True, H0=H0)
         else:
-            F_bi[_i] = fish.get_optimal_bispectrum_Fisher(typs, Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=None)
+            F_bi[_i] = fish.get_optimal_bispectrum_Fisher(typs, Lmax=3000, f_sky=0.4, param=(params[iii], params[jjj]), dx=None, H0=H0)
 
     end_time = MPI.Wtime()
 
@@ -86,9 +86,9 @@ def _main(exp, typs, params, condition, dir, _id):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 6:
+    if len(args) != 7:
         raise ValueError(
-            "Must supply arguments: exp typs, params, condition, dir id")
+            "Must supply arguments: exp typs, params, condition, dir, id, H0")
     exp = str(args[0])
     typs = str(args[1])
     params = np.array(args[2].split(','))
@@ -96,4 +96,5 @@ if __name__ == '__main__':
     # tau_prior (see 2309.03021)
     dir = args[4]
     _id = args[5]
-    _main(exp, typs, params,condition, dir, _id)
+    H0 = parse_boolean(args[6])
+    _main(exp, typs, params,condition, dir, _id, H0)
