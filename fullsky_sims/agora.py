@@ -179,8 +179,8 @@ class Agora:
             mask_idx = self._get_point_mask_indices() if self.point_mask_idx is None else self.point_mask_idx
             tsz = self._mask_point(tsz, mask_idx)
         if cluster_mask:
-            mask_idx = self._get_cluster_mask_indices() if self.cluster_mask_idx is None else self.cluster_mask_idx
-            tsz = self._mask_cluster(tsz, mask_idx)
+            masks = self._get_cluster_mask_indices() if self.cluster_mask_idx is None else (self.cluster_mask_idx, self.cluster_mask_rads)
+            tsz = self._mask_cluster(tsz, masks)
         if pixel_corr: tsz = self._apply_pixel_correction(tsz)
         return tsz
     
@@ -249,12 +249,12 @@ class Agora:
                 field[idx] = np.median(field_copy[nb_idx[:,iii]])
         return field
     
-    def _mask_cluster(self, field, mask_idx, typ="median"):
+    def _mask_cluster(self, field, masks, typ="median"):
         median = np.median(field)
-        for iii, pix in enumerate(mask_idx):
+        mask_idxs, mask_rads = masks
+        for iii, pix in enumerate(mask_idxs):
             vec = hp.pixelfunc.pix2vec(self.sht.nside, pix)
-            rad = self.cluster_mask_rads[iii]
-            disk_idx = hp.query_disc(self.sht.nside, vec, rad*1.5)
+            disk_idx = hp.query_disc(self.sht.nside, vec, mask_rads[iii]*1.5)
             if typ == "zerod":
                 field[disk_idx] = 0
             elif typ == "median":
