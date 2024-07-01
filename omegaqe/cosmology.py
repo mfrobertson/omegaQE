@@ -27,6 +27,10 @@ class Cosmology:
         self.dn_dz_tot_spline = None
         self.gal_biases = None
         self.agora = False
+        self.b1 = 0.84
+
+    def update_gal_bias(self, b1):
+        self.b1 = b1
 
     def set_cosmology(self, paramfile=None):
         self._pars = self.get_params(paramfile)
@@ -43,6 +47,7 @@ class Cosmology:
         thetastar = 0.010410837983195698
         mnu = 0.06
         sig8 = 0.8123981609602227
+        b1 = 0.84
         return {"thetastar": thetastar,
                 "H0": pars.H0,
                 "100thetastar": 100*thetastar,
@@ -58,6 +63,7 @@ class Cosmology:
                 "As": pars.InitPower.As,
                 "ns": pars.InitPower.ns,
                 "sig8": sig8,
+                "b1": b1,
                 }
 
     def modify_params(self, pars, mod_dict, H0=False):
@@ -71,6 +77,7 @@ class Cosmology:
                         omk=mod_dict["omk"], mnu=mod_dict["mnu"], tau=mod_dict["tau"], nnu=3.046,
                         standard_neutrino_neff=3.046, w=mod_dict["w"], wa=mod_dict["wa"], As=mod_dict["As"],
                         ns=mod_dict["ns"], theta_H0_range=(1, 1000))
+        self.update_gal_bias(mod_dict["b1"])
         self._results = self.calc_results()
 
     def _get_param_file(self, name):
@@ -313,14 +320,14 @@ class Cosmology:
         if typ == "agora":
             if np.size(z) == 1:
                 z = np.array([z])
-            bias = 1 + (0.84 * z)
+            bias = 1 + (self.b1 * z)
             bias[np.logical_and(z > 0.2, z < 0.4)] = self.gal_biases[0]
             bias[np.logical_and(z > 0.4, z < 0.6)] = self.gal_biases[1]
             bias[np.logical_and(z > 0.6, z < 0.8)] = self.gal_biases[2]
             bias[np.logical_and(z > 0.8, z < 1.0)] = self.gal_biases[3]
             bias[np.logical_and(z > 1.0, z < 1.2)] = self.gal_biases[4]
             return bias
-        return 1 + (0.84 * z)
+        return 1 + (self.b1 * z)
 
     def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         """
@@ -366,7 +373,7 @@ class Cosmology:
     def _gal_window_z_no_norm(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         z_distr_func = self._get_z_distr_func(typ)
         dn_dz = z_distr_func(z)
-        b = 1 if bias_unity else 1 + (0.84 * z)
+        b = 1 if bias_unity else 1 + (self.b1 * z)
         zs = np.linspace(0, self.Chi_to_z(self.get_chi_star()), 4000)
         dz = zs[1] - zs[0]
         norm = np.sum(dz * z_distr_func(zs))
