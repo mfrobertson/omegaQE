@@ -4,7 +4,7 @@ Code focussing on the post-Born CMB curl (shear-B mode) field; used to produce r
 https://arxiv.org/abs/2303.13313.
 
 Also contains general tools for analytical modelling of large-scale structure power spectra, 
-post-Born bispectra, Fisher-forecatsing, Gaussian flat sky simulations, quadratic estimator biases etc.
+post-Born bispectra, Fisher-forecasting, Gaussian flat sky simulations, quadratic estimator biases etc.
 
 All code interacting with the [DEMNUni](https://arxiv.org/abs/1505.07148) and [AGORA](https://yomori.github.io/agora/index.html) N-body simulations to produce the results in 
 https://arxiv.org/abs/2406.19998 can be found in `fullsky_sims`.
