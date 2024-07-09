@@ -10,7 +10,7 @@ def setup_dir(full_dir):
     if not os.path.exists(full_dir):
         os.makedirs(full_dir)
 
-def main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, nbody_label, nthreads, _id):
+def main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, cluster_mask, point_mask, nbody_label, nthreads, _id):
     mpi.output("-------------------------------------", 0, _id)
     mpi.output(f"start: {start}, end: {end}, nu: {nu},  tsz: {tsz}, ksz: {ksz}, cib: {cib}, rad: {rad}, gauss: {gauss}, nbody: {nbody_label}, nthreads: {nthreads}", 0, _id)
 
@@ -21,26 +21,20 @@ def main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, nbody_label, nt
     T_fg = np.zeros(npix)
     Q_fg = np.zeros(npix)
     U_fg = np.zeros(npix)
-
-    T_tsz = nbody.get_obs_tsz_map(nu)
-    T_ksz = nbody.get_obs_ksz_map()
-    T_cib = nbody.get_obs_cib_map(nu, muK=True)
-    T_rad, Q_rad, U_rad = nbody.get_obs_rad_maps(nu)
     
     if tsz:
-        T_fg += T_tsz
         dir_name += "_tsz"
     if ksz:
-        T_fg += T_ksz
         dir_name += "_ksz"
     if cib:
-        T_fg += T_cib
         dir_name += "_cib"
     if rad:
-        T_fg += T_rad
-        Q_fg += Q_rad
-        U_fg += U_rad
         dir_name += "_rad"
+    if point_mask:
+        dir_name += "_pm"
+    if cluster_mask:
+        dir_name += "_cm"
+
 
     full_dir = f"{nbody.sims_dir}/{deflect_typ}/{dir_name}"
     setup_dir(full_dir)
@@ -49,17 +43,12 @@ def main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, nbody_label, nt
         mpi.output(f"Sim: {sim}", 0, _id)
         T, Q, U = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/TQU_{sim}.fits")
         if gauss:
-            cl_T_fg = nbody.sht.map2cl(T_fg)
-            fg_lm_gauss = nbody.sht.synalm(cl_T_fg, nbody.sht.lmax)
-            T += nbody.sht.alm2map(fg_lm_gauss)
-
-            cl_E_fg, cl_B_fg = nbody.sht.map2cl_spin((Q_fg, U_fg), 2)
-            E_fg_lm_gauss = nbody.sht.synalm(cl_E_fg, nbody.sht.lmax)
-            B_fg_lm_gauss = nbody.sht.synalm(cl_B_fg, nbody.sht.lmax)
-            Q_fg, U_fg = nbody.sht.alm2map_spin((E_fg_lm_gauss, B_fg_lm_gauss), 2)
-            Q += Q_fg
-            U += U_fg
-        else:           
+            input_kappa = nbody.sht.read_map(f"{nbody.sims_dir}//kappa_diff_{sim}.fits")
+            T_fg, tracers = nbody.create_gauss_fg_maps(nu, tsz, ksz, cib, rad, point_mask, cluster_mask, return_tracers=True, input_kappa=input_kappa)
+            T += T_fg
+            nbody.sht.write_map(f"{full_dir}/kgI_{sim}.fits", tracers)
+        else:       
+            T_fg, Q_fg, U_fg = nbody.create_fg_maps(nu, tsz, ksz, cib, rad, point_mask, cluster_mask)    
             T += T_fg
             Q += Q_fg
             U += U_fg
@@ -67,9 +56,9 @@ def main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, nbody_label, nt
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 12:
+    if len(args) != 14:
         raise ValueError(
-            "Must supply arguments: start end deflect_typ nu tsz ksz cib rad gauss nbody_label nthreads _id")
+            "Must supply arguments: start end deflect_typ nu tsz ksz cib rad gauss cluster point nbody_label nthreads _id")
     start = int(args[0])
     end = int(args[1])
     deflect_typ = none_or_str(args[2])
@@ -79,7 +68,9 @@ if __name__ == '__main__':
     cib = parse_boolean(args[6])
     rad = parse_boolean(args[7])
     gauss = parse_boolean(args[8])
-    nbody_label = str(args[9])
-    nthreads  = int(args[10])
-    _id = str(args[11])
-    main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, nbody_label, nthreads, _id)
+    cluster_mask = parse_boolean(args[9])
+    point_mask = parse_boolean(args[10])
+    nbody_label = str(args[11])
+    nthreads  = int(args[12])
+    _id = str(args[13])
+    main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, cluster_mask, point_mask, nbody_label, nthreads, _id)
