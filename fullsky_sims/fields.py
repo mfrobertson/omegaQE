@@ -9,7 +9,7 @@ import copy
 
 class Fields:
 
-    def __init__(self, exp, nbody="DEMNUnii", fields="kgI", use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1, gauss_lss=False, len_lss=True):
+    def __init__(self, exp, nbody="DEMNUnii", fields="kgI", use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1, gauss_lss=False, len_lss=True, use_gauss_chache=False):
         self.nbody_name = nbody
         self.nthreads = nthreads
         self.nbody_label = nbody
@@ -24,19 +24,25 @@ class Fields:
         self.fields = fields
         self._fields = self._get_rearanged_fields(fields)
         self.ells = np.arange(self.Lmax_map+1)
-        self._initialise(use_lss_cache, use_cmb_cache, gauss_lss, len_lss)
+        self._initialise(use_lss_cache, use_cmb_cache, gauss_lss, len_lss, use_gauss_chache)
 
-    def _initialise(self, use_lss_cache, use_cmb_cache, gauss_lss, len_lss):
+    def _initialise(self, use_lss_cache, use_cmb_cache, gauss_lss, len_lss, use_gauss_cache):
         self.fft_maps = dict.fromkeys(self._fields)
         self.fft_noise_maps = dict.fromkeys(self._fields)
         for field in self._fields:
             self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache, lensed=len_lss)
             self.fft_noise_maps[field] = self.get_noise_map(field, set_seed=True, fft=True)
         if gauss_lss:
-            print("Using Cls of previous maps to generate new gaussian realisations.")
-            self.y = self._get_y(input_kappa_map=self.sht.read_map(f"{self.nbody.sims_dir}/kappa_diff.fits"))
-            for field in self._fields:
-                self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache, gaussian=gauss_lss)
+            if not use_gauss_cache:
+                print("Using Cls of previous maps to generate new gaussian realisations.")
+                self.y = self._get_y(input_kappa_map=self.sht.read_map(f"{self.nbody.sims_dir}/kappa_diff_{self.sim}.fits"))
+                for field in self._fields:
+                    self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache, gaussian=gauss_lss)
+            else:
+                print(f"Using cached gaussian realisations stored at {self.nbody.sims_dir}/{self.deflect_typ}")
+                fields = self.nbody.sht.read_map(f"{self.nbody.sims_dir}/{self.deflect_typ}/{self.fields}_{self.sim}.fits")
+                for iii, field in enumerate(self._fields):
+                    self.fft_maps[field] = self.sht.map2alm(fields[iii])
         if use_cmb_cache:
             self.rec = None
         else:

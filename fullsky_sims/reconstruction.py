@@ -52,10 +52,10 @@ class Reconstruction:
 
     def __init__(self, exp, nbody="DEMNUnii", filename=None, L_cuts=(30, 3000, 30, 5000), sim=None, nthreads=1, iter=False, noise=True, gmv=False):
         self.nthreads = nthreads
+        self.nbody = fullsky_sims.wrapper_class(nbody, nthreads) if isinstance(nbody, str) else nbody
         self.filename = filename
         self.setup_env(exp, iter, sim, filename)
         self.exp = exp
-        self.nbody = fullsky_sims.wrapper_class(nbody, nthreads) if isinstance(nbody, str) else nbody
         self.sht = self.nbody.sht
         self.cosmo = self.nbody.cosmo
         self.noise = Noise(cosmology=self.cosmo, full_sky=True)
@@ -107,7 +107,7 @@ class Reconstruction:
             os.environ['PLENS'] = plancklens_cachedir
             print(f"Setting up Plancklens cahe at {plancklens_cachedir}")
         print(filename)
-        self.temp = os.path.join(os.environ['PLENS'], 'demnunii', f"{exp}_{iter}", filename[45:-5]+"_"+str(sim))  # TODO: fix temp solution
+        self.temp = os.path.join(os.environ['PLENS'], 'demnunii', f"{exp}_{iter}", filename.replace(f"{self.nbody.sims_dir}/", "")[:-5]+"_"+str(sim))  # TODO: fix temp solution
         if os.path.exists(self.temp) and os.path.isdir(self.temp):
             print(f"Removing existing plancklens cache at {self.temp}")
             shutil.rmtree(self.temp)
