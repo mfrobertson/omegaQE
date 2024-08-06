@@ -202,6 +202,8 @@ class Noise:
             return None, None
         elif exp == "HD":
             return 0.5, 0.25
+        elif exp == "planck":
+            return 35, 7
         else:
             raise ValueError(f"Experiment {exp} unexpected.")
 
