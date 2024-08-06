@@ -39,7 +39,7 @@ class Modecoupling:
         if ndim == 2:
             return np.repeat(zs[np.newaxis, :, :], Nells, 0)
 
-    def _integral_prep(self, Nchi, zmin, zmax, typ, nu, gal_bins, gal_distro="LSST_gold"):
+    def _integral_prep(self, Nchi, zmin, zmax, typ, nu, gal_bins, gal_distro="LSST_gold", sec_order_var="k"):
         Chi_min = self._cosmo.z_to_Chi(zmin)
         if zmax is not None:
             Chi_max = self._cosmo.z_to_Chi(zmax)
@@ -49,18 +49,22 @@ class Modecoupling:
         dChi = Chis[1] - Chis[0]
         zs = self._cosmo.Chi_to_z(Chis)
         cmb_lens_window = self._cosmo.cmb_lens_window_matter(Chis, self._cosmo.get_chi_star())
+        if sec_order_var in ("k","w","r"):
+            win1 = cmb_lens_window
+        elif sec_order_var == "g":
+            win1 = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
+        elif sec_order_var == "I":
+            win1 = self._cosmo.cib_window_Chi(Chis, nu=nu)
+        else:
+            raise ValueError(f"2nd order variable {sec_order_var} is not supported.")
         if typ[0] == "k":
-            win1 = win2 = cmb_lens_window
+            win2 = cmb_lens_window
         elif typ[0] == "r":
-            win1 = win2 = self._cosmo.gal_lens_window_matter(Chis, Chi_max)     # Should set reasonable upper limit for cosmic shear
+            win2 = self._cosmo.gal_lens_window_matter(Chis, Chi_max)     # Should set reasonable upper limit for cosmic shear
         elif typ[0] == "s":
-            shear_window = self._cosmo.gal_lens_window_matter(Chis, Chi_max)
-            win1 = cmb_lens_window
-            win2 = shear_window
+            win2 = self._cosmo.gal_lens_window_matter(Chis, Chi_max)
         elif typ[0] == "g":
-            gal_window = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
-            win1 = cmb_lens_window
-            win2 = gal_window
+            win2 = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
         elif typ[0] in self.binned_gal_types:
             index = 2*(ord(typ[0]) - ord("a"))
             if self.use_LSST_abcde:
@@ -68,12 +72,11 @@ class Modecoupling:
                 gal_window = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
             else:
                 gal_window = self._cosmo.gal_window_Chi(Chis, zmin=gal_bins[index], zmax=gal_bins[index+1], typ=gal_distro)
-            win1 = cmb_lens_window
             win2 = gal_window
         elif typ[0] == "I":
-            cib_window = self._cosmo.cib_window_Chi(Chis, nu=nu)
-            win1 = cmb_lens_window
-            win2 = cib_window
+            win2 = self._cosmo.cib_window_Chi(Chis, nu=nu)
+        else:
+            raise ValueError(f"Type {typ[0]} is not supported.")
         return zs, Chis, dChi, win1, win2
 
     def _get_ps(self, ells, Chis, Chi_source2, typ, nu, gal_bins, recalc_PK, gal_distro="LSST_gold"):
@@ -97,8 +100,8 @@ class Modecoupling:
     def _get_matter_ps(self, zs, ks):
         return self._cosmo.get_matter_ps(self.matter_PK, zs, ks, curly=False, weyl_scaled=False, typ="matter")
 
-    def _components(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro="LSST_gold"):
-        zs, Chis, dChi, win1, win2 = self._integral_prep(Nchi, zmin, zmax, typ, nu, gal_bins, gal_distro=gal_distro)
+    def _components(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro="LSST_gold", sec_order_var="k"):
+        zs, Chis, dChi, win1, win2 = self._integral_prep(Nchi, zmin, zmax, typ, nu, gal_bins, gal_distro=gal_distro, sec_order_var=sec_order_var)
         Nells1 = np.size(ells1)
         ells1_vec = self._vectorise_ells(ells1, zs.ndim)
         zs = self._vectorise_zs(zs, Nells1)
@@ -120,10 +123,10 @@ class Modecoupling:
         I = step * matter_ps / Chis ** 2 * dChi * win1 * win2 * Cl
         return I.sum(axis=1)
 
-    def _matrix(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_weyl, gal_distro="LSST_gold"):
+    def _matrix(self, ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_weyl, gal_distro="LSST_gold", sec_order_var="k"):
         M = np.ones((np.size(ells1), np.size(ells2)))
         for iii, ell1 in enumerate(ells1):
-            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_weyl, gal_distro=gal_distro)
+            M[iii, :] = self._components(np.ones(np.size(ells2))*ell1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_weyl, gal_distro=gal_distro, sec_order_var=sec_order_var)
         return M
 
     def _check_type(self, typ):
@@ -149,7 +152,7 @@ class Modecoupling:
         return (observables[:, None] + observables[None, :]).flatten()
 
 
-    def components(self, ells1, ells2, typ="kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=False, recalc_PK=False, gal_distro="LSST_gold"):
+    def components(self, ells1, ells2, typ="kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=False, recalc_PK=False, gal_distro="LSST_gold", sec_order_var="k"):
         """
         Performs the calculation for extracting components of the mode-coupling matrix.
 
@@ -185,9 +188,9 @@ class Modecoupling:
             star = False
         elif typ == "rr":
             star = False
-        return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro=gal_distro)
+        return self._components(ells1, ells2, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro=gal_distro, sec_order_var=sec_order_var)
 
-    def spline(self, ells_sample=None, M_matrix=None, typ = "kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=False, recalc_PK=False, gal_distro="LSST_gold"):
+    def spline(self, ells_sample=None, M_matrix=None, typ = "kk", star=True, Nchi=100, kmin=0, kmax=100, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), extended=False, recalc_PK=False, gal_distro="LSST_gold", sec_order_var="k"):
         """
         Produces 2D spline of the mode coupling matrix.
 
@@ -223,7 +226,7 @@ class Modecoupling:
         if ells_sample is None:
             ells_sample = self.generate_sample_ells()
         self._check_type(typ)
-        M = self._matrix(ells_sample, ells_sample, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro=gal_distro)
+        M = self._matrix(ells_sample, ells_sample, typ, star, Nchi, kmin, kmax, zmin, zmax, nu, gal_bins, extended, recalc_PK, gal_distro=gal_distro, sec_order_var=sec_order_var)
         return RectBivariateSpline(ells_sample, ells_sample, M)
 
     def generate_sample_ells(self, ellmax=5000, Nells=100):

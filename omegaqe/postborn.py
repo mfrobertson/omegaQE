@@ -19,17 +19,13 @@ def _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax, powerspec
     mode_typ = "kk" if cmb else "ss"
     return mode.spline(ells_sample=mode.generate_sample_ells(M_ellmax, M_Nell), typ=mode_typ, star=False, zmin=zmin, zmax=zmax)
 
-
-def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb, zmin=0, zmax=None, powerspectra=None):
+def _get_postborn_ps(typ, Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb, zmin=0, zmax=None, powerspectra=None):
     Lmin = np.min(Ls)
     Lmax = 2*np.max(Ls)
     M_spline = _get_modecoupling(M_path, M_ellmax, M_Nell, cmb, zmin, zmax, Lmax, powerspectra)
     dTheta = np.pi / Ntheta
     thetas = np.linspace(dTheta, np.pi, Ntheta, dtype=float)
-    floaty = Lmax / 1000
-    samp1 = np.arange(Lmin, floaty * 10, 1)
-    samp2 = np.logspace(1, 3, Nell_prim - np.size(samp1)) * floaty
-    Lprims = np.concatenate((samp1, samp2))
+    Lprims = np.geomspace(Lmin, Lmax, Nell_prim)
     N_Ls = np.size(Ls)
     I = np.zeros(N_Ls)
     if N_Ls == 1:
@@ -41,24 +37,35 @@ def _get_postborn_omega_ps(Ls, M_path, Nell_prim, Ntheta, M_ellmax, M_Nell, cmb,
             Lprim_vec = vector.obj(rho=Lprim, phi=thetas)
             Lprimprim_vec = L_vec - Lprim_vec
             Lprimprims = Lprimprim_vec.rho
-            I_tmp[jjj] = np.sum(
-                2 * Lprim * dTheta * (L * Lprim * np.sin(thetas)) ** 2 * (Lprim_vec @ Lprimprim_vec) ** 2 / (
-                            (Lprim) ** 4 * (Lprimprims) ** 4) * M_spline.ev(Lprim, Lprimprims))
+            w = np.ones(np.shape(Lprimprims))
+            w[Lprimprims < Lmin] = 0
+            w[Lprimprims > Lmax] = 0
+            I_tmp[jjj] = np.sum(_get_integrand(typ, w, L_vec, Lprim_vec, Lprimprim_vec, thetas, dTheta, M_spline))
         I[iii] = InterpolatedUnivariateSpline(Lprims, I_tmp).integral(Lmin, Lmax)
     return 4 * I / ((2 * np.pi) ** 2)
 
+def _get_integrand(typ, w, L_vec, Lprim_vec, Lprimprim_vec, thetas, dTheta, M_spline):
+    L = L_vec.rho
+    Lprim = Lprim_vec.rho
+    Lprimprims = Lprimprim_vec.rho
+    if typ == "omega":
+        return 2 * w * Lprim * dTheta * (L * Lprim * np.sin(thetas)) ** 2 * (Lprim * Lprimprims * np.cos(Lprimprim_vec.deltaphi(Lprim_vec))) ** 2 / ((Lprim) ** 4 * (Lprimprims) ** 4) * M_spline.ev(Lprim, Lprimprims)
+    if typ == "len_len_kappa":
+        return 2 * w * Lprim * dTheta * (L_vec * Lprimprims * np.cos(Lprimprim_vec.deltaphi(L_vec))) ** 2 * (Lprim * Lprimprims * np.cos(Lprimprim_vec.deltaphi(Lprim_vec))) ** 2 / ((Lprim) ** 4 * (Lprimprims) ** 4) * M_spline.ev(Lprimprims, Lprim)
+    if typ == "ray_def_kappa":
+        return -2 * Lprim * dTheta * (L * Lprim * np.cos(thetas)) ** 2 / ((Lprim) ** 4) * M_spline.ev(L, Lprim)
+    if typ == "pb_kappa":
+        return (2 * w * Lprim * dTheta * (L_vec * Lprimprims * np.cos(Lprimprim_vec.deltaphi(L_vec))) ** 2 * (Lprim * Lprimprims * np.cos(Lprimprim_vec.deltaphi(Lprim_vec))) ** 2 / ((Lprim) ** 4 * (Lprimprims) ** 4) * M_spline.ev(Lprimprims, Lprim)) - (2 * Lprim * dTheta * (L * Lprim * np.cos(thetas)) ** 2 / ((Lprim) ** 4) * M_spline.ev(L, Lprim))
+    raise ValueError(f"Type: {typ} not recognised")
 
 def omega_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
-    """
+    return _get_postborn_ps("omega", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
 
-    Parameters
-    ----------
-    ells
-    Nell_prim
-    Ntheta
+def len_len_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
+    return _get_postborn_ps("len_len_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
 
-    Returns
-    -------
+def ray_def_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
+    return _get_postborn_ps("ray_def_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
 
-    """
-    return _get_postborn_omega_ps(ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
+def postborn_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
+    return _get_postborn_ps("pb_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
