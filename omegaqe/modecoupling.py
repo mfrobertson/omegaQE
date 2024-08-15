@@ -39,6 +39,26 @@ class Modecoupling:
         if ndim == 2:
             return np.repeat(zs[np.newaxis, :, :], Nells, 0)
 
+    def _get_window(self, typ, chi, nu, gal_bins, gal_distro="LSST_gold", chi_max=None):
+        cmb_lens_window = self._cosmo.cmb_lens_window_matter(chi, self._cosmo.get_chi_star())
+        if typ == "k":
+            return cmb_lens_window
+        elif typ == "g":
+            return self._cosmo.gal_window_Chi(chi, typ=gal_distro)
+        elif typ == "I":
+           return self._cosmo.cib_window_Chi(chi, nu=nu)
+        elif typ in ("r", "s"):
+            return self._cosmo.gal_lens_window_matter(chi, chi_max)
+        elif typ in self.binned_gal_types:
+            index = 2*(ord(typ[0]) - ord("a"))
+            if self.use_LSST_abcde:
+                gal_distro = f"LSST_{typ[0]}"
+                gal_window = self._cosmo.gal_window_Chi(chi, typ=gal_distro)
+            else:
+                gal_window = self._cosmo.gal_window_Chi(chi, zmin=gal_bins[index], zmax=gal_bins[index+1], typ=gal_distro)
+            return gal_window
+        raise ValueError(f"Unknown window type: {typ}.")
+
     def _integral_prep(self, Nchi, zmin, zmax, typ, nu, gal_bins, gal_distro="LSST_gold", sec_order_var="k"):
         Chi_min = self._cosmo.z_to_Chi(zmin)
         if zmax is not None:
@@ -48,35 +68,11 @@ class Modecoupling:
         Chis = np.linspace(Chi_min, Chi_max, Nchi)[1:]
         dChi = Chis[1] - Chis[0]
         zs = self._cosmo.Chi_to_z(Chis)
-        cmb_lens_window = self._cosmo.cmb_lens_window_matter(Chis, self._cosmo.get_chi_star())
-        if sec_order_var in ("k","w","r"):
-            win1 = cmb_lens_window
-        elif sec_order_var == "g":
-            win1 = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
-        elif sec_order_var == "I":
-            win1 = self._cosmo.cib_window_Chi(Chis, nu=nu)
+        if sec_order_var in ("k", "w", "r"):
+            win1 = self._get_window("k", Chis, nu, gal_bins, gal_distro)
         else:
-            raise ValueError(f"2nd order variable {sec_order_var} is not supported.")
-        if typ[0] == "k":
-            win2 = cmb_lens_window
-        elif typ[0] == "r":
-            win2 = self._cosmo.gal_lens_window_matter(Chis, Chi_max)     # Should set reasonable upper limit for cosmic shear
-        elif typ[0] == "s":
-            win2 = self._cosmo.gal_lens_window_matter(Chis, Chi_max)
-        elif typ[0] == "g":
-            win2 = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
-        elif typ[0] in self.binned_gal_types:
-            index = 2*(ord(typ[0]) - ord("a"))
-            if self.use_LSST_abcde:
-                gal_distro = f"LSST_{typ[0]}"
-                gal_window = self._cosmo.gal_window_Chi(Chis, typ=gal_distro)
-            else:
-                gal_window = self._cosmo.gal_window_Chi(Chis, zmin=gal_bins[index], zmax=gal_bins[index+1], typ=gal_distro)
-            win2 = gal_window
-        elif typ[0] == "I":
-            win2 = self._cosmo.cib_window_Chi(Chis, nu=nu)
-        else:
-            raise ValueError(f"Type {typ[0]} is not supported.")
+            win1 = self._get_window(sec_order_var, Chis, nu, gal_bins, gal_distro, Chi_max)
+        win2 = self._get_window(typ[0], Chis, nu, gal_bins, gal_distro)
         return zs, Chis, dChi, win1, win2
 
     def _get_ps(self, ells, Chis, Chi_source2, typ, nu, gal_bins, recalc_PK, gal_distro="LSST_gold"):

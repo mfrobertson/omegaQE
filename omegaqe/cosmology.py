@@ -622,12 +622,15 @@ class Cosmology:
     def _get_ps_variables(self, typ):
         weyl = "Weyl"
         matter = "delta_tot"
+        cdm = "delta_cdm"
         if typ.lower() == "weyl":
             return weyl, weyl
         if typ.lower() == "matter":
             return matter, matter
         if typ.lower() == "weyl-matter" or typ.lower() == "matter-weyl":
             return matter, weyl
+        if typ.lower() == "cdm":
+            return cdm, cdm
 
     def get_matter_PK(self, kmax=None, zmax=None, typ="Weyl"):
         """

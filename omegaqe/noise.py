@@ -111,10 +111,12 @@ class Noise:
         raise ValueError(f"Supplied type {typ} not in [phi, kappa, curl, omega].")
 
     def get_gal_shot_N(self, n=40, ellmax=4000, zmin=None, zmax=None):
+        # n=40 for LSST gold, n=7 for unWISE (assuming half of 2billion objects in fullsky catalogue are gals)?
         fraction = 1
         if zmin is not None and zmax is not None:
             fraction = self.cosmo.gal_window_fraction(zmin, zmax)
-        arcmin2_to_strad = 11818080
+        # arcmin2_to_strad = 11818080
+        arcmin2_to_strad = (180/np.pi)**2 * 60**2
         ones = np.ones(ellmax + 1)
         return ones/(arcmin2_to_strad * n * fraction)
 

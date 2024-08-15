@@ -65,6 +65,7 @@ def len_len_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Nth
     return _get_postborn_ps("len_len_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
 
 def ray_def_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
+    # NOTE: postborn paper has this term wrong, Krausse paper is correct
     return _get_postborn_ps("ray_def_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
 
 def postborn_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
