@@ -34,6 +34,7 @@ class Noise:
         self.cosmo = Cosmology() if cosmology is None else cosmology
         self.full_sky = full_sky
         self.agora = self.cosmo.agora
+        self.n = 40
 
     def _get_N0_phi(self, ellmax):
         return np.concatenate((np.zeros(self.cmb_offset), self.N0[0][:ellmax + 1 - self.cmb_offset]))
@@ -72,9 +73,29 @@ class Noise:
         N0_curl = np.array(pd.read_csv(dir+f'N0_curl_{ps}_T{T_Lmin}-{T_Lmax}_P{P_Lmin}-{P_Lmax}.csv', sep=' ')[qe])
         return N0_phi, N0_curl
 
+    def _get_lens_rec_noise_scalings(self, exp):
+        if exp.lower() == "act":
+            exp = "SO_base"
+            scaling_fac = 2.5
+            return exp, scaling_fac
+        if exp.lower() == "planck":
+            exp = "SO_base"
+            ellmax = 5000
+            ells = np.arange(2, ellmax + 1)
+            arcmin_to_rad = np.pi/180/60
+            theta_new = 5 * arcmin_to_rad
+            theta_old = 3 * arcmin_to_rad
+            scaling_fac = 9*np.exp(((ells*(ells+1)*theta_new**2)-(ells*(ells+1)*theta_old**2))/(8*np.log(2)))
+            return exp, scaling_fac
+        return exp, 1
+
     def setup_cmb_noise(self, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, iter=False, iter_ext=False, data_dir=omegaqe.DATA_DIR):
         print(f"Setting up noise...")
-        self.N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, iter_ext, data_dir)
+        exp, scaling_fac = self._get_lens_rec_noise_scalings(exp)
+        N0 = self._get_N0(exp, qe, gmv, ps, T_Lmin, T_Lmax, P_Lmin, P_Lmax, iter, iter_ext, data_dir)
+        N0_phi = N0[0] * scaling_fac
+        N0_curl = N0[1] * scaling_fac
+        self.N0 = (N0_phi, N0_curl)
 
     def get_N0(self, typ, ellmax, exp="SO", qe="TEB", gmv=True, ps="gradient", T_Lmin=30, T_Lmax=3000, P_Lmin=30, P_Lmax=5000, recalc_N0=False, iter=False, iter_ext=False, data_dir=omegaqe.DATA_DIR):
         """
@@ -110,12 +131,12 @@ class Noise:
             return self._get_N0_omega(ellmax)
         raise ValueError(f"Supplied type {typ} not in [phi, kappa, curl, omega].")
 
-    def get_gal_shot_N(self, n=40, ellmax=4000, zmin=None, zmax=None):
+    def get_gal_shot_N(self, n=None, ellmax=4000, zmin=None, zmax=None):
         # n=40 for LSST gold, n=7 for unWISE (assuming half of 2billion objects in fullsky catalogue are gals)?
         fraction = 1
         if zmin is not None and zmax is not None:
             fraction = self.cosmo.gal_window_fraction(zmin, zmax)
-        # arcmin2_to_strad = 11818080
+        n = self.n if n is None else n
         arcmin2_to_strad = (180/np.pi)**2 * 60**2
         ones = np.ones(ellmax + 1)
         return ones/(arcmin2_to_strad * n * fraction)
