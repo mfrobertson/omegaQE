@@ -211,7 +211,20 @@ class Bispectra:
         w[k >= 100] = 0
         return w*self._mode._cosmo.get_matter_ps(self._mode.matter_PK, z, k, curly=False, weyl_scaled=False, typ="matter")
 
+    def _vectorise_ells(self, ells, ndim):
+        if np.size(ells) == 1:
+            return ells
+        if ndim == 1:
+            return ells[:, None]
+        if ndim == 2:
+            return ells[:, :, None]
+        else:
+            raise ValueError(f"Too many (or too few) dimensions {ndim}")
+
     def _delta_bispectrum(self, L1, L2, L3, chi):
+        L1 = self._vectorise_ells(L1, L1.ndim)
+        L2 = self._vectorise_ells(L2, L2.ndim)
+        L3 = self._vectorise_ells(L3, L3.ndim)
         matter_ps1 = self._get_matter_ps(L1, chi)
         matter_ps2 = self._get_matter_ps(L2, chi)
         matter_ps3 = self._get_matter_ps(L3, chi)
@@ -245,13 +258,7 @@ class Bispectra:
         Nchi = 100
         _, chis, dChi, win1, win2 = self._mode._integral_prep(Nchi, zmin, zmax, typ[:-1], nu, gal_bins, gal_distro=gal_distro, sec_order_var=typ[1])
         win3 = self._mode._get_window(typ[2], chis, nu, gal_distro)
-        lss_bi = None
-        for iii, chi in enumerate(chis):
-            if lss_bi is None:
-                lss_bi = win1[iii] * win2[iii] * win3[iii] * self._delta_bispectrum(L1, L2, L3, chi) / (chi ** 4)
-            else:
-                lss_bi += win1[iii] * win2[iii] * win3[iii] * self._delta_bispectrum(L1, L2, L3, chi)/(chi**4)
-        return lss_bi * dChi
+        return np.sum(win1 * win2 * win3 * self._delta_bispectrum(L1, L2, L3, chis) / (chis ** 4), axis=-1) * dChi
 
     def get_ld_bispectrum(self, typ, L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
         self._check_type(typ, pb=False)

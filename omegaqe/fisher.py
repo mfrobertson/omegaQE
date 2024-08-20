@@ -297,21 +297,22 @@ class Fisher:
 
     def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins, gal_distro="LSST_gold", param=None, dx=None, lens_delta=False, include_lss=False, is_lss=False):
         Lmax, Lmin, dLs, thetas, dTheta, weights, _, _, _ = self._integral_prep_sample(Ls,Ntheta,typ, nu,gal_bins,include_N0_kappa=include_N0_kappa,gal_distro=gal_distro)
+        denom_parts = self._get_denom_parts(typ, Lmax)
         I = np.zeros(np.size(Ls))
         Ls2 = np.arange(Lmin, Lmax + 1, dL2)
+        L2 = Ls2[None, :]
+        L2_vec = vector.obj(rho=L2, phi=thetas[:, None])
         for iii, L3 in enumerate(Ls):
             I_tmp = 0
-            L2 = Ls2[None, :]
             L3_vec = vector.obj(rho=L3, phi=0)
-            L2_vec = vector.obj(rho=L2, phi=thetas[:, None])
             L1_vec = L3_vec - L2_vec if typ[:-1] == "w" else -L3_vec - L2_vec   # Not sure this matters much
             L1 = L1_vec.rho
             w = np.ones(np.shape(L1))
             w[L1 > Lmax] = 0
             w[L1 < Lmin] = 0
-            thetas12 = L1_vec.deltaphi(L2_vec)
-            bispectrum = self._get_bispectrum(typ, L1, L2, theta=thetas12, param_dx=(param, dx), nu=nu, gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=lens_delta, include_lss=include_lss, is_lss=is_lss)
-            denom_parts = self._get_denom_parts(typ, Lmax)
+            bispectrum = self._get_bispectrum(typ, L1, L2, L3, param_dx=(param, dx), nu=nu, gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=lens_delta, include_lss=include_lss, is_lss=is_lss)
+            # thetas12 = L1_vec.deltaphi(L2_vec)
+            # bispectrum = self._get_bispectrum(typ, L1, L2, theta=thetas12, param_dx=(param, dx), nu=nu, gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=lens_delta, include_lss=include_lss, is_lss=is_lss)
             denom = self._get_denom_samp(*denom_parts, L1, L2, L3)
             I_tmp += dL2 * 2 * np.sum(L2 * w * dTheta * bispectrum ** 2 / denom)
             I[iii] = 2 * np.pi * L3 * I_tmp
@@ -844,7 +845,7 @@ class Fisher:
         cl_ll_kappa = Cl_spline(ells)
         cl_kappa = self.power.get_kappa_ps(ells)
         if cmb:
-            N0 = self.covariance.noise.get_N0("kappa", Lmax)*2.5
+            N0 = self.covariance.noise.get_N0("kappa", Lmax)
         else:
             N0 = self.covariance.noise.get_shape_N(n=n)
         return f_sky * np.sum((2*ells + 1) * np.abs(cl_ll_kappa) / (cl_kappa + N0[ells]))
