@@ -15,7 +15,7 @@ class Demnunii:
     def __init__(self, nthreads=1):
         self.data_dir = "/mnt/lustre/users/astro/mr671/DEMNUnii/LCDM/"
         self.cache_dir = f"/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/cache/"
-        self.sims_dir = f"/mnt/lustre/users/astro/mr671/len_cmbs/sims/"
+        self.sims_dir = f"/mnt/lustre/users/astro/mr671/len_cmbs/sims2/"
         self.omegaqe_data = f"/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/data/"
         self.config = self.setup_config()
         self.nside = int(self.parse_config(self.get_config("HealpixNside")))
@@ -181,23 +181,24 @@ class Demnunii:
         if pixel_corr: gal = self._apply_pixel_correction(gal)
         return gal
     
-    def get_obs_mag_bias_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
-        # TODO: This assumes s=1 (could use estimated euclid s 1506.01369)
+    def get_obs_mag_bias_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, s_typ=1):
+        # TODO: what to do with s... (could use estimated euclid s 1506.01369)
         window="LSST_mu"
-        if verbose: print(f"DEMNUnii: Constructing mag bias map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}, lensed={lensed}")
+        if verbose: print(f"DEMNUnii: Constructing mag bias map for zmin={zmin}, zmax={zmax}, window={window}, pix_cor={pixel_corr}")
         npix = self.sht.nside2npix()
         gal = np.zeros(npix)
         snaps = self.get_snaps_z(zmin, zmax)
         t0 = datetime.datetime.now()
+        s_spline = self.cosmo.get_s_spline(s_typ)
         for iii, snap in enumerate(snaps):
             if snap == 62:
                 continue
             if verbose: print(f"    [{str(datetime.datetime.now() - t0)[:-7]}] Snap: {snap} ({iii+1}/{np.size(snaps)})", end='')
-            gal += self._window(snap, window) * self.get_density_snap(snap, lensed)
+            gal += ((5*s_spline(self._get_z(snap))) - 2) * self._window(snap, window) * self.get_density_snap(snap, lensed=False)
             if verbose: print('\r', end='')
         if verbose: print("")
         if pixel_corr: gal = self._apply_pixel_correction(gal)
-        return 3 * gal   # assums s=1
+        return gal
     
     def get_obs_rsd_map(self, zmin=0, zmax=20, verbose=False, pixel_corr=True, lensed=False):
         #TODO: see 2309.00052

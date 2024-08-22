@@ -9,14 +9,17 @@ import copy
 
 class Fields:
 
-    def __init__(self, exp, nbody="DEMNUnii", fields="kgI", use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1, gauss_lss=False, len_lss=True, use_gauss_chache=False):
-        self.nbody_name = nbody
+    def __init__(self, exp, nbody="DEMNUnii", fields="kgI", use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1, gauss_lss=False, len_lss=True, use_gauss_chache=False, u_typ=2):
         self.nthreads = nthreads
         self.nbody_label = nbody
         self.nbody = fullsky_sims.wrapper_class(nbody, nthreads)
         self.sht = self.nbody.sht
         self.exp = exp
         self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=self.nbody.omegaqe_data, cosmology=self.nbody.cosmo)
+        self.u_typ = u_typ
+        if "u" in fields:
+            self.nbody.cosmo.s_spline = self.nbody.cosmo.get_s_spline(self.u_typ)
+            self.fish.covariance.mag_bias = True
         self.sim = cmb_sim
         self.deflect_typ = deflect_typ
         self.nside = self.nbody.nside
@@ -57,8 +60,12 @@ class Fields:
     def get_Cl(self, typ, smoothing_nbins=None):
         alm1 = self.fft_maps[typ[0]]
         alm2 = self.fft_maps[typ[1]]
+        if "I" in typ and self.nbody_label.lower()=="agora":
+            cl = self.sht.alm2cl(alm1, alm2)
+            cl[0] = 0
+            return self.sht.smoothed_cl(cl, nbins=smoothing_nbins)
         return self.sht.alm2cl(alm1, alm2, smoothing_nbins=smoothing_nbins)
-
+        
     def _get_cov(self, N_fields):
         C = np.empty((self.Lmax_map, N_fields, N_fields))
         for iii, field_i in enumerate(self._fields):
@@ -131,6 +138,9 @@ class Fields:
             print(f"  Using cached Gaussian {field} map.")
             return self.sht.read_map(f"{self.nbody.cache_dir}_maps/{field}_gaussian.fits")
         if lensed and field != "k":
+            if field == "u":
+                print(f"  Using cached lensed {field} and g maps.")
+                return self.sht.read_map(f"{self.nbody.cache_dir}_maps/u_{self.u_typ}.fits") + self.sht.read_map(f"{self.nbody.cache_dir}_maps/g_len.fits")
             print(f"  Using cached lensed {field} map.")
             return self.sht.read_map(f"{self.nbody.cache_dir}_maps/{field}_len.fits")
         return self.sht.read_map(f"{self.nbody.cache_dir}_maps/{field}.fits")
@@ -199,7 +209,7 @@ class Fields:
         kmax = 5000
         if field == "k":
             return self.fish.covariance.noise.get_N0("kappa", ellmax=kmax, recalc_N0=False)
-        if field == "g":
+        if field in ("g", "u"):
             return self.fish.covariance.noise.get_gal_shot_N(ellmax=kmax)
         if field == "I":
             N_dust = self.fish.covariance.noise.get_dust_N(353e9, ellmax=kmax)
@@ -215,7 +225,7 @@ class Fields:
             return int(datetime.now().timestamp())
         sim = self.sim if sim is None else sim
         seed = 3 * sim
-        if field == "g":
+        if field in ("g", "u"):
             seed += 1
         elif field == "I":
             seed += 2

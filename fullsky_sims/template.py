@@ -8,6 +8,7 @@ class Template:
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
+        self.lss_fields = self.fields.fields.replace("u", "g")
         self.sht = self.fields.nbody.sht
         self.Lmax_map = self.fields.Lmax_map
         self.nside = self.fields.nside
@@ -19,7 +20,7 @@ class Template:
         self._cosmo = self._power.cosmo
         self.F_L, self.C_inv = self._get_F_L_and_C_inv(cmb_lens_qe_typ)
         self.matter_PK = self.fields.nbody.get_PK()
-        self.a_bars = dict.fromkeys(self.fields.fields)
+        self.a_bars = dict.fromkeys(self.lss_fields)
         self.use_kappa_rec = use_kappa_rec
         if self.use_kappa_rec:
             print(f"Using reconstructed kappa (QE: {cmb_lens_qe_typ}) in template.")
@@ -59,8 +60,9 @@ class Template:
             fields = "TT"
         else:
             raise ValueError(f"Supplied cmb_lens_qe_typ {cmb_lens_qe_typ} not of supported typs; T, EB, TEB, TEB_iter, EB_iter, T_iter")
-        Ls = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls.npy")
-        F_L = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.fields.fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L.npy")
+        filename_ext = f"_u{self.fields.u_typ}" if "u" in self.fields.fields else ""
+        Ls = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.lss_fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/Ls{filename_ext}.npy")
+        F_L = np.load(f"{self.fields.nbody.cache_dir}/_F_L/{self.lss_fields}/{self.fields.exp}/{qe_typ}/{fields}/30_3000/1_2000/F_L{filename_ext}.npy")
         
         # # tmp 
         # C_omega_old = np.load(f"{self.fields.nbody.cache_dir}/_C_omega/C_omega.npy")
@@ -73,12 +75,11 @@ class Template:
         iter=True if "_iter" in qe_typ else False 
         self.fields.setup_noise(qe=fields, iter=iter, gmv=qe_typ!="single")
         gal_distro = "agora" if self._cosmo.agora else "LSST_gold"
-        print(gal_distro)
-        C_inv = self._fish.covariance.get_C_inv(self.fields.fields, self.Lmax_map, nu=353e9, gal_distro=gal_distro)
+        C_inv = self._fish.covariance.get_C_inv(self.lss_fields, self.Lmax_map, nu=353e9, gal_distro=gal_distro)
         F_L_spline = InterpolatedUnivariateSpline(Ls, F_L)
         Ls_sample = np.arange(self.Lmax_map+1)
         F_L = F_L_spline(Ls_sample)
-        N_fields = len(self.fields.fields)
+        N_fields = len(self.lss_fields)
         C_invs = np.empty((N_fields, N_fields, np.size(F_L)))
         for iii in range(N_fields):
             for jjj in range(N_fields):
@@ -106,7 +107,8 @@ class Template:
             for jjj, field_j in enumerate(self.fields.fields):
                 a_j = self._get_fft_maps(field_j, tracer_noise, neg_tracers)
                 a_bar_i += self.sht.almxfl(a_j, self.C_inv[iii, jjj])
-            self.a_bars[field_i] = a_bar_i
+            a_bar_field = field_i.replace("u", "g")
+            self.a_bars[a_bar_field] = a_bar_i
 
     def _get_Cl_and_window(self, Chi, field, nu=353e9, gal_distro="LSST_gold"):
         Ls_sample = np.arange(1, self.Lmax_map + 1)
@@ -117,7 +119,7 @@ class Template:
             window = self._cosmo.cmb_lens_window_matter(Chi, self._cosmo.get_chi_star(), False)
         if field == "g":
             Cl_sample[1:] = self._power.get_gal_kappa_ps(Ls_sample, Chi, gal_distro=gal_distro, use_weyl=False)
-            window = self._cosmo.gal_window_Chi(Chi)
+            window = self._cosmo.gal_window_Chi(Chi, typ=gal_distro)
         if field == "I":
             Cl_sample[1:] = self._power.get_cib_kappa_ps(Ls_sample, nu=nu, Chi_source1=Chi, use_weyl=False)
             window = self._cosmo.cib_window_Chi(Chi, nu)
@@ -136,7 +138,7 @@ class Template:
     def _get_Egamma_Elambda(self, Cls, windows, matter_ps):
         h_gamma = None
         h_lambda = None
-        for iii, field_i in enumerate(self.fields.fields):
+        for iii, field_i in enumerate(self.lss_fields):
             if h_gamma is None:
                 h_gamma = self.a_bars[field_i] * windows[field_i]
                 h_lambda = self.sht.almxfl(self.a_bars[field_i], Cls[field_i])
@@ -152,10 +154,10 @@ class Template:
         t0 = datetime.datetime.now()
         print(f"[00:00] {0}%", end='')
         for Chi_i, Chi in enumerate(Chis):
-            Cls = dict.fromkeys(self.fields.fields)
-            windows = dict.fromkeys(self.fields.fields)
+            Cls = dict.fromkeys(self.lss_fields)
+            windows = dict.fromkeys(self.lss_fields)
             matter_ps = self._get_matter_ps(Chi)
-            for field in self.fields.fields:
+            for field in self.lss_fields:
                 Cls[field], windows[field] = self._get_Cl_and_window(Chi, field, gal_distro=gal_distro)
 
             E_gamma, E_lambda = self._get_Egamma_Elambda(Cls, windows, matter_ps)
