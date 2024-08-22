@@ -28,6 +28,7 @@ class Cosmology:
         self.gal_biases = None
         self.agora = False
         self.b1 = 0.84
+        self.s_spline = self.get_s_spline(1)
 
     def update_gal_bias(self, b1):
         self.b1 = b1
@@ -152,7 +153,7 @@ class Cosmology:
         win = self.cmb_lens_window(Chi1, Chi2, heaviside) * poisson_fac
         return win
 
-    def gal_lens_window(self, Chi1, Chi2, heaviside=True):
+    def gal_lens_window(self, Chi1, Chi2, gal_distro="LSST_gold", heaviside=True):
         """
         Reference 1411.0115
 
@@ -170,14 +171,14 @@ class Cosmology:
         dChi = chis[1] - chis[0]
 
         # Setting bias to 1 in gal window
-        gal_distro = self.gal_window_Chi(chis, bias_unity=True)
+        gal_distro = self.gal_window_Chi(chis, typ=gal_distro, bias_unity=True)
 
         I = gal_distro * self.cmb_lens_window(Chi1, chis, heaviside)
         q = np.sum(dChi * I, axis=0)
 
         return q
 
-    def gal_lens_window_matter(self, Chi1, Chi2, heaviside=True):
+    def gal_lens_window_matter(self, Chi1, Chi2, gal_distro="LSST_gold", heaviside=True):
         """
         Reference 1411.0115
 
@@ -193,8 +194,44 @@ class Cosmology:
         """
         zs = self.Chi_to_z(Chi1)
         poisson_fac = self.poisson_factor(zs)
-        win = self.gal_lens_window(Chi1, Chi2, heaviside) * poisson_fac
+        win = self.gal_lens_window(Chi1, Chi2, gal_distro, heaviside) * poisson_fac
         return win
+    
+    def mu_window(self, Chi1, Chi2, gal_distro="LSST_gold", heaviside=True):
+        """
+        Reference 1411.0115
+
+        Parameters
+        ----------
+        Chi1
+        Chi2
+        heaviside
+
+        Returns
+        -------
+
+        """
+        s = self.s_spline(self.Chi_to_z(Chi1))
+        fac = (5*s - 2)
+        return fac * self.gal_lens_window(Chi1, Chi2, gal_distro, heaviside)
+    
+    def mu_window_matter(self, Chi1, Chi2, gal_distro="LSST_gold", heaviside=True):
+        """
+        Reference 1411.0115
+
+        Parameters
+        ----------
+        Chi1
+        Chi2
+        heaviside
+
+        Returns
+        -------
+
+        """
+        s = self.s_spline(self.Chi_to_z(Chi1))
+        fac = (5*s - 2)
+        return fac * self.gal_lens_window_matter(Chi1, Chi2, gal_distro, heaviside)
 
     def rsd_window_constChi(self, Chi, ellmax, typ="LSST_gold", zmin=0, zmax=None):
         """
@@ -328,6 +365,18 @@ class Cosmology:
             bias[np.logical_and(z > 1.0, z < 1.2)] = self.gal_biases[4]
             return bias
         return 1 + (self.b1 * z)
+    
+    def get_s_spline(self, typ=1):
+        zs = np.linspace(0, 200, 10000)
+        if typ == 1:
+            s = np.exp(zs) / (np.exp(1))
+        elif typ == 2:
+            s = np.exp(zs) / (np.exp(2))
+        elif typ == 3:
+            s = np.exp(zs) / (np.exp(3))
+        elif typ == 4:
+            s = np.ones(np.size(zs))
+        return InterpolatedUnivariateSpline(zs, s)
 
     def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
         """

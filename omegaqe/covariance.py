@@ -16,6 +16,7 @@ class Covariance:
         self.test_types = list("xyz")
         self.use_LSST_abcde = False
         self.shot_noise = [2.25, 3.11, 3.09, 2.61, 2.00] if self.use_LSST_abcde else None  # caution that one bin agora is using n=40 
+        self.mag_bias = False
 
     def get_log_sample_Ls(self, Lmin, Lmax, Nells=500, dL_small=1):
         floaty = Lmax / 1000
@@ -37,8 +38,15 @@ class Covariance:
     def _get_Cl_gal(self, ellmax, gal_win_zmin_a=None, gal_win_zmax_a=None, gal_win_zmin_b=None, gal_win_zmax_b=None, use_bins=True, gal_distro="LSST_gold", gal_distro_b=None):
         ells = np.arange(ellmax + 1)
         if use_bins:
-            return self.power.get_gal_ps(ells, gal_win_zmin_a=gal_win_zmin_a, gal_win_zmax_a=gal_win_zmax_a, gal_win_zmin_b=gal_win_zmin_b, gal_win_zmax_b=gal_win_zmax_b, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
-        return self.power.get_gal_ps(ells, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
+            cl_g = self.power.get_gal_ps(ells, gal_win_zmin_a=gal_win_zmin_a, gal_win_zmax_a=gal_win_zmax_a, gal_win_zmin_b=gal_win_zmin_b, gal_win_zmax_b=gal_win_zmax_b, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
+            if self.mag_bias:
+                raise ValueError("Mag bias not implementated for binned gal powerspectra")
+        else:
+            cl_g = self.power.get_gal_ps(ells, gal_distro=gal_distro, gal_distro_b=gal_distro_b)
+        if self.mag_bias:
+            print("including mu terms in cl_gg")
+            cl_g += 2 * self.power.get_ps("gu", ells) + self.power.get_ps("uu", ells)
+        return cl_g
 
     def _get_Cl_cib(self, ellmax, nu=353e9):
         ells = np.arange(ellmax + 1)
@@ -47,8 +55,15 @@ class Covariance:
     def _get_Cl_gal_kappa(self, ellmax, gal_win_zmin=None, gal_win_zmax=None, use_bins=True, gal_distro="LSST_gold"):
         ells = np.arange(ellmax + 1)
         if use_bins:
-            return self.power.get_gal_kappa_ps(ells, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, gal_distro=gal_distro)
-        return self.power.get_gal_kappa_ps(ells, gal_distro=gal_distro)
+            cl_kg = self.power.get_gal_kappa_ps(ells, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, gal_distro=gal_distro)
+            if self.mag_bias:
+                raise ValueError("Mag bias not implementated for binned gal powerspectra")
+        else:
+            cl_kg = self.power.get_gal_kappa_ps(ells, gal_distro=gal_distro)
+        if self.mag_bias:
+            print("including mu term in cl_kg")
+            cl_kg += self.power.get_ps("ku", ells)
+        return cl_kg
 
     def _get_Cl_cib_kappa(self, ellmax, nu=353e9):
         ells = np.arange(ellmax + 1)
@@ -57,8 +72,15 @@ class Covariance:
     def _get_Cl_cib_gal(self, ellmax, nu=353e9, gal_win_zmin=None, gal_win_zmax=None, use_bins=True, gal_distro="LSST_gold"):
         ells = np.arange(ellmax + 1)
         if use_bins:
-            return self.power.get_cib_gal_ps(ells, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, gal_distro=gal_distro)
-        return self.power.get_cib_gal_ps(ells, nu=nu, gal_distro=gal_distro)
+            cl_Ig = self.power.get_cib_gal_ps(ells, nu=nu, gal_win_zmin=gal_win_zmin, gal_win_zmax=gal_win_zmax, gal_distro=gal_distro)
+            if self.mag_bias:
+                raise ValueError("Mag bias not implementated for binned gal powerspectra")
+        else:
+            cl_Ig = self.power.get_cib_gal_ps(ells, nu=nu, gal_distro=gal_distro)
+        if self.mag_bias:
+            print("including mu term in cl_Ig")
+            cl_Ig += self.power.get_ps("Iu", ells)
+        return cl_Ig
 
     def _get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold", gal_distro_b=None):
         if "s" in typ:

@@ -49,6 +49,8 @@ class Modecoupling:
            return self._cosmo.cib_window_Chi(chi, nu=nu)
         elif typ in ("r", "s"):
             return self._cosmo.gal_lens_window_matter(chi, chi_max)
+        elif typ == "u":
+            return self._cosmo.mu_window_matter(chi, chi_max)
         elif typ in self.binned_gal_types:
             index = 2*(ord(typ[0]) - ord("a"))
             if self.use_LSST_abcde:
@@ -72,7 +74,7 @@ class Modecoupling:
             win1 = self._get_window("k", Chis, nu, gal_bins, gal_distro)
         else:
             win1 = self._get_window(sec_order_var, Chis, nu, gal_bins, gal_distro, Chi_max)
-        win2 = self._get_window(typ[0], Chis, nu, gal_bins, gal_distro)
+        win2 = self._get_window(typ[0], Chis, nu, gal_bins, gal_distro, Chi_max)
         return zs, Chis, dChi, win1, win2
 
     def _get_ps(self, ells, Chis, Chi_source2, typ, nu, gal_bins, recalc_PK, gal_distro="LSST_gold"):
@@ -92,6 +94,8 @@ class Modecoupling:
             return self._powerspectra.get_gal_kappa_ps(ells, Chis, recalc_PK=recalc_PK, gal_win_zmin=gal_bins[index], gal_win_zmax=gal_bins[index+1], gal_distro=gal_distro, use_weyl=False)
         if typ[1] == "I":
             return self._powerspectra.get_cib_kappa_ps(ells, nu=nu, Chi_source1=Chis, recalc_PK=recalc_PK, use_weyl=False)
+        if typ[1] == "u":
+            return self._powerspectra.get_mu_kappa_ps(ells, Chi_source1=Chis, recalc_PK=recalc_PK, use_weyl=False)
 
     def _get_matter_ps(self, zs, ks):
         return self._cosmo.get_matter_ps(self.matter_PK, zs, ks, curly=False, weyl_scaled=False, typ="matter")
@@ -144,7 +148,7 @@ class Modecoupling:
         -------
 
         """
-        observables = np.char.array(list("kgIwrs")+self.binned_gal_types)
+        observables = np.char.array(list("kgIwrsu")+self.binned_gal_types)
         return (observables[:, None] + observables[None, :]).flatten()
 
 
