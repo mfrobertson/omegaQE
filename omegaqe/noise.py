@@ -83,9 +83,10 @@ class Noise:
             ellmax = 5000
             ells = np.arange(2, ellmax + 1)
             arcmin_to_rad = np.pi/180/60
-            theta_new = 5 * arcmin_to_rad
+            theta_new = 7 * arcmin_to_rad
             theta_old = 3 * arcmin_to_rad
-            scaling_fac = 9*np.exp(((ells*(ells+1)*theta_new**2)-(ells*(ells+1)*theta_old**2))/(8*np.log(2)))
+            exponent = lambda beam: ells*(ells+1)*theta_new**2 / (8*np.log(2))
+            scaling_fac = 9*np.exp(exponent(theta_new)-exponent(theta_old))
             return exp, scaling_fac
         return exp, 1
 
