@@ -257,7 +257,9 @@ class QE:
             typ2 = typ[1] + typ[1]
         if not curl:
             return self._response_phi(typ1, typ2, L_vec, ell_vec, L3_vec, h1, h2, cl)
-        return L * ell * np.sin(ell_vec.deltaphi(L_vec)) * (h1 * self._get_cmb_cl(ell, typ1, cl) - h2 * self._get_cmb_cl(L3, typ2, cl))
+        # return L * ell * np.sin(ell_vec.deltaphi(L_vec)) * (h1 * self._get_cmb_cl(ell, typ1, cl) - h2 * self._get_cmb_cl(L3, typ2, cl))
+        # Correcting 2D cross product def, should be L1xL2=|L1||L2|sin(theta21)
+        return L * ell * np.sin(L_vec.deltaphi(ell_vec)) * (h1 * self._get_cmb_cl(ell, typ1, cl) - h2 * self._get_cmb_cl(L3, typ2, cl))
 
     def geo_fac(self, typ, theta12):
         """

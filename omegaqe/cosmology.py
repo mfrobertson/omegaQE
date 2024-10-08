@@ -28,7 +28,10 @@ class Cosmology:
         self.gal_biases = None
         self.agora = False
         self.b1 = 0.84
-        self.s_spline = self.get_s_spline(1)
+        self.set_magbias(1)
+
+    def set_magbias(self, typ):
+        self.s_spline = self.get_s_spline(typ)
 
     def update_gal_bias(self, b1):
         self.b1 = b1
@@ -257,7 +260,8 @@ class Cosmology:
             iii -= 1
             Chi_scaled = (2 * ells + 1 + 4 * iii) / (2 * ells + 1) * Chi
             n = self.gal_window_Chi(Chi_scaled, typ=typ, zmin=zmin, zmax=zmax, bias_unity=True)
-            f = self.get_f(self.Chi_to_z(Chi_scaled))
+            z = self.Chi_to_z(Chi_scaled)
+            f = self.get_f(z)
             res += L_fac * n * f
         return np.concatenate((np.zeros(9), res))
 

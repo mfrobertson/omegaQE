@@ -171,19 +171,21 @@ class Bispectra:
         M1, M2, L12_dot = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         if typ[-1] == "w":
             product_func = self._triangle_cross_product
+            fac = -1
         elif typ[-1] == "k":
             product_func = self._triangle_dot_product
+            fac = +1
         else:
             raise ValueError(f"Bispectrum type {typ} has second order variable {typ[-1]} not from expected 'k' or 'w'.")
         L13_fac = product_func(L1, L3, L2)
-        L23_fac = product_func(L2, L3, L1)
-        res = 2 * L12_dot * ((L13_fac * M1) - (L23_fac * M2))/(L1**2 * L2**2)
+        L23_fac = fac * product_func(L2, L3, L1)
+        res = 2 * L12_dot * ((L13_fac * M1) + (L23_fac * M2))/(L1**2 * L2**2)    #Note for kappa bi this should be + not -
         res[np.isnan(res)] = 0
         return res
 
     def _omega_bispectrum_angle(self, typ, L1, L2, theta12, M_spline, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold"):
         M1, M2, _ = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-        return np.sin(2 * theta12) * (M1 - M2)
+        return -np.sin(2 * theta12) * (M1 - M2)    #Using anti-clockwise omega so bi has different sign compared to Pratten & Lewis
 
     def _get_F2(self, L1, L2, L3):
         A = 1
