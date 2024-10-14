@@ -19,7 +19,7 @@ def _get_Cl_spline(typ):
         raise ValueError(f"Type {typ} does not exist.")
 
 
-def _get_cached_F_L(F_L_path, typs, iter, L_min_cut=30, L_max_cut=3000):
+def _get_cached_F_L(F_L_path, typs, iter, L_min_cut=30, L_max_cut=3000, magbias_typ=None):
     sep = getFileSep()
     fields = global_fish.qe
     exp = global_fish.exp
@@ -27,8 +27,9 @@ def _get_cached_F_L(F_L_path, typs, iter, L_min_cut=30, L_max_cut=3000):
     gmv_str = "gmv" if gmv else "single"
     if iter: gmv_str += "_iter"
     full_F_L_path = F_L_path+sep+typs+sep+exp+sep+gmv_str+sep+fields+sep+f"{L_min_cut}_{L_max_cut}"+sep+"1_2000"
-    sample_Ls = np.load(full_F_L_path+sep+"Ls.npy")
-    F_L = np.load(full_F_L_path+sep+"F_L.npy")
+    magbias_str = f"_u{magbias_typ}" if magbias_typ is not None else "" 
+    sample_Ls = np.load(full_F_L_path+sep+f"Ls{magbias_str}.npy")
+    F_L = np.load(full_F_L_path+sep+f"F_L{magbias_str}.npy")
     return sample_Ls, F_L
 
 
@@ -338,7 +339,6 @@ def _cache_lss_cls(lss_cls, iter):
     ellmax = 5000
     rho = global_fish.covariance.get_delens_corr(Lmax=5000) if iter else 0
     Cl_kk = global_fish.covariance.get_Cl("kk", ellmax=ellmax) if lss_cls is None else lss_cls["kk"]
-    # Cl_kk *= 1-rho**2
     Cl_kk *= np.sqrt(1-rho**2)
     Ls_sample = np.arange(np.size(Cl_kk))
     Cl_kk_spline = InterpolatedUnivariateSpline(Ls_sample[1:], Cl_kk[1:])
@@ -370,9 +370,9 @@ def _setup_delen_cmb_cls():
             global_qe.cmb[typ[::-1]].gradCl_spline = InterpolatedUnivariateSpline(Ls[2:], delen_len_cl[2:])
 
 
-def _cache_splines(F_L_path, bi_typ, lss_cls, iter):
+def _cache_splines(F_L_path, bi_typ, lss_cls, iter, magbias_typ):
     global F_L_spline, C_inv_splines
-    sample_Ls, F_L = _get_cached_F_L(F_L_path, bi_typ, iter)
+    sample_Ls, F_L = _get_cached_F_L(F_L_path, bi_typ, iter, magbias_typ=magbias_typ)
     F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
     C_inv = global_fish.covariance.get_C_inv(bi_typ, Lmax=int(np.ceil(np.max(sample_Ls))), nu=353e9)
     C_inv_splines = _build_C_inv_splines(C_inv, bi_typ)
@@ -381,10 +381,14 @@ def _cache_splines(F_L_path, bi_typ, lss_cls, iter):
     if iter:
         _setup_delen_cmb_cls()
 
-def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir=omegaqe.DATA_DIR, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False, noise=True, lss_cls=None):
+def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps="gradient", L_cuts=(30,3000,30,5000), iter=False, data_dir=omegaqe.DATA_DIR, F_L_path=f"{omegaqe.RESULTS_DIR}{getFileSep()}F_L_results", qe_setup_path=None, N_L1=30, N_L3=70, Ntheta12=25, Ntheta13=60, verbose=False, noise=True, lss_cls=None, magbias_typ=None):
 
     global global_qe, global_fish, N0_w_spline, N0_k_spline
     global_fish = Fisher(exp, qe_fields, gmv, ps, L_cuts, iter, False, data_dir, setup_bispectra=True)
+
+    if magbias_typ is not None: 
+        global_fish.covariance.mag_bias = True
+        global_fish.covariance.power.cosmo.set_magbias(magbias_typ)
     
     # DEMNUnii runs only ----------------
     dm = Demnunii()
@@ -411,6 +415,6 @@ def bias(bias_typ, Ls, bi_typ="theory", exp="SO", qe_fields="TEB", gmv=True, ps=
 
     if bi_typ != "theory":
         if verbose: print("Caching lss splines")
-        _cache_splines(F_L_path, bi_typ, lss_cls, iter)
+        _cache_splines(F_L_path, bi_typ, lss_cls, iter, magbias_typ)
     Ls = np.ones(1, dtype=int)*Ls if np.size(Ls) == 1 else Ls
     return _bias(bias_typ, bi_typ, global_fish.qe, global_fish.gmv, Ls, N_L1, N_L3, Ntheta12, Ntheta13, verbose, noise, iter)
