@@ -9,7 +9,7 @@ import copy
 
 class Fields:
 
-    def __init__(self, exp, nbody="DEMNUnii", fields="kgI", use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1, gauss_lss=False, len_lss=True, use_gauss_chache=False, u_typ=2):
+    def __init__(self, exp, nbody="DEMNUnii", fields="kgI", use_lss_cache=False, use_cmb_cache=False, cmb_sim=0, deflect_typ="dem_dem", nthreads=1, gauss_lss=False, len_lss=True, use_gauss_chache=False, u_typ=1):
         self.nthreads = nthreads
         self.nbody_label = nbody
         self.nbody = fullsky_sims.wrapper_class(nbody, nthreads)
@@ -18,7 +18,7 @@ class Fields:
         self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=self.nbody.omegaqe_data, cosmology=self.nbody.cosmo)
         self.u_typ = u_typ
         if "u" in fields:
-            self.nbody.cosmo.s_spline = self.nbody.cosmo.get_s_spline(self.u_typ)
+            self.nbody.cosmo.set_magbias(self.u_typ)
             self.fish.covariance.mag_bias = True
         self.sim = cmb_sim
         self.deflect_typ = deflect_typ
@@ -141,6 +141,9 @@ class Fields:
             if field == "u":
                 print(f"  Using cached lensed {field} and g maps.")
                 return self.sht.read_map(f"{self.nbody.cache_dir}_maps/u_{self.u_typ}.fits") + self.sht.read_map(f"{self.nbody.cache_dir}_maps/g_len.fits")
+            if field == "r":
+                print(f"  Using cached lensed {field} and g maps.")
+                return self.sht.read_map(f"{self.nbody.cache_dir}_maps/r.fits") + self.sht.read_map(f"{self.nbody.cache_dir}_maps/g_len.fits")
             print(f"  Using cached lensed {field} map.")
             return self.sht.read_map(f"{self.nbody.cache_dir}_maps/{field}_len.fits")
         return self.sht.read_map(f"{self.nbody.cache_dir}_maps/{field}.fits")
@@ -209,7 +212,7 @@ class Fields:
         kmax = 5000
         if field == "k":
             return self.fish.covariance.noise.get_N0("kappa", ellmax=kmax, recalc_N0=False)
-        if field in ("g", "u"):
+        if field in ("g", "u", "r"):
             return self.fish.covariance.noise.get_gal_shot_N(ellmax=kmax)
         if field == "I":
             N_dust = self.fish.covariance.noise.get_dust_N(353e9, ellmax=kmax)
@@ -225,7 +228,7 @@ class Fields:
             return int(datetime.now().timestamp())
         sim = self.sim if sim is None else sim
         seed = 3 * sim
-        if field in ("g", "u"):
+        if field in ("g", "u", "r"):
             seed += 1
         elif field == "I":
             seed += 2

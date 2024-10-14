@@ -9,6 +9,7 @@ class Template:
         self.Lmax = Lmax
         self.fields = fields
         self.lss_fields = self.fields.fields.replace("u", "g")
+        self.lss_fields = self.fields.fields.replace("r", "g")
         self.sht = self.fields.nbody.sht
         self.Lmax_map = self.fields.Lmax_map
         self.nside = self.fields.nside
@@ -108,6 +109,7 @@ class Template:
                 a_j = self._get_fft_maps(field_j, tracer_noise, neg_tracers)
                 a_bar_i += self.sht.almxfl(a_j, self.C_inv[iii, jjj])
             a_bar_field = field_i.replace("u", "g")
+            a_bar_field = field_i.replace("r", "g")
             self.a_bars[a_bar_field] = a_bar_i
 
     def _get_Cl_and_window(self, Chi, field, nu=353e9, gal_distro="LSST_gold"):

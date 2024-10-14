@@ -7,7 +7,7 @@ import pandas as pd
 import datetime
 import re
 from fullsky_sims.spherical import Spherical
-from scipy.interpolate import RectBivariateSpline, InterpolatedUnivariateSpline, UnivariateSpline
+from scipy.interpolate import RectBivariateSpline, InterpolatedUnivariateSpline
 from scipy import signal
 
 class Demnunii:
@@ -216,7 +216,7 @@ class Demnunii:
             if verbose: print('\r', end='')
         if verbose: print("")
         if pixel_corr: gal = self._apply_pixel_correction(gal)
-        return -gal
+        return gal   #This used to be -ve --- why?
 
     def get_obs_cib_map(self, zmin=0, zmax=1100, verbose=False, pixel_corr=True, lensed=False):
         window = "Planck_cib"
