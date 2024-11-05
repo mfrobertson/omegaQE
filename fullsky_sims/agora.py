@@ -12,7 +12,7 @@ class Agora:
     def __init__(self, nthreads=1, downgrade=True):
         self.data_dir = "/mnt/lustre/users/astro/mr671/AGORA/"
         self.cache_dir = f"/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/cache_ag/"
-        self.sims_dir = f"{self.data_dir}/cmbsim2/"
+        self.sims_dir = f"{self.data_dir}/cmbsim3/"
         self.omegaqe_data = f"/mnt/lustre/users/astro/mr671/omegaQE/fullsky_sims/data_ag/"
         self.downgrade = downgrade
         self.nside_u = 8192
@@ -193,6 +193,7 @@ class Agora:
     def get_obs_y_map(self, pixel_corr=True, lensed=True, agn_T_pow=80, downgrade_overwrite=False):
         y_map = self.sht_u.read_map(f"{self.data_dir}/tsz/agora_ltszNG_bahamas{agn_T_pow}_bnd_unb_1.0e+12_1.0e+18_lensed.fits")
         if self.downgrade and not downgrade_overwrite:
+            print("downgrading y map")
             y_map = self._downgrade(y_map)
         if pixel_corr: y_map = self._apply_pixel_correction(y_map)
         return y_map
@@ -205,6 +206,8 @@ class Agora:
         if cluster_mask:
             masks = self._get_cluster_mask_indices() if self.cluster_mask_idx is None else (self.cluster_mask_idx, self.cluster_mask_rads)
             tsz = self._mask_cluster(tsz, masks)
+        if self.downgrade:
+            tsz = self._downgrade(tsz)
         if pixel_corr: tsz = self._apply_pixel_correction(tsz)
         return tsz
     
@@ -224,7 +227,8 @@ class Agora:
         # B-mode radio sources not correct (but seem unimportant anyway 1911.09466)
         T, Q, U = self.sht_u.read_map(f"{self.data_dir}/radio/agora_radiomap_len_universemachine_trinity_{nu}ghz_randflux_datta2018_truncgauss.0.fits")
         # mask_limits = self.get_mask_limits(nu)
-        for iii, field in enumerate([T, Q, U]):
+        fields = [T, Q, U]
+        for iii, field in enumerate(fields):
             if point_mask:
                 mask_idx = self._get_point_mask_indices(cib=False) if self.point_mask_idx is None else self.point_mask_idx
                 field = self._mask_point(field, mask_idx)
@@ -232,7 +236,8 @@ class Agora:
             if self.downgrade:
                 field = self._downgrade(field)
             if pixel_corr: field = self._apply_pixel_correction(field)
-        return T, Q, U
+            fields[iii] = field
+        return fields
     
     def get_PK(self):
         return self.cosmo.get_matter_PK(typ="matter")
@@ -295,7 +300,10 @@ class Agora:
                 field[disk_idx] = np.nan
         return field
 
-    def create_fg_maps(self, nu, tsz, ksz, cib, rad, point_mask=False, cluster_mask=False):
+    def create_fg_maps(self, nu, tsz, ksz, cib, rad, gauss=False, point_mask=False, cluster_mask=False):
+        if gauss: 
+            return create_gauss_fg_maps(nu, tsz, ksz, cib, rad, point_mask, cluster_mask, return_tracers=False, input_kappa=None)
+        
         nside = self.nside if self.downgrade else self.nside_u
         npix = self.sht.nside2npix(nside)
         T_fg = np.zeros(npix)
@@ -307,19 +315,31 @@ class Agora:
         if cluster_mask:
             self.cluster_mask_idx, self.cluster_mask_rads = self._get_cluster_mask_indices()
         
+        nu_tsz, nu_cib, nu_rad = self._get_feqs(nu)
+
         if tsz:
-            T_fg += self.get_obs_tsz_map(nu,  point_mask=point_mask, cluster_mask=cluster_mask)
+            T_fg += self.get_obs_tsz_map(nu_tsz,  point_mask=point_mask, cluster_mask=cluster_mask)
         if ksz:
             T_fg += self.get_obs_ksz_map()
         if cib:
-            T_fg += self.get_obs_cib_map(nu, muK=True, point_mask=point_mask)
+            T_fg += self.get_obs_cib_map(nu_cib, muK=True, point_mask=point_mask)
         if rad:
-            T_rad, Q_rad, U_rad = self.get_obs_rad_maps(nu, point_mask=True)
+            T_rad, Q_rad, U_rad = self.get_obs_rad_maps(nu_rad, point_mask=True)
             T_fg += T_rad
             Q_fg += Q_rad
             U_fg += U_rad
             
         return T_fg, Q_fg, U_fg
+    
+    def _get_feqs(self, nu):
+        if nu == "cross1":
+            return 95, 150, 150
+        if nu == "cross2":
+            return 95, 220, 220
+        if nu == "cross3":
+            return 150, 220, 220
+        nu = int(nu)
+        return nu, nu, nu
     
     def create_gauss_fg_maps(self, nu, tsz, ksz, cib, rad, point_mask=False, cluster_mask=False, return_tracers=False, input_kappa=None):
         # TODO: if self.cov already exits it will be used regardless of whether input fg fields are the same
@@ -379,6 +399,8 @@ class Agora:
             y = _matmul(L, v)
             return y
         
+        nu_tsz, nu_cib, nu_rad = self._get_feqs(nu)
+        
         if self.cov is None:
             if point_mask:
                 self.point_mask_idx = self._get_point_mask_indices(cib=True)
@@ -389,13 +411,13 @@ class Agora:
             maps["g"] = self.get_obs_gal_map()
             maps["I"] = self.get_obs_cib_map(nu=353, muK=False)
             if tsz:
-                maps["t"] = self.get_obs_tsz_map(nu, point_mask=point_mask, cluster_mask=cluster_mask)
+                maps["t"] = self.get_obs_tsz_map(nu_tsz, point_mask=point_mask, cluster_mask=cluster_mask)
             if ksz:
                 maps["k"] = self.get_obs_ksz_map()
             if cib:
-                maps["c"] = self.get_obs_cib_map(nu, muK=True, point_mask=point_mask)
+                maps["c"] = self.get_obs_cib_map(nu_cib, muK=True, point_mask=point_mask)
             if rad:
-                maps["r"] = self.get_obs_rad_map(nu, point_mask=True)
+                maps["r"] = self.get_obs_rad_map(nu_rad, point_mask=True)
             self.cov = _get_cov(maps)
             del maps
 
