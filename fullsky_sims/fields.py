@@ -149,7 +149,7 @@ class Fields:
         return self.sht.read_map(f"{self.nbody.cache_dir}_maps/{field}.fits")
 
     def _lensing_fac(self):
-        return -self.ells*(self.ells + 1)/2
+        return self.ells*(self.ells + 1)/2
     
     def _get_cmb_lens_rec_iter(self, typ, cmb_fields):
         itmax = 20

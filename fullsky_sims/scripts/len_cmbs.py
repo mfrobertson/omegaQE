@@ -27,7 +27,7 @@ def _raise_deflection_error(deflect_typ):
 def _lensing_fac():
     ells = np.arange(LMAX_MAP+1)[1:]
     fac = np.zeros(LMAX_MAP+1)
-    fac[1:] = -2 / np.sqrt(ells * (ells + 1))
+    fac[1:] = 2 / np.sqrt(ells * (ells + 1))
     return fac
 
 
@@ -118,22 +118,24 @@ def save_lens_maps(loc, len_maps, sim):
     wrapper.sht.write_map(f"{directory}{sep}TQU_{sim}.fits", len_maps)
 
 
-def _save_omega_diff(loc, clm, nthreads):
+def _save_omega_diff(loc, clm, nthreads, sim=None):
     directory = f"{loc}"
     if not os.path.isdir(directory):
         os.makedirs(directory)
     olm = wrapper.sht.almxfl(clm, _inv_lensing_fac())
     omega_map = wrapper.sht.alm2map(olm, lmax=LMAX_MAP, nthreads=nthreads)
-    wrapper.sht.write_map(f"{directory}{sep}omega_diff.fits", omega_map)
+    extra = "" if sim is None else f"_{sim}"
+    wrapper.sht.write_map(f"{directory}{sep}omega_diff{extra}.fits", omega_map)
 
 
-def _save_kappa_diff(loc, glm, nthreads):
+def _save_kappa_diff(loc, glm, nthreads, sim=None):
     directory = f"{loc}"
     if not os.path.isdir(directory):
         os.makedirs(directory)
     klm = wrapper.sht.almxfl(glm, _inv_lensing_fac())
     kappa_map = wrapper.sht.alm2map(klm, lmax=LMAX_MAP, nthreads=nthreads)
-    wrapper.sht.write_map(f"{directory}{sep}kappa_diff.fits", kappa_map)
+    extra = "" if sim is None else f"_{sim}"
+    wrapper.sht.write_map(f"{directory}{sep}kappa_diff{extra}.fits", kappa_map)
 
 
 def save_Tunl(loc, Tmap, sim):
@@ -143,7 +145,7 @@ def save_Tunl(loc, Tmap, sim):
     wrapper.sht.write_map(f"{directory}{sep}T_{sim}.fits", Tmap)
 
 def _save_unl_cmbs(loc, alms, sim, nthreads):
-    directory = f"{loc}{sep}unlensed"
+    directory = f"{loc}{sep}unlensed3"
     if not os.path.isdir(directory):
         os.makedirs(directory)
     Tmap = wrapper.sht.alm2map(alms[0], lmax=LMAX_MAP, nthreads=nthreads)
@@ -156,21 +158,27 @@ def main(nsims, nthreads, loc, nbody, use_cache_diff, unl_loc):
     wrapper = fullsky_sims.wrapper_class(nbody, nthreads)
     cache_diff_loc = loc if use_cache_diff else None
     glm_pb = get_glm(nthreads, "pb")
-    glm_dem = get_glm(nthreads, "dem")
-    glm_diff = get_glm(nthreads, "diff", cache_diff_loc)
+    # glm_dem = get_glm(nthreads, "dem")
+    # glm_diff = get_glm(nthreads, "diff", cache_diff_loc)
     clm_dem = get_clm(nthreads, "dem")
-    clm_diff = get_clm(nthreads, "diff", cache_diff_loc)
+    # clm_diff = get_clm(nthreads, "diff", cache_diff_loc)
 
-    deflect_configs = {"pbdem_dem":(glm_pb, clm_dem),
-                       "pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb))),
-                       "npbdem_dem": (-glm_pb, clm_dem),
-                       "diff_zero": (glm_diff, np.zeros(np.size(glm_diff))),
-                       "zero_dem":(np.zeros(np.size(glm_diff)), clm_dem)
-                       }
+    # deflect_configs = {"pbdem_dem":(glm_pb, clm_dem),
+    #                    "pbdem_zero": (glm_pb, np.zeros(np.size(glm_pb))),
+    #                    "npbdem_dem": (-glm_pb, clm_dem),
+    #                    "diff_zero": (glm_diff, np.zeros(np.size(glm_diff))),
+    #                    "zero_dem":(np.zeros(np.size(glm_diff)), clm_dem)
+    #                    }
     unl_cmb_spectra = get_unlensed_cmb_ps()
     for sim in range(nsims):
+        glm_diff = get_glm(nthreads, "diff", cache_diff_loc)
+        deflect_configs = {"pbdem_zero3": (glm_pb, np.zeros(np.size(glm_pb))),
+                           "diff_zero3": (glm_diff, np.zeros(np.size(glm_diff))),
+                            "pbdem_dem3": (glm_pb, clm_dem)
+                    }
         unl_alms = get_unlensed_alms(unl_cmb_spectra, sim, unl_loc)
         _save_unl_cmbs(loc, unl_alms, sim, nthreads)
+        _save_kappa_diff(loc, glm_diff, nthreads, sim=sim)
         for deflect_typ in deflect_configs:
             glm, clm = deflect_configs[deflect_typ]
             dlm = np.array([glm, clm])
@@ -179,7 +187,7 @@ def main(nsims, nthreads, loc, nbody, use_cache_diff, unl_loc):
             len_maps = get_lensed_maps(dlm, unl_alms, nthreads)
             save_lens_maps(outdir, len_maps, sim)
 
-    _save_kappa_diff(loc, glm_diff, nthreads)
+    # _save_kappa_diff(loc, glm_diff, nthreads)
     _save_omega_diff(loc, clm_diff, nthreads)
 
 
