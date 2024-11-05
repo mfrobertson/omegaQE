@@ -62,7 +62,7 @@ if __name__ == '__main__':
     start = int(args[0])
     end = int(args[1])
     deflect_typ = none_or_str(args[2])
-    nu = int(args[3])
+    nu = str(args[3])
     tsz = parse_boolean(args[4])
     ksz = parse_boolean(args[5])
     cib = parse_boolean(args[6])
