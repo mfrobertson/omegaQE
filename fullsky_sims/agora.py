@@ -300,10 +300,20 @@ class Agora:
                 field[disk_idx] = np.nan
         return field
 
+    def get_cluster_profile(self, flat_lmax=60):
+        # tSZ cluster profile for bias hardend lensing rec with flat curve at L<flat_lmax
+        nu = 95
+        offset = 1
+        u = np.sqrt(ag.sht.map2cl(self.get_obs_tsz_map(nu)))
+        u_smooth = ag.sht.smoothed_cl(u[offset:],150, zerod=False)
+        u_smooth = np.insert(u_smooth, 0, 0)
+        u_smooth[:flat_lmax] = u_smooth[flat_lmax]
+        return u_smooth
+
     def create_fg_maps(self, nu, tsz, ksz, cib, rad, gauss=False, point_mask=False, cluster_mask=False):
-        if gauss: 
-            return create_gauss_fg_maps(nu, tsz, ksz, cib, rad, point_mask, cluster_mask, return_tracers=False, input_kappa=None)
-        
+        if gauss:
+            return self.create_gauss_fg_maps(nu, tsz, ksz, cib, rad, point_mask, cluster_mask, return_tracers=False, input_kappa=None)
+
         nside = self.nside if self.downgrade else self.nside_u
         npix = self.sht.nside2npix(nside)
         T_fg = np.zeros(npix)
@@ -340,7 +350,7 @@ class Agora:
             return 150, 220, 220
         nu = int(nu)
         return nu, nu, nu
-    
+
     def create_gauss_fg_maps(self, nu, tsz, ksz, cib, rad, point_mask=False, cluster_mask=False, return_tracers=False, input_kappa=None):
         # TODO: if self.cov already exits it will be used regardless of whether input fg fields are the same
         def _get_cov(maps):
@@ -400,7 +410,7 @@ class Agora:
             return y
         
         nu_tsz, nu_cib, nu_rad = self._get_feqs(nu)
-        
+
         if self.cov is None:
             if point_mask:
                 self.point_mask_idx = self._get_point_mask_indices(cib=True)

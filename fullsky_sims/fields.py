@@ -112,11 +112,11 @@ class Fields:
         y = self._matmul(L, v)
         return y
 
-    def setup_rec(self, sim, deflect_typ, iter=False, noise=True, gmv=True):
+    def setup_rec(self, sim, deflect_typ, iter=False, noise=True, gmv=True, bh=None):
         self.sim = sim
         self.deflect_typ = deflect_typ
         print(f"Creating Reconstruction instance with exp: {self.exp}, and file: {self.nbody.sims_dir}/{self.deflect_typ}/TQU_{self.sim}.fits")
-        self.rec = Reconstruction(self.exp, self.nbody, filename=f"{self.nbody.sims_dir}/{self.deflect_typ}/TQU_{self.sim}.fits", sim=self.sim, nthreads=self.nthreads, iter=iter, noise=noise, gmv=gmv)
+        self.rec = Reconstruction(self.exp, self.nbody, filename=f"{self.nbody.sims_dir}/{self.deflect_typ}/TQU_{self.sim}.fits", sim=self.sim, nthreads=self.nthreads, iter=iter, noise=noise, gmv=gmv, bh=bh)
 
     def setup_noise(self, exp=None, qe=None, gmv=None, ps=None, L_cuts=None, iter=None, iter_ext=None, data_dir=None):
         return self.fish.setup_noise(exp, qe, gmv, ps, L_cuts, iter, iter_ext, data_dir)

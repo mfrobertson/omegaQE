@@ -32,8 +32,8 @@ def main(exp, qe_typ, start, end, deflect_typ, iter, noise, gmv, bh, nbody, nthr
     for sim in np.arange(start, end):
         mpi.output(f"Sim: {sim}", 0, _id)
         for deflect_typ in deflect_typs:
-            fields.setup_rec(sim, deflect_typ, iter=iter, noise=noise, gmv=gmv)
-            kappa_rec = fields.get_kappa_rec(qe_typ, fft=False, iter=iter, bias_hard=bh)
+            fields.setup_rec(sim, deflect_typ, iter=iter, noise=noise, gmv=gmv, bh=bh)
+            kappa_rec = fields.get_kappa_rec(qe_typ, fft=False, iter=iter)
             fields.nbody.sht.write_map(f"{sims_dir}/{deflect_typ}/{exp}/kappa/{qe_typ_str}_{sim}_{ext}.fits", kappa_rec)
             mpi.output(f"   {deflect_typ} kappa done.", 0, _id)
             omega_rec = fields.get_omega_rec(qe_typ, fft=False, iter=iter)

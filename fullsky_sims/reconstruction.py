@@ -50,7 +50,7 @@ class Reconstruction:
         def hashdict(self):
             return {'cmbs': self.maps_filename, 'noise': self.maps_filename, 'data': self.maps_filename}
 
-    def __init__(self, exp, nbody="DEMNUnii", filename=None, L_cuts=(30, 3000, 30, 5000), sim=None, nthreads=1, iter=False, noise=True, gmv=False):
+    def __init__(self, exp, nbody="DEMNUnii", filename=None, L_cuts=(30, 3000, 30, 5000), sim=None, nthreads=1, iter=False, noise=True, gmv=False, bh=None):
         self.nthreads = nthreads
         self.nbody = fullsky_sims.wrapper_class(nbody, nthreads) if isinstance(nbody, str) else nbody
         self.filename = filename
@@ -69,8 +69,9 @@ class Reconstruction:
         self.setup = False
         self.iter_rec_data = None
         self.gmv = gmv
+        self.bh = bh
         if filename is not None:
-            self.setup_reconstruction(self.filename, seed=sim, iter=iter, noise=noise, gmv=gmv)
+            self.setup_reconstruction(self.filename, seed=sim, iter=iter, noise=noise, gmv=gmv, bh=bh)
 
     def _initialise(self):
         print("Initialising filters and libraries for Plancklens")
@@ -146,9 +147,10 @@ class Reconstruction:
     def _raise_typ_error(self, typ):
         raise ValueError(f"QE type {typ} not recognized. Recognized types included TEB (for mv), EB (for pol only), or T.")
 
-    def _get_qe_key(self, typ, curl=False, bias_hard=False):
+    def _get_qe_key(self, typ, curl=False, bias_hard=None):
+        # bias_hard=s (point surce) or =n (cluster source)
         potential = "x" if curl else "p"
-        bh_ext = "_bh_s" if bias_hard else "" # If bias_hard it will mitigate aganst point sources
+        bh_ext = f"_bh_{bias_hard}" if bias_hard is not None else ""
         if typ == "TEB":
             return potential + bh_ext
         if typ == "T":
@@ -190,7 +192,7 @@ class Reconstruction:
                 fal_dict[idx_i+idx_j] = c_inv_ij
         return fal_dict
 
-    def setup_reconstruction(self, TQUmaps_filename, seed=None, iter=False, noise=True, gmv=False):
+    def setup_reconstruction(self, TQUmaps_filename, seed=None, iter=False, noise=True, gmv=False, bh=None):
         print(f"Setting up reconstruction for file: {TQUmaps_filename}")
         libdir_pixphas = os.path.join(self.temp, 'phas_lmax%s' % self.Lmax_map)
         rng_state = np.random.get_state
@@ -204,14 +206,15 @@ class Reconstruction:
         pix_phas = phas.lib_phas(libdir_pixphas, 3, self.Lmax_map, get_state_func=rng_state)
         noise_cls = self.noise_cls if noise else {idx[0]: np.zeros(np.size(self.noise_cls[idx[0]])) for idx in self.indices}
         self.maps_lib = maps.cmb_maps_harmonicspace(self.MyMapLib(self.Lmax_map, TQUmaps_filename, self.sht), self.transfer_dict, noise_cls, noise_phas=pix_phas)
+        transf = 1/self.nbody.get_cluster_profile() if bh == "n" else None
         if gmv:
             filt_matrix = self._get_filt_matrix(self.cl_len, noise=True)
             weighted_maps_lib = filt_simple.library_fullsky_alms_jTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf, filt_matrix)
-            self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, filt_matrix, self.Lmax_map)
+            self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, filt_matrix, self.Lmax_map, transf=transf)
             self.qlms_lib = qest.library_jtTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, self.nbody.nside, lmax_qlm=self.Lmax_map, resplib=self.qresp_lib)
         else:
             weighted_maps_lib = filt_simple.library_fullsky_alms_sepTP(os.path.join(self.temp, 'ivfs'), self.maps_lib, self.transfer_dict, cl_wf, self.filt_dict['t'], self.filt_dict['e'], self.filt_dict['b'])
-            self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, self.filt_dict, self.Lmax_map)
+            self.qresp_lib = qresp.resp_lib_simple(os.path.join(self.temp, 'qresp'), self.Lmax_map, cl_wf, cl_wf, self.filt_dict, self.Lmax_map, transf=transf)
             self.qlms_lib = qest.library_sepTP(os.path.join(self.temp, 'qlms_dd'), weighted_maps_lib, weighted_maps_lib, cl_wf['te'], self.nbody.nside, lmax_qlm=self.Lmax_map, resplib=self.qresp_lib)
         self.rdn0_lib = nhl.nhl_lib_simple(os.path.join(self.temp, 'rdn0'), weighted_maps_lib, cl_wf, self.Lmax_map)
         self.setup = True
@@ -334,17 +337,17 @@ class Reconstruction:
         self.niters = itmax
         self.iter_lib = lib_dir_iterator
 
-    def get_phi_rec(self, typ, bias_hard=False):
+    def get_phi_rec(self, typ):
         self._check_setup()
-        qe_key = self._get_qe_key(typ, curl=False, bias_hard=bias_hard)
+        qe_key = self._get_qe_key(typ, curl=False, bias_hard=self.bh)
         qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
         resp = self.get_response(typ)
         qnorm = utils.cli(resp)
         return self.sht.almxfl(qlm, qnorm)
 
-    def get_curl_rec(self, typ, bias_hard=False):
+    def get_curl_rec(self, typ):
         self._check_setup()
-        qe_key = self._get_qe_key(typ, curl=True, bias_hard=bias_hard)
+        qe_key = self._get_qe_key(typ, curl=True, bias_hard=self.bh)
         qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
         resp = self.get_response(typ, True)
         qnorm = utils.cli(resp)
