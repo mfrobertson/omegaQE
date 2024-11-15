@@ -16,7 +16,7 @@ def _get_lss_cls_dict(cls_path):
     }
     return cls_dict
 
-def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_path, dir, bi_typ, gmv, fields, _id):
+def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_path, dir, bi_typ, gmv, fields, u_typ, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -25,7 +25,7 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_pa
     start_time_tot = MPI.Wtime()
 
     mpi.output("-------------------------------------", my_rank, _id)
-    mpi.output(f"bias_typ: {bias_typ}, exp: {exp}, N_Ls: {N_Ls}, N_L1: {N_L1}, N_L3: {N_L3}, Ntheta12: {Ntheta12}, Ntheta13: {Ntheta13}, noise: {noise}, lss_cls_path: {lss_cls_path}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields}", my_rank, _id)
+    mpi.output(f"bias_typ: {bias_typ}, exp: {exp}, N_Ls: {N_Ls}, N_L1: {N_L1}, N_L3: {N_L3}, Ntheta12: {Ntheta12}, Ntheta13: {Ntheta13}, noise: {noise}, lss_cls_path: {lss_cls_path}, bi_typ: {bi_typ}, gmv: {gmv}, fields: {fields},u_typ: {u_typ}", my_rank, _id)
     mpi.output("Setting up parallisation of workload.", my_rank, _id)
 
     Ls = np.geomspace(30, 3000, N_Ls)
@@ -51,7 +51,9 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_pa
 
     start_time = MPI.Wtime()
     # TODO: be careful of F_L directory location
-    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=qe_fields, gmv=gmv, N_L1=N_L1, N_L3=N_L3, Ntheta12=Ntheta12, Ntheta13=Ntheta13, F_L_path=f"{omegaqe.CACHE_DIR}/_F_L", verbose=verbose, noise=noise, lss_cls=lss_cls, iter=iter)
+    if u_typ is not None:
+        u_typ = int(u_typ)
+    N = bias(bias_typ, Ls[my_start: my_end], bi_typ, exp=exp, qe_fields=qe_fields, gmv=gmv, N_L1=N_L1, N_L3=N_L3, Ntheta12=Ntheta12, Ntheta13=Ntheta13, F_L_path=f"{omegaqe.CACHE_DIR}/_F_L", verbose=verbose, noise=noise, lss_cls=lss_cls, iter=iter, magbias_typ=u_typ)
     end_time = MPI.Wtime()
 
     mpi.output("Bias calculation finished.", my_rank, _id)
@@ -68,6 +70,7 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_pa
             N_arr[start: end] = N
         gmv_str = "gmv" if gmv else "single"
         bias_typ += "_nN" if not noise else ""
+        bias_typ += f"_u{u_typ}" if u_typ is not None else ""
         dir += f"{exp}/{fields}_{gmv_str}/{bi_typ}/{bias_typ}"
         if not os.path.isdir(dir):
             os.makedirs(dir)
@@ -82,8 +85,8 @@ def _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_pa
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 14:
-        raise ValueError("Must supply arguments: bias_typ exp bi_typ fields gmv Nell N_L1 N_L3 Ntheta12 Ntheta13 noise lss_cls_path dir id")
+    if len(args) != 15:
+        raise ValueError("Must supply arguments: bias_typ exp bi_typ fields gmv Nell N_L1 N_L3 Ntheta12 Ntheta13 noise lss_cls_path u_typ dir id")
     bias_typ = str(args[0])
     exp = str(args[1])
     bi_typ = str(args[2])
@@ -96,6 +99,7 @@ if __name__ == '__main__':
     Ntheta13 = int(args[9])
     noise = parse_boolean(args[10])
     lss_cls_path = none_or_str(args[11])
-    dir = args[12]
-    _id = args[13]
-    _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_path, dir, bi_typ, gmv, fields, _id)
+    u_typ = none_or_str(args[12])
+    dir = args[13]
+    _id = args[14]
+    _main(bias_typ, exp, N_Ls, N_L1, N_L3, Ntheta12, Ntheta13, noise, lss_cls_path, dir, bi_typ, gmv, fields, u_typ, _id)
