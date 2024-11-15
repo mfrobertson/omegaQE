@@ -304,8 +304,8 @@ class Agora:
         # tSZ cluster profile for bias hardend lensing rec with flat curve at L<flat_lmax
         nu = 95
         offset = 1
-        u = np.sqrt(ag.sht.map2cl(self.get_obs_tsz_map(nu)))
-        u_smooth = ag.sht.smoothed_cl(u[offset:],150, zerod=False)
+        u = np.sqrt(self.sht.map2cl(self.get_obs_tsz_map(nu)))
+        u_smooth = self.sht.smoothed_cl(u[offset:],150, zerod=False)
         u_smooth = np.insert(u_smooth, 0, 0)
         u_smooth[:flat_lmax] = u_smooth[flat_lmax]
         return u_smooth

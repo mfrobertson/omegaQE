@@ -33,8 +33,8 @@ def _get_ps(exp, tracer_fields, deflect_typ, tem_ext, nsims, iter_mc_corr, cmb_n
     ext = "nN" if not cmb_noise else ""
     if gmv:
         ext += "_gmv"
-    if bh:
-        ext += "_bh"
+    if bh is not None:
+        ext += f"_bh{bh}"
 
     omega_tem = nbody.sht.read_map(f"{nbody.cache_dir}/_tems/{deflect_typ}/{exp}/{tracer_fields}/omega_tem_{0}{tem_ext}.fits")
     omega_rec = nbody.sht.read_map(f"{nbody.sims_dir}/{deflect_typ}/{exp}/omega/{qe_typ}_{0}_{ext}.fits")
@@ -76,8 +76,8 @@ def main(exp, tracer_fields, tracer_noise, kappa_rec, qe_typ, nsims, deflect_typ
         ext += "_nN"
     if gmv:
         ext += "_gmv"
-    if bh:
-        ext += "_bh"
+    if bh is not None:
+        ext += f"_bh{bh}"
     if "u" in tracer_fields:
         ext += f"_u{u_typ}"
     for deflect_typ in deflect_typs:
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     iter_mc_corr = parse_boolean(args[9])
     cmb_noise = parse_boolean(args[10])
     gmv = parse_boolean(args[11])
-    bh = parse_boolean(args[12])
+    bh = none_or_str(args[12])
     nbody_name = str(args[13])
     u_typ = int(args[14])
     nthreads = int(args[15])

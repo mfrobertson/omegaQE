@@ -26,8 +26,8 @@ def main(exp, qe_typ, start, end, deflect_typ, iter, noise, gmv, bh, nbody, nthr
     ext = "" if noise else "nN"
     if gmv:
         ext += "_gmv"
-    if bh:
-        ext += "_bh"
+    if bh is not None:
+        ext += f"_bh{bh}"
     setup_dirs(sims_dir, exp, deflect_typs)
     for sim in np.arange(start, end):
         mpi.output(f"Sim: {sim}", 0, _id)
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     iter = parse_boolean(args[5])
     noise = parse_boolean(args[6])
     gmv = parse_boolean(args[7])
-    bh = parse_boolean(args[8])
+    bh = none_or_str(args[8])
     nbody = str(args[9])
     nthreads  = int(args[10])
     _id = str(args[11])

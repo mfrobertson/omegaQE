@@ -337,21 +337,38 @@ class Reconstruction:
         self.niters = itmax
         self.iter_lib = lib_dir_iterator
 
-    def get_phi_rec(self, typ):
+    def _get_qlm(self, qe_key):
+        # if "bh" in qe_key:
+        #     qe, s = qe_key.split('_bh_')
+        #     phi_qe = self.qlms_lib.get_sim_qlm(qe, -1)
+        #     qe_t = qe[0] + "tt"
+        #     phi_t = self.qlms_lib.get_sim_qlm(qe_t, -1)
+        #     qe_bh = qe[0] + f"tt_bh_{s}"
+        #     phi_bh = self.qlms_lib.get_sim_qlm(qe_bh, -1)
+
+        #     resp_cross = self.qresp_lib.get_response(qe_t, s)
+        #     resp_bh = self.qresp_lib.get_response(s + "tt", s)
+        #     resp_t = self.qresp_lib.get_response(qe_t, "p")
+        #     denom = utils.cli((resp_t*resp_bh) - (resp_cross**2))
+        #     phi_bh = self.sht.almxfl(phi_bh, resp_bh*resp_t*denom)
+
+        #     return phi_qe - phi_t + phi_bh            
+        return self.qlms_lib.get_sim_qlm(qe_key, -1)
+
+    def _get_qe(self, typ, curl):
         self._check_setup()
-        qe_key = self._get_qe_key(typ, curl=False, bias_hard=self.bh)
-        qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
-        resp = self.get_response(typ)
+        qe_key = self._get_qe_key(typ, curl, bias_hard=self.bh)
+        qlm = self._get_qlm(qe_key)
+        resp = self._get_response(qe_key)
+        # resp = self.get_response(typ, curl)
         qnorm = utils.cli(resp)
         return self.sht.almxfl(qlm, qnorm)
 
+    def get_phi_rec(self, typ):
+        return self._get_qe(typ, False)
+
     def get_curl_rec(self, typ):
-        self._check_setup()
-        qe_key = self._get_qe_key(typ, curl=True, bias_hard=self.bh)
-        qlm = self.qlms_lib.get_sim_qlm(qe_key, -1)
-        resp = self.get_response(typ, True)
-        qnorm = utils.cli(resp)
-        return self.sht.almxfl(qlm, qnorm)
+        return self._get_qe(typ, True)
     
     def get_phi_rec_iter(self, iter):
         if self.iter_rec_data is None:
@@ -386,15 +403,18 @@ class Reconstruction:
         N0 = self.noise.get_N0(typ, self.Lmax_map, qe=qe_typ, gmv=True, exp=self.exp, T_Lmin=self.L_cuts[0], T_Lmax=self.L_cuts[1], P_Lmin=self.L_cuts[2], P_Lmax=self.L_cuts[3], iter=iter, recalc_N0=True)
         return Cl/(Cl + N0)
 
-    def get_response(self, typ, curl=False):
-        qe_key = self._get_qe_key(typ, curl=curl)
+    def _get_response(self, qe_key):
         return self.qresp_lib.get_response(qe_key, 'p')
+
+    def get_response(self, typ, curl):
+        qe_key = self._get_qe_key(typ, curl)
+        return self._get_response(qe_key)
 
     def get_RDN0(self, typ, curl=False):
         self._check_setup()
         qe_key = self._get_qe_key(typ, curl=curl)
         N0_unnorm = self.rdn0_lib.get_sim_nhl(-1, qe_key, qe_key)
-        resp = self.get_response(typ, curl)
+        resp = self._get_response(qe_key)
         qnorm = utils.cli(resp)**2
         return N0_unnorm * qnorm[:np.size(N0_unnorm)]
 
@@ -422,7 +442,7 @@ class Reconstruction:
         lib_n1 = n1_fft.n1_fft(fal, self.cl_grad, self.cl_grad, self._get_Cl_phi(), lminbox=10, lmaxbox=5000 + 100) 
         Ls_n1 = np.linspace(30, 3000, 200)
         n1 = np.array([lib_n1.get_n1(qe_key, L, do_n1mat=False) for L in Ls_n1])
-        qnorm = utils.cli(self.get_response(typ, curl=False))
+        qnorm = utils.cli(self._get_response(qe_key))
         qnorm = InterpolatedUnivariateSpline(np.arange(np.size(qnorm)), qnorm)(Ls_n1)
         return Ls_n1, n1 * qnorm**2
 

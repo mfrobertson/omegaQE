@@ -21,8 +21,8 @@ def save_tem_map(field_typs, tem_map, tem_dir, sim, tracer_noise, kappa_rec, kap
         extension += "_nN"
     if gmv:
         extension += "_gmv"
-    if bh:
-        extension += "_bh"
+    if bh is not None:
+        extension += f"_bh{bh}"
     if "u" in field_typs:
         extension += f"_u{u_typ}"
     full_path = f"{tem_dir}/{filename}{extension}.fits"
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     len_lss = parse_boolean(args[10])
     iter_mc_corr = parse_boolean(args[11])
     gmv = parse_boolean(args[12])
-    bh = parse_boolean(args[13])
+    bh = none_or_str(args[13])
     cmb_noise = parse_boolean(args[14])
     nbody = str(args[15])
     gauss_cache = parse_boolean(args[16])

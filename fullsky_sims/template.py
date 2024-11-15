@@ -4,7 +4,7 @@ import datetime
 
 class Template:
 
-    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False, gmv=True, bh=False, cmb_noise=True):
+    def __init__(self, fields, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, cmb_lens_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False, gmv=True, bh=None, cmb_noise=True):
         self.Lmin = Lmin
         self.Lmax = Lmax
         self.fields = fields
@@ -32,7 +32,7 @@ class Template:
             else:
                 iter=False
                 mc_corr = np.ones(self.Lmax_map+1)
-            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter, gmv=gmv, bias_hard=bh, cmb_noise=cmb_noise)
+            self.kappa_rec = self.fields.get_kappa_rec(cmb_lens_qe_typ, fft=True, iter=iter, gmv=gmv, bh=bh, cmb_noise=cmb_noise)
             self.kappa_rec = self.sht.almxfl(self.kappa_rec, 1/mc_corr)
         self._populate_a_bars(tracer_noise, neg_tracers)
     
