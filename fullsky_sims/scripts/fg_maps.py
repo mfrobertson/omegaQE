@@ -48,7 +48,7 @@ def main(start, end, deflect_typ, nu, tsz, ksz, cib, rad, gauss, cluster_mask, p
             T += T_fg
             nbody.sht.write_map(f"{full_dir}/kgI_{sim}.fits", tracers)
         else:       
-            T_fg, Q_fg, U_fg = nbody.create_fg_maps(nu, tsz, ksz, cib, rad, point_mask, cluster_mask)    
+            T_fg, Q_fg, U_fg = nbody.create_fg_maps(nu, tsz, ksz, cib, rad, False, point_mask, cluster_mask)
             T += T_fg
             Q += Q_fg
             U += U_fg
