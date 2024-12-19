@@ -278,6 +278,34 @@ class Bispectra:
         # Using cosine rule (remember that theta is not same as internal angle of bispectrum traingle)
         return np.sqrt(L1 ** 2 + L2 ** 2 + (2 * L1 * L2 * np.cos(theta).astype("double"))).astype("double")
 
+    def _get_ll_bispectrum(self, typ, L1, L2, L3, M_spline=False, zmin=0, zmax=None):
+        M1, M2, L12_dot = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax)
+        res = -2 * L12_dot**2 * (M1 + M2) / (L1 ** 2 * L2 ** 2)
+        res[np.isnan(res)] = 0
+        return res
+
+    def get_ll_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None):
+        if L3 is None:
+            L3 = self._get_third_L(L1, L2, theta)
+        bi1 = self._get_ll_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax)
+        bi2 = self._get_ll_bispectrum(typ, L3, L2, L1, M_spline, zmin, zmax)
+        bi3 = self._get_ll_bispectrum(typ, L1, L3, L2, M_spline, zmin, zmax)
+        return bi1 + bi2 + bi3
+
+    def _get_rd_bispectrum(self, typ, L1, L2, L3, M_spline=False, zmin=0, zmax=None):
+        M1, M2, L12_dot = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax)
+        res = -2 * L12_dot * ((L1**2 * M1) + (L2**2 * M2)) / ( L1 ** 2 * L2 ** 2)
+        res[np.isnan(res)] = 0
+        return res
+
+    def get_rd_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None):
+        if L3 is None:
+            L3 = self._get_third_L(L1, L2, theta)
+        bi1 = self._get_rd_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax)
+        bi2 = self._get_rd_bispectrum(typ, L3, L2, L1, M_spline, zmin, zmax)
+        bi3 = self._get_rd_bispectrum(typ, L1, L3, L2, M_spline, zmin, zmax)
+        return bi1 + bi2 + bi3
+
     def get_pb_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold", verbose=False):
         self._check_type(typ)
         if M_spline:
@@ -326,6 +354,8 @@ class Bispectra:
         if sec_var in ("w", "k"):
             if verbose: print("Including post born bispectra terms")
             b += self.get_pb_bispectrum(typ, L1, L2, L3, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro, verbose)
+        if L3 is None:
+            L3 = self._get_third_L(L1, L2, theta)
         if lens_delta:
             if verbose: print("Including lensed delta bispectra terms")
             b += self._get_lens_delta_bis(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro, verbose)
