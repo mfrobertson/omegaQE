@@ -50,9 +50,9 @@ def _get_integrand(typ, w, L_vec, Lprim_vec, Lprimprim_vec, thetas, dTheta, M_sp
     Lprimprims = Lprimprim_vec.rho
     if typ == "omega":
         return 2 * w * Lprim * dTheta * (L * Lprim * np.sin(thetas)) ** 2 * (Lprim * Lprimprims * np.cos(Lprimprim_vec.deltaphi(Lprim_vec))) ** 2 / ((Lprim) ** 4 * (Lprimprims) ** 4) * M_spline.ev(Lprim, Lprimprims)
-    if typ == "len_len_kappa":
+    if typ == "pb22_kappa":
         return 2 * w * Lprim * dTheta * (L_vec * Lprimprims * np.cos(Lprimprim_vec.deltaphi(L_vec))) ** 2 * (Lprim * Lprimprims * np.cos(Lprimprim_vec.deltaphi(Lprim_vec))) ** 2 / ((Lprim) ** 4 * (Lprimprims) ** 4) * M_spline.ev(Lprimprims, Lprim)
-    if typ == "ray_def_kappa":
+    if typ == "pb13_kappa":
         return -2 * Lprim * dTheta * (L * Lprim * np.cos(thetas)) ** 2 / ((Lprim) ** 4) * M_spline.ev(L, Lprim)
     if typ == "pb_kappa":
         return (2 * w * Lprim * dTheta * (L_vec * Lprimprims * np.cos(Lprimprim_vec.deltaphi(L_vec))) ** 2 * (Lprim * Lprimprims * np.cos(Lprimprim_vec.deltaphi(Lprim_vec))) ** 2 / ((Lprim) ** 4 * (Lprimprims) ** 4) * M_spline.ev(Lprimprims, Lprim)) - (2 * Lprim * dTheta * (L * Lprim * np.cos(thetas)) ** 2 / ((Lprim) ** 4) * M_spline.ev(L, Lprim))
@@ -61,12 +61,12 @@ def _get_integrand(typ, w, L_vec, Lprim_vec, Lprimprim_vec, thetas, dTheta, M_sp
 def omega_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
     return _get_postborn_ps("omega", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
 
-def len_len_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
-    return _get_postborn_ps("len_len_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
+def pb22_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
+    return _get_postborn_ps("pb22_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
 
-def ray_def_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
+def pb13_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
     # NOTE: postborn paper has this term wrong, Krausse paper is correct
-    return _get_postborn_ps("ray_def_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
+    return _get_postborn_ps("pb13_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
 
 def postborn_kappa_ps(ells, M_path=f"{omegaqe.CACHE_DIR}/_M", Nell_prim=1000, Ntheta=500, cmb=True, zmin=0, zmax=None, powerspectra=None):
     return _get_postborn_ps("pb_kappa", ells, M_path, Nell_prim, Ntheta, 10000, 200, cmb, zmin, zmax, powerspectra)
