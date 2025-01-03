@@ -194,12 +194,12 @@ class Fisher:
         if param is None:
             if is_lss:
                 return self.bi.get_lss_bispectrum(typ, L1, L2, L3, theta, zmin, zmax, nu, gal_bins, gal_distro)
-            if "L" in typ:
-                typ = typ.replace("L", "k")
-                return self.bi.get_ll_bispectrum(typ, L1, L2, L3, theta, M_spline=True, zmin=zmin, zmax=zmax)
-            if "D" in typ:
-                typ = typ.replace("D", "k")
-                return self.bi.get_rd_bispectrum(typ, L1, L2, L3, theta, M_spline=True, zmin=zmin, zmax=zmax)
+            # if "L" in typ:
+            #     typ = typ.replace("L", "k")
+            #     return self.bi.get_ll_bispectrum(typ, L1, L2, L3, theta, M_spline=True, zmin=zmin, zmax=zmax)
+            # if "D" in typ:
+            #     typ = typ.replace("D", "k")
+            #     return self.bi.get_rd_bispectrum(typ, L1, L2, L3, theta, M_spline=True, zmin=zmin, zmax=zmax)
             return self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro, lens_delta=lens_delta, include_lss=include_lss)
         if is_lss:
             raise ValueError("Doing cosmology fisher with LSS bispectrum? Not sure how you got here....")
@@ -459,14 +459,15 @@ class Fisher:
         return self.bi.get_bispectrum(bi_typ.replace("g", "u") + sec_var, L1, L2, L3, M_spline=M_spline, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro)
 
 
-    def _get_F_L_element_sample(self, typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias):
+    def _get_F_L_element_sample(self, typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega):
         thetas, dTheta, weights, C1_spline, C2_spline = self._integral_prep_F_L(Lmax, Ntheta, typ, typs, C_inv)
         F_L = np.zeros(np.size(Ls))
         Ls2 = np.arange(Lmin, Lmax + 1, dL2)
         if any([np.isin(typ_i, self.covariance.test_types) for typ_i in typ[4:]]):
             typ = "opt_kkkk"  # if any test types are detected, it is assumed all observables are kappa
-        bi_typ1 = typ[4:6] + "w"
-        bi_typ2 = typ[6:] + "w"
+        sec_var = "w" if omega else "k"
+        bi_typ1 = typ[4:6] + sec_var
+        bi_typ2 = typ[6:] + sec_var
         if np.size(Ls) == 1:
             Ls = np.array([Ls])
         for iii, L3 in enumerate(Ls):
@@ -492,7 +493,7 @@ class Fisher:
         F_L *= 1 / ((2 * np.pi) ** 2)
         return F_L
 
-    def _get_F_L(self, typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax, mag_bias):
+    def _get_F_L(self, typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax, mag_bias, omega):
         if Lmax is None: Lmax = int(np.ceil(np.max(Ls)))
         if Lmin is None: Lmin = int(np.floor(np.min(Ls)))
         typs = np.char.array(typs)
@@ -502,7 +503,6 @@ class Fisher:
             C_omega_spline = self.C_omega_spline
         else:
             C_inv = self.covariance.get_C_inv(typs, int(np.ceil(np.max(Ls))), nu, gal_bins, gal_distro=gal_distro)
-            # omega_ells = self.covariance.get_log_sample_Ls(2, Lmax, 100, dL_small=2)
             omega_ells = np.geomspace(2, Lmax, 100)
             C_omega = pb.omega_ps(omega_ells)
             C_omega_spline = InterpolatedUnivariateSpline(omega_ells, C_omega)
@@ -514,15 +514,21 @@ class Fisher:
         for iii in np.arange(Ncombos):
             for jjj in np.arange(iii, Ncombos):
                 typ = "opt_" + combos[iii] + combos[jjj]
-                F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline,gal_distro, Lmin, Lmax, mag_bias)
+                F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega)
                 if combos[iii] != combos[jjj]:
-                    factor = 2
+                    factor = 2     # This only works if both bispectra are the same (so not true for mag bias or pB-kappa)
+                    if mag_bias or not omega:
+                        typ2 = "opt_" + combos[jjj] + combos[iii]
+                        F_L_tmp += self._get_F_L_element_sample(typs, typ2, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega)
+                        factor = 1
                 else:
                     factor = 1
                 perms += factor
                 F_L += factor * F_L_tmp
-        if perms != np.size(typs) ** 4:
-            raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
+        if not omega:
+            F_L *= C_omega_spline(Ls)
+        # if perms != np.size(typs) ** 4:
+        #     raise ValueError(f"{perms} permutations computed, should be {np.size(typs) ** 4}")
         if return_C_inv:
             return Ls, F_L, C_inv
         return Ls, F_L
@@ -594,7 +600,7 @@ class Fisher:
                                                dx=dx, lens_delta=lens_delta, include_lss=include_lss)
 
     def get_F_L(self, typs, Ls, dL2=2, Ntheta=1000, nu=353e9, gal_bins=(None, None, None, None), return_C_inv=False,
-                gal_distro="LSST_gold", use_cache=False, Lmin=None, Lmax=None, mag_bias=False):
+                gal_distro="LSST_gold", use_cache=False, Lmin=None, Lmax=None, mag_bias=False, omega=True):
         """
 
         Parameters
@@ -609,7 +615,7 @@ class Fisher:
 
         """
         typs = list(typs)
-        return self._get_F_L(typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax, mag_bias)
+        return self._get_F_L(typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax, mag_bias, omega)
 
     def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1,
                                       verbose=False, nu=353e9, gal_bins=(None, None, None, None), save_array=False,

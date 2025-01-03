@@ -354,6 +354,14 @@ class Bispectra:
         if sec_var in ("w", "k"):
             if verbose: print("Including post born bispectra terms")
             b += self.get_pb_bispectrum(typ, L1, L2, L3, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro, verbose)
+        elif sec_var == "L":
+            if verbose: print("Including lens-lens post born bispectra terms")
+            typ = typ.replace(sec_var, "k")
+            b += self.get_ll_bispectrum(typ, L1, L2, L3, theta, M_spline, zmin, zmax)
+        elif sec_var == "D":
+            if verbose: print("Including ray-deflect post born bispectra terms")
+            typ = typ.replace(sec_var, "k")
+            b += self.get_rd_bispectrum(typ, L1, L2, L3, theta, M_spline, zmin, zmax)
         if L3 is None:
             L3 = self._get_third_L(L1, L2, theta)
         if lens_delta:
