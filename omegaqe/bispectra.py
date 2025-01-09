@@ -76,7 +76,7 @@ class Bispectra:
         M1, M2, L12_dot = self._bispectra_prep("kkk", L1, L2, L3, M_spline, zmin, zmax)
         L13_dot = self._triangle_dot_product(L1, L3, L2)
         L23_dot = self._triangle_dot_product(L2, L3, L1)
-        res = 2*L12_dot*(L13_dot*M1 + L23_dot*M2)/(L1**2 * L2**2)
+        res = 2*L12_dot*((L13_dot*M1) + (L23_dot*M2))/(L1**2 * L2**2)
         res[np.isnan(res)] = 0
         return res
 
@@ -306,30 +306,34 @@ class Bispectra:
         bi3 = self._get_rd_bispectrum(typ, L1, L3, L2, M_spline, zmin, zmax)
         return bi1 + bi2 + bi3
 
-    def get_pb_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold", verbose=False):
+    def get_pb_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold", verbose=False, one_perm=False):
         self._check_type(typ)
         if M_spline:
             self._build_M_splines(typ, nu, gal_bins, gal_distro=gal_distro)
         if L3 is not None:
+            # if typ == "kkk":
+            #     b1 = self._kappa2_kappa1_kappa1(L1, L2, L3, M_spline, zmin, zmax)
+            #     b2 = self._kappa1_kappa2_kappa1(L1, L2, L3, M_spline, zmin, zmax)
+            #     b3 = self._kappa1_kappa1_kappa2(L1, L2, L3, M_spline, zmin, zmax)
+            #     b = b1 + b2 + b3
+            b = self._pb_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
+            if one_perm:
+                return b
             if typ == "kkk":
-                b1 = self._kappa2_kappa1_kappa1(L1, L2, L3, M_spline, zmin, zmax)
-                b2 = self._kappa1_kappa2_kappa1(L1, L2, L3, M_spline, zmin, zmax)
-                b3 = self._kappa1_kappa1_kappa2(L1, L2, L3, M_spline, zmin, zmax)
-                b = b1 + b2 + b3
-            else:
-                b = self._pb_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
-                if "kk" in ''.join(sorted(typ)) and "w" not in typ:
-                    if typ[0] == "k":   #kak
-                        b += self._pb_bispectrum(typ, L3, L2, L1, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
-                    else:   #akk
-                        b += self._pb_bispectrum(typ, L1, L3, L2, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
+                b += self._kappa2_kappa1_kappa1(L1, L2, L3, M_spline, zmin, zmax)
+                b += self._kappa1_kappa2_kappa1(L1, L2, L3, M_spline, zmin, zmax)
+            elif "kk" in ''.join(sorted(typ)) and "w" not in typ:
+                if typ[0] == "k":   #kak
+                    b += self._pb_bispectrum(typ, L3, L2, L1, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
+                else:   #akk
+                    b += self._pb_bispectrum(typ, L1, L3, L2, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
             return b
         if typ[-1] == "w":
             return self._omega_bispectrum_angle(typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
         return self.get_pb_bispectrum(typ, L1, L2, self._get_third_L(L1, L2, theta), None, M_spline, zmin, zmax, nu, gal_bins, gal_distro)
 
 
-    def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold", lens_delta=False, include_lss=False, verbose=False):
+    def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold", lens_delta=False, include_lss=False, verbose=False, one_perm=False):
         """
         Calculates cmb lensing bispectrum for the combination of observables specified.
 
@@ -353,7 +357,7 @@ class Bispectra:
         b = 0
         if sec_var in ("w", "k"):
             if verbose: print("Including post born bispectra terms")
-            b += self.get_pb_bispectrum(typ, L1, L2, L3, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro, verbose)
+            b += self.get_pb_bispectrum(typ, L1, L2, L3, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro, verbose, one_perm=one_perm)
         elif sec_var == "L":
             if verbose: print("Including lens-lens post born bispectra terms")
             typ = typ.replace(sec_var, "k")

@@ -486,7 +486,7 @@ class Fisher:
                 w[L1 > Lmax] = 0
                 w[L1 < Lmin] = 0
                 thetas12 = L1_vec.deltaphi(L2_vec)
-                bi1 = self.bi.get_bispectrum(bi_typ1, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro)
+                bi1 = self.bi.get_bispectrum(bi_typ1, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro, one_perm=True)
                 bi2 = self.bi.get_bispectrum(bi_typ2, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=bi2_include_ld, include_lss=bi2_include_lss)
                 if mag_bias:
                     bi2 += self.additional_mu_bispectra(bi_typ2, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro)
@@ -520,7 +520,7 @@ class Fisher:
                 F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega, pB_only)
                 if combos[iii] != combos[jjj]:
                     factor = 2     # This only works if both bispectra are the same (so not true for mag bias or pB-kappa)
-                    if mag_bias or not (omega and pB_only):
+                    if mag_bias or (not omega and not pB_only):
                         typ2 = "opt_" + combos[jjj] + combos[iii]
                         F_L_tmp += self._get_F_L_element_sample(typs, typ2, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega, pB_only)
                         factor = 1
@@ -887,7 +887,7 @@ class Fisher:
             var = 2 / (2 * ells + 1) * (Cl_spline(ells) ** 2 + 0.5 * (N0[ells] * Cl_spline(ells)))
         return f_sky * np.sum(Cl_spline(ells) ** 2 / var)
 
-    def get_len_len_kappa_Fisher(self, Lmax, M_path, f_sky=1, cmb=True, Lmin=30, n=40):
+    def get_pB_kappa_Fisher(self, Lmax, M_path, f_sky=1, cmb=True, Lmin=30, n=40):
         """
         TODO: Check equation !!!!!!!!!!!
         Parameters
@@ -901,16 +901,23 @@ class Fisher:
 
         """
         ells = np.geomspace(2, Lmax, 100)
-        Cl = pb.len_len_kappa_ps(ells, M_path, cmb=cmb)
+        Cl = pb.postborn_kappa_ps(ells, M_path, cmb=cmb)
         Cl_spline = InterpolatedUnivariateSpline(ells, Cl)
         ells = np.arange(Lmin, Lmax + 1)
-        cl_ll_kappa = Cl_spline(ells)
+        cl_pB_kappa = Cl_spline(ells)
         cl_kappa = self.power.get_kappa_ps(ells)
         if cmb:
             N0 = self.covariance.noise.get_N0("kappa", Lmax)
         else:
             N0 = self.covariance.noise.get_shape_N(n=n)
-        return f_sky * np.sum((2*ells + 1) * np.abs(cl_ll_kappa) / (cl_kappa + N0[ells]))
+        return f_sky * np.sum((2*ells + 1) * np.abs(cl_pB_kappa) / (cl_kappa + N0[ells]))
+
+    def get_kappa_pB_cross_Fisher(self, Lmin, Lmax, A_tilde_spline, f_sky=1):
+        ells = np.arange(Lmin, Lmax+1)
+        cl_kappa = self.power.get_kappa_ps(ells)
+        N0 = self.covariance.noise.get_N0("kappa", Lmax)[Lmin:]
+        var = 2 / (2 * ells + 1) * ((cl_kappa + N0) * A_tilde_spline(ells) + 1)
+        return 2 * f_sky * np.sum(1/var)
 
     def reset_noise(self):
         """
