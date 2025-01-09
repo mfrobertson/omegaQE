@@ -83,6 +83,7 @@ class Covariance:
         return cl_Ig
 
     def _get_Cl(self, typ, ellmax, nu=353e9, gal_bins=(None,None,None,None), use_bins=False, gal_distro="LSST_gold", gal_distro_b=None):
+        #TODO: no error on infinite recursions if typ doesn't match
         if "s" in typ:
             return self.power.get_ps(typ, np.arange(ellmax + 1), nu=nu)
         if typ == "kk":

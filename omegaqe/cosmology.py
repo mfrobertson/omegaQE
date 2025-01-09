@@ -380,6 +380,8 @@ class Cosmology:
             s = np.exp(zs) / (np.exp(3))
         elif typ == 4:
             s = np.ones(np.size(zs))
+        else:
+            raise ValueError(f"Magbias type {s} unsupported.")
         return InterpolatedUnivariateSpline(zs, s)
 
     def gal_window_z(self, z, typ="LSST_gold", zmin=None, zmax=None, bias_unity=False):
