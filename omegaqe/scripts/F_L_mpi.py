@@ -9,7 +9,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from fullsky_sims.demnunii import Demnunii
 # from fullsky_sims.agora import Agora
 
-def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, iter, mag_bias, out_dir, _id):
+def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, iter, mag_bias, omega, pB_only, out_dir, _id):
     # get basic information about the MPI communicator
     world_comm = MPI.COMM_WORLD
     world_size = world_comm.Get_size()
@@ -33,8 +33,13 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
     # dm.power.matter_PK = dm.power.cosmo.get_matter_PK(typ="matter")  #tmp
     fish = Fisher(exp=exp, qe=fields, gmv=gmv, ps="gradient", L_cuts=(30,3000,30,5000), iter=iter, iter_ext=False, data_dir=f"{omegaqe.DATA_DIR}", cosmology=dm.cosmo)
     if mag_bias != 0:
+        mpi.output(f"Setting up magbias {mag_bias}", my_rank, _id)
         fish.covariance.mag_bias = True
-        fish.covariance.power.cosmo.s_spline = fish.covariance.power.cosmo.get_s_spline(mag_bias)
+        # fish.covariance.power.cosmo.s_spline = fish.covariance.power.cosmo.get_s_spline(mag_bias)
+        fish.covariance.power.cosmo.set_magbias(mag_bias)
+    if not omega:
+        mpi.output("Changing galaxy number density to 7 (equivalent for unWISE)", my_rank, _id)
+        fish.covariance.noise.n = fish.covariance.noise.n = 7   #n=7 for 1 billion gals (unWise)
     fish.covariance.power = dm.power
     fish.power = dm.power
     
@@ -78,7 +83,7 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
     mpi.output("Starting F_L calculation...", my_rank, _id)
 
     start_time = MPI.Wtime()
-    _, F_L = fish.get_F_L(typ, Ls_samp[my_start: my_end], dL2=dL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True, Lmin=Lcut_min, Lmax=Lcut_max, mag_bias=fish.covariance.mag_bias)
+    _, F_L = fish.get_F_L(typ, Ls_samp[my_start: my_end], dL2=dL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="LSST_gold", use_cache=True, Lmin=Lcut_min, Lmax=Lcut_max, mag_bias=fish.covariance.mag_bias, omega=omega, pB_only=pB_only)
     # _, F_L = fish.get_F_L(typ, Ls_samp[my_start: my_end], dL2=dL2, Ntheta=Ntheta, nu=nu, return_C_inv=False, gal_distro="agora", use_cache=True, Lmin=Lcut_min, Lmax=Lcut_max)
     end_time = MPI.Wtime()
 
@@ -100,6 +105,8 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
         filename_ext = f"_u{mag_bias}" if fish.covariance.mag_bias else ""
+        filename_ext += "_k" if not omega else ""
+        filename_ext += "_pB" if pB_only else ""
         np.save(out_dir+"/Ls"+filename_ext, Ls_samp)
         np.save(out_dir+"/F_L"+filename_ext, F_L_arr)
         end_time_tot = MPI.Wtime()
@@ -111,8 +118,8 @@ def _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, it
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if len(args) != 14:
-        raise ValueError("Arguments should be typ exp fields gmv Lmax Lcut_min Lcut_max dL2 Ntheta N_Ls iter mag_bias out_dir _id")
+    if len(args) != 16:
+        raise ValueError("Arguments should be typ exp fields gmv Lmax Lcut_min Lcut_max dL2 Ntheta N_Ls iter mag_bias omega pB_only out_dir _id")
     typ = str(args[0])
     exp = str(args[1])
     fields = str(args[2])
@@ -125,6 +132,8 @@ if __name__ == '__main__':
     N_Ls = int(args[9])
     iter = parse_boolean(args[10])
     mag_bias = int(args[11])
-    out_dir = args[12]
-    _id = args[13]
-    _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, iter, mag_bias, out_dir, _id)
+    omega = parse_boolean(args[12])
+    pB_only = parse_boolean(args[13])
+    out_dir = args[14]
+    _id = args[15]
+    _main(typ, exp, fields, gmv, Lmax, Lcut_min, Lcut_max, dL2, Ntheta, N_Ls, iter, mag_bias, omega, pB_only, out_dir, _id)
