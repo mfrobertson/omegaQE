@@ -41,7 +41,7 @@ def _BB_mixed(Ls, verbose, N_L1, N_L2, Ntheta1, Ntheta2):
                 w3[(L1p_vec+L2_vec).rho < Lmin] = 0
                 theta1p2 = L1p_vec.deltaphi(L2_vec)
                 L_fac = (L1p**4 * L2**2) + (2*L1p**3*L2**3) + (L1p**2 * L2**4)   #Depending on convention for omega...
-                bi = 8 * fish.bi.get_bispectrum("kkw", L1p, L2, theta=theta1p2, M_spline=True)/(-L_fac) #Lfac may be -ve
+                bi = 8 * fish.bi.get_bispectrum("kkw", L1p, L2, theta=theta1p2, M_spline=True)/(L_fac) #Lfac may be -ve
                 I_theta2 = w2 * w3 * (L1_vec @ L2_vec) * (L1*L2p*np.sin(L2p_vec.deltaphi(L1_vec))) * bi
 
                 I_L2[kkk] = InterpolatedUnivariateSpline(thetas2, I_theta2).integral(0, 2*np.pi-dTheta2)

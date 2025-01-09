@@ -185,7 +185,7 @@ class Bispectra:
 
     def _omega_bispectrum_angle(self, typ, L1, L2, theta12, M_spline, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold"):
         M1, M2, _ = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
-        return -np.sin(2 * theta12) * (M1 - M2)    #Using anti-clockwise omega so bi has different sign compared to Pratten & Lewis
+        return np.sin(2 * theta12) * (M1 - M2)    #Using clockwise omega convention of Pratten & Lewis
 
     def _get_F2(self, L1, L2, L3):
         A = 1
@@ -229,7 +229,7 @@ class Bispectra:
 
     def get_lss_bispectrum(self, typ, L1, L2, L3=None, theta=None, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
         if "w" in typ:
-            raise ValueError(f"Bispectrum type {typ} not got lss bispectrum")
+            return 0
         if L3 is None:
             return self.get_lss_bispectrum(typ, L1, L2, self._get_third_L(L1, L2, theta), None, zmin, zmax, nu, gal_bins, gal_distro)
         Nchi = 100
