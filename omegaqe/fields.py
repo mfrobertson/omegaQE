@@ -14,7 +14,7 @@ warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
 
 class Fields:
 
-    def __init__(self, fields, exp, N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None, Nsims=1, sim=0, resp_cls=None):
+    def __init__(self, fields, exp, N_pix_pow=10, kmax=5000, setup_cmb_lens_rec=False, HDres=None, Nsims=1, sim=0, resp_cls=None, fisher=None):
         # TODO: Lensit has ellM = int(np.around(kM - 1/2))?? So my maps disagree with lensit of small scales...
         self.exp = exp
         self.N_pix = 2**N_pix_pow
@@ -22,7 +22,10 @@ class Fields:
         self.kmax_map = self._get_kmax(kmax)                # If HDres is not None then HDres determines kmax_map
         self.kmax_map_round = int(np.floor(self.kmax_map))
         self.kM, self.k_values = self._get_k_values()
-        self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=omegaqe.DATA_DIR)
+        if fisher is None:
+            self.fish = Fisher(exp, "TEB", True, "gradient", (30, 3000, 30, 5000), False, False, data_dir=omegaqe.DATA_DIR)
+        else:
+            self.fish = fisher
         self.covariance = self.fish.covariance
         self.rec = None
         self._sim = sim
@@ -201,12 +204,13 @@ class Fields:
         nT, beam = self.covariance.noise.get_noise_args(self.exp)
         return self.covariance.noise.get_cmb_gaussian_N(field, nT, beam, kmax, exp=self.exp)
 
-    def EB_to_QU(self, Emap, Bmap):
+    def EB_to_QU(self, Emap, Bmap, spin=2):
+        # TODO: actually derive spin-1 transforms (spin-2 is eq5.20 in lensing review)
         kx, ky = self.get_kx_ky()
         phi_k = np.arctan2(ky[..., np.newaxis], kx[np.newaxis, ...])
-        exp_2iphi = np.exp(2j * phi_k)
-        cos = exp_2iphi.real
-        sin = exp_2iphi.imag
+        exp_siphi = np.exp(spin*1j * phi_k)
+        cos = exp_siphi.real
+        sin = exp_siphi.imag
         Qmap = cos * Emap - (sin * Bmap)
         Umap = sin * Emap + (cos * Bmap)
         return Qmap, Umap
@@ -316,8 +320,8 @@ class Fields:
             self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, tracer_noise=tracer_noise, use_kappa_rec=use_kappa_rec, kappa_rec_qe_typ=kappa_rec_qe_typ, gaussCMB=gaussCMB, diffCMBs=diffMaps, diffCMBs_offset=diffMaps_offset)
         return self.template.get_omega(Nchi)
 
-    def get_kappa_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, tracer_noise=False, reinitialise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", gaussCMB=False, diffMaps=False, diffMaps_offset=1):
+    def get_kappa_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, tracer_noise=False, reinitialise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", gaussCMB=False, diffMaps=False, diffMaps_offset=1, typ="pB"):
         if self.template is None or reinitialise:
             self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, tracer_noise=tracer_noise, use_kappa_rec=use_kappa_rec, kappa_rec_qe_typ=kappa_rec_qe_typ, gaussCMB=gaussCMB, diffCMBs=diffMaps, diffCMBs_offset=diffMaps_offset)
-        return self.template.get_kappa_pB(Nchi)
+        return self.template.get_kappa_pB(Nchi, typ=typ)
 

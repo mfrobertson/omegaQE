@@ -41,6 +41,7 @@ class Template:
     def _get_F_L_and_C_inv_splines(self, F_L_spline=None, C_inv_spline=None):
         if F_L_spline is not None and C_inv_spline is not None:
             return F_L_spline, C_inv_spline
+        # TODO: F_L below is always omega, so won't work for kappa
         sample_Ls = self._fish.covariance.get_log_sample_Ls(Lmin=2, Lmax=self.Lmax_map, Nells=300)
         sample_Ls, F_L, C_inv = self._fish.get_F_L(self.fields.fields, Ls=sample_Ls, dL2=2, Ntheta=2000, nu=353e9, return_C_inv=True, Lmin=self.Lmin, Lmax=self.Lmax)
         F_L_spline = InterpolatedUnivariateSpline(sample_Ls, F_L)
@@ -98,11 +99,6 @@ class Template:
         L_map_inv[L_map_inv == np.inf] = 0
         return L_p * L_r * L_map_inv ** 2
 
-    def _get_L_fac_ll(self, p):
-        L_p = self._L_comp_map(p)
-        L_map_inv = 1 / self.L_map
-        L_map_inv[L_map_inv == np.inf] = 0
-        return L_p**2 * L_map_inv ** 2
 
     def _get_L_facs_rd(self, p):
         L_p = self._L_comp_map(p)
@@ -119,15 +115,7 @@ class Template:
             h_f += windows[field_i] * self.a_bars[field_i]
             h_g += Cls[field_i] * self.a_bars[field_i]
         return L_fac_f * h_f * matter_ps, L_fac_g * h_g
-    
-    def _get_f_g_ll(self, p, Cls, windows, matter_ps):
-        L_fac_f = L_fac_g = self._get_L_fac_ll(p)
-        h_f = 0
-        h_g = 0
-        for iii, field_i in enumerate(self.fields.fields):
-            h_f += windows[field_i] * self.a_bars[field_i]
-            h_g += Cls[field_i] * self.a_bars[field_i]
-        return L_fac_f * h_f * matter_ps, L_fac_g * h_g
+
 
     def _get_f_g_rd(self, p, Cls, windows, matter_ps):
         L_fac_f, L_fac_g = self._get_L_facs_rd(p)
@@ -217,7 +205,13 @@ class Template:
         print("")
         return - I * dChi * dL / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
 
-    def get_kappa_pB(self, Nchi=200):
+    def get_kappa_pB(self, Nchi=200, typ="pB"):
+        include_ll = True
+        include_rd = True
+        if typ == "ll":
+            include_rd = False
+        elif typ == "rd":
+            include_ll = False
         norm = "forward"
         Lx, Ly = self.fields.get_kx_ky()
         dL = Lx[1] - Lx[0]
@@ -234,16 +228,91 @@ class Template:
                 Cls[field], windows[field] = self._get_Cl_and_window(Chi, field)
             I_tmp = np.zeros((np.shape(self.L_map)[0], np.shape(self.L_map)[0]), dtype="complex128")
             for p in range(2):
-                f_ll, g_ll = self._get_f_g_ll(p, Cls, windows, matter_ps)
                 f_rd, g_rd = self._get_f_g_rd(p, Cls, windows, matter_ps)
-                F_ll = np.fft.irfft2(f_ll, norm=norm)
-                G_ll = np.fft.irfft2(g_ll, norm=norm)
                 F_rd = np.fft.irfft2(f_rd, norm=norm)
                 G_rd = np.fft.irfft2(g_rd, norm=norm)
-                I_tmp += (F_ll * G_ll) + (F_rd * G_rd)
+                if include_rd:
+                    I_tmp += F_rd * G_rd
+                for q in range(2):
+                    f_ll, g_ll = self._get_f_g(p, q, p, q, Cls, windows, matter_ps)
+                    F_ll = np.fft.irfft2(f_ll, norm=norm)
+                    G_ll = np.fft.irfft2(g_ll, norm=norm)
+                    if include_ll:
+                        I_tmp += F_ll * G_ll
             window_k = self._get_window_k(Chi)
             I += 2 * np.fft.rfft2(I_tmp, norm=norm) / (Chi ** 2) * window_k
             print('\r', end='')
             print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i+1)/Nchi * 100)}%", end='')
         print("")
         return - I * dChi * dL / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
+
+    def get_kappa_ll_Pmethod(self, Nchi=200):
+        L_map_inv = 1 / self.L_map
+        L_map_inv[L_map_inv == np.inf] = 0
+        norm = "forward"
+        Lx, Ly = self.fields.get_kx_ky()
+        dL = Lx[1] - Lx[0]
+        Chis = np.linspace(0, self._cosmo.get_chi_star(), Nchi + 1)[1:]
+        dChi = Chis[1] - Chis[0]
+        I = np.zeros((np.shape(self.L_map)), dtype="complex128")
+        t0 = datetime.datetime.now()
+        print(f"[00:00] {0}%", end='')
+        for Chi_i, Chi in enumerate(Chis):
+            Cls = dict.fromkeys(self.fields.fields)
+            windows = dict.fromkeys(self.fields.fields)
+            matter_ps = self._get_matter_ps(Chi)
+            for field in self.fields.fields:
+                Cls[field], windows[field] = self._get_Cl_and_window(Chi, field)
+            I_tmp = np.zeros((np.shape(self.L_map)[0], np.shape(self.L_map)[0]), dtype="complex128")
+            E_gamma, E_lambda = self._get_Egamma_Elambda(Cls, windows, matter_ps)
+            B_gamma = np.zeros(np.shape(E_gamma))
+            B_lambda = np.zeros(np.shape(E_lambda))
+            Q_gamma, U_gamma = self.fields.EB_to_QU(E_gamma, B_gamma)
+            Q_gamma, U_gamma = np.fft.irfft2(Q_gamma, norm=norm), np.fft.irfft2(U_gamma, norm=norm)
+            Q_lambda, U_lambda = self.fields.EB_to_QU(E_lambda, B_lambda)
+            Q_lambda, U_lambda = np.fft.irfft2(Q_lambda, norm=norm), np.fft.irfft2(U_lambda, norm=norm)
+            I_tmp += (Q_gamma * Q_lambda) + (U_lambda * U_gamma)
+
+            I_tmp += np.fft.irfft2(E_gamma, norm=norm) * np.fft.irfft2(E_lambda, norm=norm)
+
+            window_k = self._get_window_k(Chi)
+            I += np.fft.rfft2(I_tmp, norm=norm) / (Chi ** 2) * window_k
+            print('\r', end='')
+            print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i + 1) / Nchi * 100)}%", end='')
+        print("")
+        return - I * dChi * dL / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
+
+    def get_kappa_rd_Pmethod(self, Nchi=200):
+        L_map_inv = 1 / self.L_map
+        L_map_inv[L_map_inv == np.inf] = 0
+        norm = "forward"
+        Lx, Ly = self.fields.get_kx_ky()
+        dL = Lx[1] - Lx[0]
+        Chis = np.linspace(0, self._cosmo.get_chi_star(), Nchi + 1)[1:]
+        dChi = Chis[1] - Chis[0]
+        I = np.zeros((np.shape(self.L_map)), dtype="complex128")
+        t0 = datetime.datetime.now()
+        print(f"[00:00] {0}%", end='')
+        for Chi_i, Chi in enumerate(Chis):
+            Cls = dict.fromkeys(self.fields.fields)
+            windows = dict.fromkeys(self.fields.fields)
+            matter_ps = self._get_matter_ps(Chi)
+            for field in self.fields.fields:
+                Cls[field], windows[field] = self._get_Cl_and_window(Chi, field)
+            I_tmp = np.zeros((np.shape(self.L_map)[0], np.shape(self.L_map)[0]), dtype="complex128")
+            E_gamma, E_lambda = self._get_Egamma_Elambda(Cls, windows, matter_ps)
+            B_gamma = np.zeros(np.shape(E_gamma))
+            B_lambda = np.zeros(np.shape(E_lambda))
+            Q_gamma, U_gamma = self.fields.EB_to_QU(self.L_map*E_gamma, B_gamma, spin=1)
+            Q_gamma, U_gamma = np.fft.irfft2(Q_gamma, norm=norm), np.fft.irfft2(U_gamma, norm=norm)
+            Q_lambda, U_lambda = self.fields.EB_to_QU(L_map_inv*E_lambda, B_lambda, spin=1)
+            Q_lambda, U_lambda = np.fft.irfft2(Q_lambda, norm=norm), np.fft.irfft2(U_lambda, norm=norm)
+            I_tmp += (Q_gamma * Q_lambda) + (U_lambda * U_gamma)
+
+            window_k = self._get_window_k(Chi)
+            I += np.fft.rfft2(I_tmp, norm=norm) / (Chi ** 2) * window_k
+            print('\r', end='')
+            print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i + 1) / Nchi * 100)}%", end='')
+        print("")
+        return - 2 * I * dChi * dL / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
+
