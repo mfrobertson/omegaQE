@@ -262,6 +262,7 @@ class Bispectra:
             lens_bi1 = self._lens_delta_bispectrum("k" + typ[1] + typ[0], L3, L2, L1, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
             lens_bi2 = self._lens_delta_bispectrum(typ[0] + "k" + typ[1], L1, L3, L2, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
             return lens_bi1 + lens_bi2
+        print("Shouldn't see me in fisher or F_L calc...")
         if verbose: print(f"Including lensed delta {typ} and {typ[0] + typ[2] + typ[1]} and {typ[2] + typ[1] + typ[0]} bispectra")
         lens_bi1 = self._lens_delta_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins,gal_distro=gal_distro)
         lens_bi2 = self._lens_delta_bispectrum(typ[0] + typ[2] + typ[1], L1, L3, L2, M_spline, zmin, zmax, nu, gal_bins,gal_distro=gal_distro)
@@ -330,7 +331,7 @@ class Bispectra:
             return b
         if typ[-1] == "w":
             return self._omega_bispectrum_angle(typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
-        return self.get_pb_bispectrum(typ, L1, L2, self._get_third_L(L1, L2, theta), None, M_spline, zmin, zmax, nu, gal_bins, gal_distro)
+        return self.get_pb_bispectrum(typ, L1, L2, self._get_third_L(L1, L2, theta), None, M_spline, zmin, zmax, nu, gal_bins, gal_distro, one_perm=one_perm)
 
 
     def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold", lens_delta=False, include_lss=False, verbose=False, one_perm=False):

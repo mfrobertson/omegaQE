@@ -194,12 +194,6 @@ class Fisher:
         if param is None:
             if is_lss:
                 return self.bi.get_lss_bispectrum(typ, L1, L2, L3, theta, zmin, zmax, nu, gal_bins, gal_distro)
-            # if "L" in typ:
-            #     typ = typ.replace("L", "k")
-            #     return self.bi.get_ll_bispectrum(typ, L1, L2, L3, theta, M_spline=True, zmin=zmin, zmax=zmax)
-            # if "D" in typ:
-            #     typ = typ.replace("D", "k")
-            #     return self.bi.get_rd_bispectrum(typ, L1, L2, L3, theta, M_spline=True, zmin=zmin, zmax=zmax)
             return self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro, lens_delta=lens_delta, include_lss=include_lss)
         if is_lss:
             raise ValueError("Doing cosmology fisher with LSS bispectrum? Not sure how you got here....")
@@ -210,9 +204,9 @@ class Fisher:
         self.change_cosmology(H0=H0)
         return (bi_x_h - bi_x_h_minus) / (2 * np.abs(h))
 
-    def _get_thetas(self, Ntheta):
-        dTheta = np.pi / Ntheta
-        thetas = np.arange(dTheta, np.pi + dTheta, dTheta, dtype=float)
+    def _get_thetas(self, Ntheta, max_angle=np.pi):
+        dTheta = max_angle / Ntheta
+        thetas = np.arange(dTheta, max_angle + dTheta, dTheta, dtype=float)
         return thetas, dTheta
 
     def _get_Cov(self, typ, Lmax):
@@ -460,17 +454,21 @@ class Fisher:
 
 
     def _get_F_L_element_sample(self, typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega, pB_only):
-        thetas, dTheta, weights, C1_spline, C2_spline = self._integral_prep_F_L(Lmax, Ntheta, typ, typs, C_inv)
+        if Lmax is None: Lmax = 5000
+        if Lmin is None: Lmin = 2
+        thetas, dTheta, _, C1_spline, C2_spline = self._integral_prep_F_L(Lmax, Ntheta, typ, typs, C_inv)
         F_L = np.zeros(np.size(Ls))
-        Ls2 = np.arange(Lmin, Lmax + 1, dL2)
+        Ls2 = np.arange(Lmin, Lmax + dL2, dL2)
         if any([np.isin(typ_i, self.covariance.test_types) for typ_i in typ[4:]]):
             typ = "opt_kkkk"  # if any test types are detected, it is assumed all observables are kappa
         sec_var = "w" if omega else "k"
         bi2_include_lss = True
         bi2_include_ld = True
+        bi2_one_perm = False
         if pB_only:
             bi2_include_lss = False
             bi2_include_ld = False
+            bi2_one_perm = True
         bi_typ1 = typ[4:6] + sec_var
         bi_typ2 = typ[6:] + sec_var
         if np.size(Ls) == 1:
@@ -482,31 +480,29 @@ class Fisher:
                 L2_vec = vector.obj(rho=L2, phi=thetas)
                 L1_vec = L3_vec - L2_vec
                 L1 = L1_vec.rho
-                w = np.ones(np.shape(L1))
-                w[L1 > Lmax] = 0
-                w[L1 < Lmin] = 0
                 thetas12 = L1_vec.deltaphi(L2_vec)
                 bi1 = self.bi.get_bispectrum(bi_typ1, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro, one_perm=True)
-                bi2 = self.bi.get_bispectrum(bi_typ2, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=bi2_include_ld, include_lss=bi2_include_lss)
+                bi2 = self.bi.get_bispectrum(bi_typ2, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=bi2_include_ld, include_lss=bi2_include_lss, one_perm=bi2_one_perm)
                 if mag_bias:
                     bi2 += self.additional_mu_bispectra(bi_typ2, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro)
-                covs = C1_spline(L1) * C2_spline(L2)
-                I_tmp[jjj] = 2 * np.sum(L2 * w * dTheta * bi1 * bi2 * covs)
+                C1 = C1_spline(L1)
+                C1[L1 > Lmax] = 0
+                C1[L1 < Lmin] = 0
+                covs = C1 + C2_spline(L2)
+                I_tmp[jjj] = 2 * np.sum(L2 * dTheta * bi1 * bi2 * covs)
             F_L[iii] = InterpolatedUnivariateSpline(Ls2, I_tmp).integral(Lmin, Lmax) / (2 * C_omega_spline(L3))
         F_L *= 1 / ((2 * np.pi) ** 2)
         return F_L
 
     def _get_F_L(self, typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax, mag_bias, omega, pB_only):
-        if Lmax is None: Lmax = int(np.ceil(np.max(Ls)))
-        if Lmin is None: Lmin = int(np.floor(np.min(Ls)))
         typs = np.char.array(typs)
         if mag_bias: self.covariance.mag_bias = True
         if use_cache:
             C_inv = self.C_inv
             C_omega_spline = self.C_omega_spline
         else:
-            C_inv = self.covariance.get_C_inv(typs, int(np.ceil(np.max(Ls))), nu, gal_bins, gal_distro=gal_distro)
-            omega_ells = np.geomspace(2, Lmax, 100)
+            C_inv = self.covariance.get_C_inv(typs, 5000, nu, gal_bins, gal_distro=gal_distro)
+            omega_ells = np.geomspace(int(np.floor(np.min(Ls))), int(np.ceil(np.max(Ls))), 100)
             C_omega = pb.omega_ps(omega_ells)
             C_omega_spline = InterpolatedUnivariateSpline(omega_ells, C_omega)
         all_combos = typs[:, None] + typs[None, :]
@@ -916,8 +912,8 @@ class Fisher:
         ells = np.arange(Lmin, Lmax+1)
         cl_kappa = self.power.get_kappa_ps(ells)
         N0 = self.covariance.noise.get_N0("kappa", Lmax)[Lmin:]
-        var = 2 / (2 * ells + 1) * ((cl_kappa + N0) * A_tilde_spline(ells) + 1)
-        return 2 * f_sky * np.sum(1/var)
+        var = (((cl_kappa + N0) * A_tilde_spline(ells)) + 1) / (2 * ells + 1)
+        return f_sky * np.sum(1/var)
 
     def reset_noise(self):
         """
