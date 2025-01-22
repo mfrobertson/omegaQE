@@ -43,7 +43,9 @@ class Fields:
                     self.fft_maps[field] = self.get_map(field, fft=True, use_cache=use_lss_cache, gaussian=gauss_lss)
             else:
                 print(f"Using cached gaussian realisations stored at {self.nbody.sims_dir}/{self.deflect_typ}")
-                fields = self.nbody.sht.read_map(f"{self.nbody.sims_dir}/{self.deflect_typ}/{self.fields}_{self.sim}.fits")
+                # fields = self.nbody.sht.read_map(f"{self.nbody.sims_dir}/{self.deflect_typ}/{self.fields}_{self.sim}.fits")
+                fields = self.nbody.sht.read_map(f"{self.nbody.sims_dir}/{self.deflect_typ}/kgI_{self.sim}.fits")
+
                 for iii, field in enumerate(self._fields):
                     self.fft_maps[field] = self.sht.map2alm(fields[iii])
         if use_cmb_cache:
@@ -248,3 +250,9 @@ class Fields:
         if self.nbody_label.lower() == "agora":
             return self.tem.get_omega(Nchi, gal_distro="agora")
         return self.tem.get_omega(Nchi)
+
+    def kappa_template(self, Nchi, Lmin=30, Lmax=3000, tracer_noise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", neg_tracers=False, iter_mc_corr=False, gmv=True, bh=False, cmb_noise=True, F_L_spline=None):
+        self.tem = Template(self, Lmin, Lmax, tracer_noise, use_kappa_rec, kappa_rec_qe_typ, neg_tracers=neg_tracers, iter_mc_corr=iter_mc_corr, gmv=gmv, bh=bh, cmb_noise=cmb_noise, F_L_spline=F_L_spline)
+        if self.nbody_label.lower() == "agora":
+            return self.tem.get_kappa(Nchi, gal_distro="agora")
+        return self.tem.get_kappa(Nchi)
