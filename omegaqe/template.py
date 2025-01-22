@@ -246,7 +246,13 @@ class Template:
         print("")
         return - I * dChi * dL / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
 
-    def get_kappa_ll_Pmethod(self, Nchi=200):
+    def get_kappa_pB_Pmethod(self, Nchi=200, typ="pB"):
+        include_ll = True
+        include_rd = True
+        if typ == "ll":
+            include_rd = False
+        elif typ == "rd":
+            include_ll = False
         L_map_inv = 1 / self.L_map
         L_map_inv[L_map_inv == np.inf] = 0
         norm = "forward"
@@ -267,13 +273,20 @@ class Template:
             E_gamma, E_lambda = self._get_Egamma_Elambda(Cls, windows, matter_ps)
             B_gamma = np.zeros(np.shape(E_gamma))
             B_lambda = np.zeros(np.shape(E_lambda))
-            Q_gamma, U_gamma = self.fields.EB_to_QU(E_gamma, B_gamma)
-            Q_gamma, U_gamma = np.fft.irfft2(Q_gamma, norm=norm), np.fft.irfft2(U_gamma, norm=norm)
-            Q_lambda, U_lambda = self.fields.EB_to_QU(E_lambda, B_lambda)
-            Q_lambda, U_lambda = np.fft.irfft2(Q_lambda, norm=norm), np.fft.irfft2(U_lambda, norm=norm)
-            I_tmp += (Q_gamma * Q_lambda) + (U_lambda * U_gamma)
+            if include_ll:
+                Q_gamma, U_gamma = self.fields.EB_to_QU(E_gamma, B_gamma)
+                Q_gamma, U_gamma = np.fft.irfft2(Q_gamma, norm=norm), np.fft.irfft2(U_gamma, norm=norm)
+                Q_lambda, U_lambda = self.fields.EB_to_QU(E_lambda, B_lambda)
+                Q_lambda, U_lambda = np.fft.irfft2(Q_lambda, norm=norm), np.fft.irfft2(U_lambda, norm=norm)
+                I_tmp += (Q_gamma * Q_lambda) + (U_lambda * U_gamma)
 
-            I_tmp += np.fft.irfft2(E_gamma, norm=norm) * np.fft.irfft2(E_lambda, norm=norm)
+                I_tmp += np.fft.irfft2(E_gamma, norm=norm) * np.fft.irfft2(E_lambda, norm=norm)
+            if include_rd:
+                Q_gamma, U_gamma = self.fields.EB_to_QU(self.L_map * E_gamma, B_gamma, spin=1)
+                Q_gamma, U_gamma = np.fft.irfft2(Q_gamma, norm=norm), np.fft.irfft2(U_gamma, norm=norm)
+                Q_lambda, U_lambda = self.fields.EB_to_QU(L_map_inv * E_lambda, B_lambda, spin=1)
+                Q_lambda, U_lambda = np.fft.irfft2(Q_lambda, norm=norm), np.fft.irfft2(U_lambda, norm=norm)
+                I_tmp += 2 * ((Q_gamma * Q_lambda) + (U_lambda * U_gamma))
 
             window_k = self._get_window_k(Chi)
             I += np.fft.rfft2(I_tmp, norm=norm) / (Chi ** 2) * window_k
@@ -281,38 +294,4 @@ class Template:
             print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i + 1) / Nchi * 100)}%", end='')
         print("")
         return - I * dChi * dL / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
-
-    def get_kappa_rd_Pmethod(self, Nchi=200):
-        L_map_inv = 1 / self.L_map
-        L_map_inv[L_map_inv == np.inf] = 0
-        norm = "forward"
-        Lx, Ly = self.fields.get_kx_ky()
-        dL = Lx[1] - Lx[0]
-        Chis = np.linspace(0, self._cosmo.get_chi_star(), Nchi + 1)[1:]
-        dChi = Chis[1] - Chis[0]
-        I = np.zeros((np.shape(self.L_map)), dtype="complex128")
-        t0 = datetime.datetime.now()
-        print(f"[00:00] {0}%", end='')
-        for Chi_i, Chi in enumerate(Chis):
-            Cls = dict.fromkeys(self.fields.fields)
-            windows = dict.fromkeys(self.fields.fields)
-            matter_ps = self._get_matter_ps(Chi)
-            for field in self.fields.fields:
-                Cls[field], windows[field] = self._get_Cl_and_window(Chi, field)
-            I_tmp = np.zeros((np.shape(self.L_map)[0], np.shape(self.L_map)[0]), dtype="complex128")
-            E_gamma, E_lambda = self._get_Egamma_Elambda(Cls, windows, matter_ps)
-            B_gamma = np.zeros(np.shape(E_gamma))
-            B_lambda = np.zeros(np.shape(E_lambda))
-            Q_gamma, U_gamma = self.fields.EB_to_QU(self.L_map*E_gamma, B_gamma, spin=1)
-            Q_gamma, U_gamma = np.fft.irfft2(Q_gamma, norm=norm), np.fft.irfft2(U_gamma, norm=norm)
-            Q_lambda, U_lambda = self.fields.EB_to_QU(L_map_inv*E_lambda, B_lambda, spin=1)
-            Q_lambda, U_lambda = np.fft.irfft2(Q_lambda, norm=norm), np.fft.irfft2(U_lambda, norm=norm)
-            I_tmp += (Q_gamma * Q_lambda) + (U_lambda * U_gamma)
-
-            window_k = self._get_window_k(Chi)
-            I += np.fft.rfft2(I_tmp, norm=norm) / (Chi ** 2) * window_k
-            print('\r', end='')
-            print(f"[{str(datetime.datetime.now() - t0)[:-7]}] {int((Chi_i + 1) / Nchi * 100)}%", end='')
-        print("")
-        return - 2 * I * dChi * dL / self.F_L_spline(self.L_map) / ((2 * np.pi) ** 2)
 
