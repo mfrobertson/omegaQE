@@ -37,18 +37,19 @@ class Bispectra:
         self._M_splines = dict.fromkeys(self._mode.get_M_types())
         self._M_splines_lens_delta = {
             "g": dict.fromkeys(self._mode.get_M_types()),
-            "I": dict.fromkeys(self._mode.get_M_types())
+            "I": dict.fromkeys(self._mode.get_M_types()),
+            "a": dict.fromkeys(self._mode.get_M_types())
         }
 
     def _triangle_dot_product(self, mag1, mag2, mag3):
         res = (-(mag1**2) - (mag2**2) + (mag3**2))/2
-        res[np.isnan(res)] = 0  # tmp
+        # res[np.isnan(res)] = 0  # tmp
         return res
 
     def _triangle_cross_product(self, mag1, mag2, mag3):
         s = (mag1 + mag2 + mag3)/2
         res = -2 * np.sqrt(s*(s-mag1)*(s-mag2)*(s-mag3))     # I think sign here is arbitrary?
-        res[np.isnan(res)] = 0   # tmp
+        # res[np.isnan(res)] = 0   # tmp
         return res
 
     def _bispectra_prep(self, typ,  L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
@@ -61,7 +62,7 @@ class Bispectra:
         if M_spline:
             if sec_var in ("k", "w"):
                 M_spline_cache = self._M_splines
-            elif sec_var in ("g", "I"):
+            elif sec_var in ("g", "I", "a"):
                 M_spline_cache = self._M_splines_lens_delta[sec_var]
             else:
                 raise ValueError(f"Unrecognized value for sec_var: {sec_var}")
@@ -71,20 +72,6 @@ class Bispectra:
         M1 = self._mode.components(L1, L2, typ=M_typ1, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         M2 = self._mode.components(L2, L1, typ=M_typ2, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         return M1, M2, L12_dot
-
-    def _kappa1_kappa1_kappa2(self, L1, L2, L3, M_spline, zmin, zmax):
-        M1, M2, L12_dot = self._bispectra_prep("kkk", L1, L2, L3, M_spline, zmin, zmax)
-        L13_dot = self._triangle_dot_product(L1, L3, L2)
-        L23_dot = self._triangle_dot_product(L2, L3, L1)
-        res = 2*L12_dot*((L13_dot*M1) + (L23_dot*M2))/(L1**2 * L2**2)
-        res[np.isnan(res)] = 0
-        return res
-
-    def _kappa1_kappa2_kappa1(self, L1, L2, L3, M_spline, zmin, zmax):
-        return self._kappa1_kappa1_kappa2(L1, L3, L2, M_spline, zmin, zmax)
-
-    def _kappa2_kappa1_kappa1(self, L1, L2, L3, M_spline, zmin, zmax):
-        return self._kappa1_kappa1_kappa2(L3, L2, L1, M_spline, zmin, zmax)
 
     def _build_M_spline(self, typ, ells_sample, M_matrix, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold", sec_var="k"):
         if ells_sample is not None and M_matrix is not None:
@@ -122,7 +109,7 @@ class Bispectra:
                 M_typ2 = M_typ1[::-1]
                 M_spline_ld = self._M_splines_lens_delta[sec_var][M_typ1]
                 if M_spline_ld is not None:
-                    if (M_spline_ld.nu == nu) or (M_spline_ld.gal_bins == gal_bins) or (M_spline_ld.gal_distro != gal_distro):
+                    if (M_spline_ld.nu == nu) and (M_spline_ld.gal_bins == gal_bins) and (M_spline_ld.gal_distro == gal_distro):
                         continue
                 print(f"Building M-spline for {sec_var} lens delta matrices for {M_typ1}.")
                 self._M_splines_lens_delta[sec_var][M_typ1] = self._build_M_spline(M_typ1, None, None, 0, None, nu, gal_bins, gal_distro=gal_distro, sec_var=sec_var)
@@ -179,7 +166,11 @@ class Bispectra:
             raise ValueError(f"Bispectrum type {typ} has second order variable {typ[-1]} not from expected 'k' or 'w'.")
         L13_fac = product_func(L1, L3, L2)
         L23_fac = fac * product_func(L2, L3, L1)
-        res = 2 * L12_dot * ((L13_fac * M1) + (L23_fac * M2))/(L1**2 * L2**2)    #Note for kappa bi this should be + not -
+        res = 2 * L12_dot * ((L13_fac * M1) + (L23_fac * M2))/(L1**2 * L2**2)
+        if np.size(res) == 1:
+            if np.isnan(res):
+                return 0
+            return res
         res[np.isnan(res)] = 0
         return res
 
@@ -187,14 +178,14 @@ class Bispectra:
         M1, M2, _ = self._bispectra_prep(typ, L1, L2, None, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         return np.sin(2 * theta12) * (M1 - M2)    #Using clockwise omega convention of Pratten & Lewis
 
-    def _get_F2(self, L1, L2, L3):
+    def _get_F2(self, k1, k2, k3):
         A = 1
         B = 1
         C = 1
-        L12_dot = self._triangle_dot_product(L1, L2, L3)
+        k12_dot = self._triangle_dot_product(k1, k2, k3)
         A_fac= 5/7
-        B_fac = L12_dot/(2*L1*L2) * ((L1/L2) + (L2/L1))
-        C_fac = 2/7 * (L12_dot/(L1*L2))**2
+        B_fac = k12_dot/(2*k1*k2) * ((k1/k2) + (k2/k1))
+        C_fac = 2/7 * (k12_dot/(k1*k2))**2
         return (A_fac * A) + (B_fac * B) + (C_fac * C)
 
     def _get_matter_ps(self, L, chi, extended=False):
@@ -215,16 +206,19 @@ class Bispectra:
         else:
             raise ValueError(f"Too many (or too few) dimensions {ndim}")
 
-    def _delta_bispectrum(self, L1, L2, L3, chi):
+    def _delta_bispectrum(self, L1, L2, L3, chi, extended=False):
         L1 = self._vectorise_ells(L1, L1.ndim)
         L2 = self._vectorise_ells(L2, L2.ndim)
         L3 = self._vectorise_ells(L3, L3.ndim)
-        matter_ps1 = self._get_matter_ps(L1, chi)
-        matter_ps2 = self._get_matter_ps(L2, chi)
-        matter_ps3 = self._get_matter_ps(L3, chi)
-        bi1 = 2 * self._get_F2(L1, L2, L3) * matter_ps1 * matter_ps2
-        bi2 = 2 * self._get_F2(L2, L3, L1) * matter_ps2 * matter_ps3
-        bi3 = 2 * self._get_F2(L3, L1, L2) * matter_ps3 * matter_ps1
+        k1 = (L1 + 0.5) / chi if extended else L1 / chi
+        k2 = (L2 + 0.5) / chi if extended else L2 / chi
+        k3 = (L3 + 0.5) / chi if extended else L3 / chi
+        matter_ps1 = self._get_matter_ps(L1, chi, extended)
+        matter_ps2 = self._get_matter_ps(L2, chi, extended)
+        matter_ps3 = self._get_matter_ps(L3, chi, extended)
+        bi1 = 2 * self._get_F2(k1, k2, k3) * matter_ps1 * matter_ps2
+        bi2 = 2 * self._get_F2(k2, k3, k1) * matter_ps2 * matter_ps3
+        bi3 = 2 * self._get_F2(k3, k1, k2) * matter_ps3 * matter_ps1
         return bi1 + bi2 + bi3
 
     def get_lss_bispectrum(self, typ, L1, L2, L3=None, theta=None, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
@@ -234,20 +228,28 @@ class Bispectra:
             return self.get_lss_bispectrum(typ, L1, L2, self._get_third_L(L1, L2, theta), None, zmin, zmax, nu, gal_bins, gal_distro)
         Nchi = 100
         _, chis, dChi, win1, win2 = self._mode._integral_prep(Nchi, zmin, zmax, typ[:-1], nu, gal_bins, gal_distro=gal_distro, sec_order_var=typ[1])
-        win3 = self._mode._get_window(typ[2], chis, nu, gal_distro)
+        win3 = self._mode._get_window(typ[2], chis, nu, gal_bins, gal_distro)
         return np.sum(win1 * win2 * win3 * self._delta_bispectrum(L1, L2, L3, chis) / (chis ** 4), axis=-1) * dChi
 
     def _lens_delta_bispectrum(self, typ, L1, L2, L3, M_spline, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
         if "w" in typ:
             return 0
+        if typ[-1] == "k":
+            raise ValueError("Lens delta bispectrum type has second order variable 'k'?")
         M1, M2, L12_dot = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         res = -2 * L12_dot * ((M1 / L2**2) + (M2 / L1**2))
+        if np.size(res) == 1:
+            if np.isnan(res):
+                return 0
+            return res
         res[np.isnan(res)] = 0
         return res
 
     def _get_lens_delta_bis(self, typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro="LSST_gold", verbose=False):
         if "w" in typ or typ == "kkk":
             return 0
+        if typ[-1] != "k":
+            raise ValueError(f"Something has gone wrong...")
         if M_spline:
             self._build_M_splines_lens_delta(typ, nu, gal_bins, gal_distro=gal_distro)
         if "kk" in ''.join(sorted(typ)):
@@ -312,26 +314,27 @@ class Bispectra:
         if M_spline:
             self._build_M_splines(typ, nu, gal_bins, gal_distro=gal_distro)
         if L3 is not None:
-            # if typ == "kkk":
-            #     b1 = self._kappa2_kappa1_kappa1(L1, L2, L3, M_spline, zmin, zmax)
-            #     b2 = self._kappa1_kappa2_kappa1(L1, L2, L3, M_spline, zmin, zmax)
-            #     b3 = self._kappa1_kappa1_kappa2(L1, L2, L3, M_spline, zmin, zmax)
-            #     b = b1 + b2 + b3
             b = self._pb_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
             if one_perm:
+                if verbose: print(f"Including one permutation of pB bispectrun {typ}")
                 return b
             if typ == "kkk":
-                b += self._kappa2_kappa1_kappa1(L1, L2, L3, M_spline, zmin, zmax)
-                b += self._kappa1_kappa2_kappa1(L1, L2, L3, M_spline, zmin, zmax)
+                if verbose: print(f"Including all three pB bispectra of {typ}")
+                b += self._pb_bispectrum(typ, L1, L3, L2, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
+                b += self._pb_bispectrum(typ, L3, L2, L1, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
             elif "kk" in ''.join(sorted(typ)) and "w" not in typ:
                 if typ[0] == "k":   #kak
+                    if verbose: print(f"Including all two pB bispectra of {typ} (kak)")
                     b += self._pb_bispectrum(typ, L3, L2, L1, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
                 else:   #akk
+                    if verbose: print(f"Including all two pB bispectra of {typ} (akk)")
                     b += self._pb_bispectrum(typ, L1, L3, L2, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
+            else:
+                if verbose: print(f"Including all one pB bispectra of {typ} (abk)")
             return b
         if typ[-1] == "w":
             return self._omega_bispectrum_angle(typ, L1, L2, theta, M_spline, zmin, zmax, nu, gal_bins, gal_distro=gal_distro)
-        return self.get_pb_bispectrum(typ, L1, L2, self._get_third_L(L1, L2, theta), None, M_spline, zmin, zmax, nu, gal_bins, gal_distro, one_perm=one_perm)
+        return self.get_pb_bispectrum(typ, L1, L2, self._get_third_L(L1, L2, theta), None, M_spline, zmin, zmax, nu, gal_bins, gal_distro,verbose=verbose, one_perm=one_perm)
 
 
     def get_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold", lens_delta=False, include_lss=False, verbose=False, one_perm=False):
@@ -367,6 +370,8 @@ class Bispectra:
             if verbose: print("Including ray-deflect post born bispectra terms")
             typ = typ.replace(sec_var, "k")
             b += self.get_rd_bispectrum(typ, L1, L2, L3, theta, M_spline, zmin, zmax)
+        else:
+            raise ValueError("Sec var must be either 'w', 'k', 'D', or 'L'")
         if L3 is None:
             L3 = self._get_third_L(L1, L2, theta)
         if lens_delta:
