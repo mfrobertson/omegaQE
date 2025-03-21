@@ -87,7 +87,7 @@ class Fields:
         for iii, field_i in enumerate(self._fields):
             for jjj, field_j in enumerate(self._fields):
                 C[:, iii, jjj] = self.covariance.get_Cl(field_i + field_j, ellmax=self.kmax_map_round)[1:]
-        return C * (2*np.pi)**2
+        return C * (2*np.pi)**2  # Shouldn't 2\pi factor be on the ps estimator instead?
 
     def _get_L(self, C):
         N_fields = np.size(self._fields)
@@ -321,6 +321,11 @@ class Fields:
         return self.template.get_omega(Nchi)
 
     def get_kappa_template(self, Nchi=20, F_L_spline=None, C_inv_spline=None, tracer_noise=False, reinitialise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", gaussCMB=False, diffMaps=False, diffMaps_offset=1, typ="pB"):
+        if self.template is None or reinitialise:
+            self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, tracer_noise=tracer_noise, use_kappa_rec=use_kappa_rec, kappa_rec_qe_typ=kappa_rec_qe_typ, gaussCMB=gaussCMB, diffCMBs=diffMaps, diffCMBs_offset=diffMaps_offset)
+        return self.template.get_kappa_pB(Nchi, typ=typ)
+
+    def get_kappa_template_Pmethod(self, Nchi=20, F_L_spline=None, C_inv_spline=None, tracer_noise=False, reinitialise=False, use_kappa_rec=False, kappa_rec_qe_typ="TEB", gaussCMB=False, diffMaps=False, diffMaps_offset=1, typ="pB"):
         if self.template is None or reinitialise:
             self.template = Template(self, Lmin=30, Lmax=3000, F_L_spline=F_L_spline, C_inv_spline=C_inv_spline, tracer_noise=tracer_noise, use_kappa_rec=use_kappa_rec, kappa_rec_qe_typ=kappa_rec_qe_typ, gaussCMB=gaussCMB, diffCMBs=diffMaps, diffCMBs_offset=diffMaps_offset)
         return self.template.get_kappa_pB(Nchi, typ=typ)
