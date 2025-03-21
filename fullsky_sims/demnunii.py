@@ -79,7 +79,7 @@ class Demnunii:
         print(f"Using particles between redshifts zmin: {z_starts[indices][0]} (snap {np.max(snaps)}) and zmax: {z_ends[indices][-1]} (snap {np.min(snaps)})")
         return snaps
 
-    def get_density_map(self, zmin=0, zmax=1100, verbose=False):
+    def get_density_map(self, zmin=0, zmax=1100, pixel_corr=True, verbose=False):
         if verbose: print(f"DEMNUnii: Constructing density map for zmin={zmin}, zmax={zmax}")
         pixel_area = self.sht.nside2pixarea()
         npix = self.sht.nside2npix()
@@ -93,7 +93,9 @@ class Demnunii:
             if verbose: print('\r', end='')
         if verbose: print("")
         rho_bar = np.mean(rho)
-        return rho / rho_bar - 1
+        density_map = rho / rho_bar - 1
+        if pixel_corr: density_map = self._apply_pixel_correction(density_map)
+        return density_map
     
     def _get_param_at_snap(self, param_name, snap):
         return np.asarray(self.snap_df[param_name][self.snap_df["#1:output"] == snap])[0]
