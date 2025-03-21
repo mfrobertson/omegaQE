@@ -488,7 +488,7 @@ class Fisher:
                 C1 = C1_spline(L1)
                 C1[L1 > Lmax] = 0
                 C1[L1 < Lmin] = 0
-                covs = C1 + C2_spline(L2)
+                covs = C1 * C2_spline(L2)
                 I_tmp[jjj] = 2 * np.sum(L2 * dTheta * bi1 * bi2 * covs)
             F_L[iii] = InterpolatedUnivariateSpline(Ls2, I_tmp).integral(Lmin, Lmax) / (2 * C_omega_spline(L3))
         F_L *= 1 / ((2 * np.pi) ** 2)
