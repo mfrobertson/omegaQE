@@ -79,7 +79,7 @@ class Reconstruction:
         self.transfer_dict = {'t': transfers[0], 'e': transfers[1], 'b': transfers[2]}
         filters = self.get_filters(self.indices, self.cl_len, self.noise_cls)
         self.filt_dict = {'t': filters[0], 'e': filters[1], 'b': filters[2]}
-        self.n1_lib = n1.library_n1(os.path.join(self.temp, 'n1'), self.cl_grad['tt'], self.cl_grad['ee'], self.cl_grad['bb'], lmaxphi=5000)
+        # self.n1_lib = n1.library_n1(os.path.join(self.temp, 'n1'), self.cl_grad['tt'], self.cl_grad['ee'], self.cl_grad['bb'], lmaxphi=5000)
 
     def get_transfers(self):
         transfers = [np.ones(self.Lmax_map + 1) for _ in self.indices]
@@ -107,6 +107,7 @@ class Reconstruction:
             plancklens_cachedir = f"_tmp"
             os.environ['PLENS'] = plancklens_cachedir
             print(f"Setting up Plancklens cahe at {plancklens_cachedir}")
+        if filename is None: return
         print(filename)
         self.temp = os.path.join(os.environ['PLENS'], 'demnunii', f"{exp}_{iter}", filename.replace(f"{self.nbody.sims_dir}/", "")[:-5]+"_"+str(sim))  # TODO: fix temp solution
         if os.path.exists(self.temp) and os.path.isdir(self.temp):
@@ -436,11 +437,11 @@ class Reconstruction:
         Cl_curl[1:] = 4/(ells * (ells + 1))**2 * Cl_omega
         return Cl_curl
 
-    def get_N1(self, typ):
-        qe_key = self._get_qe_key(typ)
+    def get_N1(self, typ, curl=False):
+        qe_key = self._get_qe_key(typ, curl)
         fal = self._get_filt_matrix(self.cl_len, True) if self.gmv else self.filt_dict
         lib_n1 = n1_fft.n1_fft(fal, self.cl_grad, self.cl_grad, self._get_Cl_phi(), lminbox=10, lmaxbox=5000 + 100) 
-        Ls_n1 = np.linspace(30, 3000, 200)
+        Ls_n1 = np.linspace(30, 3000, 300)
         n1 = np.array([lib_n1.get_n1(qe_key, L, do_n1mat=False) for L in Ls_n1])
         qnorm = utils.cli(self._get_response(qe_key))
         qnorm = InterpolatedUnivariateSpline(np.arange(np.size(qnorm)), qnorm)(Ls_n1)
