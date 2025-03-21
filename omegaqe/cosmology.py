@@ -687,7 +687,7 @@ class Cosmology:
         if typ.lower() == "cdm":
             return cdm, cdm
 
-    def get_matter_PK(self, kmax=None, zmax=None, typ="Weyl"):
+    def get_matter_PK(self, kmax=None, zmax=None, typ="Weyl", nonlinear=True):
         """
         Gets an interpolated matter power spectrum from CAMB.
 
@@ -708,7 +708,7 @@ class Cosmology:
         if kmax is None:
             kmax = 100
         var1, var2 = self._get_ps_variables(typ)
-        PK = camb.get_matter_power_interpolator(self._pars, hubble_units=False, zmin=0, zmax=zmax, kmax=kmax,
+        PK = camb.get_matter_power_interpolator(self._pars, nonlinear=nonlinear, hubble_units=False, zmin=0, zmax=zmax, kmax=kmax,
                                                 k_hunit=False, var1=var1, var2=var2)
         return PK
 
