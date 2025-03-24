@@ -464,7 +464,7 @@ class Fisher:
         sec_var = "w" if omega else "k"
         bi2_include_lss = True
         bi2_include_ld = True
-        bi2_one_perm = True   # One_perm should only apply to pB bispectra
+        bi2_one_perm = False
         if pB_only:
             bi2_include_lss = False
             bi2_include_ld = False
@@ -908,14 +908,20 @@ class Fisher:
             N0 = self.covariance.noise.get_shape_N(n=n)
         return f_sky * np.sum((2*ells + 1) * np.abs(cl_pB_kappa) / (cl_kappa + N0[ells]))
 
-    def get_kappa_pB_cross_Fisher(self, Lmin, Lmax, F_L_spline, cl_cross_spline, f_sky=1, born_subracted=True):
+    def get_kappa_pB_cross_Fisher(self, Lmin, Lmax, F_L_spline, f_sky=1, born_subtracted=True, perf_tem=True):
         ells = np.arange(Lmin, Lmax+1)
         cl_kappa = self.power.get_kappa_ps(ells)
         N0 = self.covariance.noise.get_N0("kappa", Lmax)[Lmin:]
         ells_samp = np.geomspace(1, Lmax+1, 100)
         cl_kappa_pB_spline = InterpolatedUnivariateSpline(ells_samp, pb.pb22_kappa_ps(ells_samp, powerspectra=self.power))
-        if born_subracted:
-            cl_kappa_hat = cl_kappa_pB_spline(ells) + N0
+        if born_subtracted:
+            if perf_tem:
+                delta_cl_kappa = 0
+            else:
+                delensing_tracers = "gI"
+                rho = self.covariance.get_total_tracer_corr(delensing_tracers, Lmax)[Lmin:]
+                delta_cl_kappa = (1-rho**2)*cl_kappa
+            cl_kappa_hat = delta_cl_kappa + cl_kappa_pB_spline(ells) + N0
         else:
             cl_kappa_hat = cl_kappa + N0
         # var = (cl_kappa_hat / F_L_spline(ells) * cl_kappa_pB_spline(ells)) + cl_cross_spline(ells) ** 2
