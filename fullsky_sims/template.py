@@ -115,7 +115,7 @@ class Template:
                 a_j = self._get_fft_maps(field_j, tracer_noise, neg_tracers)
                 a_bar_i += self.sht.almxfl(a_j, self.C_inv[iii, jjj])
             a_bar_field = field_i.replace("u", "g")
-            a_bar_field = field_i.replace("r", "g")
+            a_bar_field = field_i.replace("r", "g")   # TODO: this is typo? fix?
             self.a_bars[a_bar_field] = a_bar_i
 
     def _get_Cl_and_window(self, Chi, field, nu=353e9, gal_distro="LSST_gold"):

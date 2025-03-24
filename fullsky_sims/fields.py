@@ -1,7 +1,6 @@
 import numpy as np
 from omegaqe.fisher import Fisher
 import fullsky_sims
-from fullsky_sims.reconstruction import Reconstruction
 from fullsky_sims.template import Template
 from datetime import datetime
 import copy
@@ -115,6 +114,7 @@ class Fields:
         return y
 
     def setup_rec(self, sim, deflect_typ, iter=False, noise=True, gmv=True, bh=None):
+        from fullsky_sims.reconstruction import Reconstruction
         self.sim = sim
         self.deflect_typ = deflect_typ
         print(f"Creating Reconstruction instance with exp: {self.exp}, and file: {self.nbody.sims_dir}/{self.deflect_typ}/TQU_{self.sim}.fits")
