@@ -23,6 +23,7 @@ class Demnunii:
         self.sht = Spherical(self.nside, self.Lmax_map, nthreads=nthreads)
         self.snap_df = self.get_snap_info()
         self.cosmo = Cosmology("DEMNUnii")
+        self.cosmo.b1 = 0
         self.power = Powerspectra(cosmology=self.cosmo)
         self.power.matter_PK = self.get_PK()
 
