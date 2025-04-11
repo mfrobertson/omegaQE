@@ -1,12 +1,14 @@
 import numpy as np
-from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 from omegaqe.fisher import Fisher
 from omegaqe.cosmology import Cosmology
 from time import time
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+from omegaqe.postborn import pb22_kappa_ps
 
-def kappa_cross_Cov(typs, Ls, F_L, A_tilde, NL1s=1000, tracer_Lmin=30, tracer_Lmax=3000):
+
+def kappa_cross_Cov(typs, Ls, F_L, NL1s=1000, F_L_tot=None, tracer_Lmin=30, tracer_Lmax=3000):
     def triangle_lims(A, B):
         third_side_min = np.max([np.abs(A-B), tracer_Lmin])
         third_side_max = np.min([A+B, tracer_Lmax])
@@ -17,64 +19,105 @@ def kappa_cross_Cov(typs, Ls, F_L, A_tilde, NL1s=1000, tracer_Lmin=30, tracer_Lm
         return all_combos.flatten()
 
     cosmo = Cosmology("DEMNUnii")
-    fish = Fisher(exp="ACT", cosmology=cosmo, setup_bispectra=True)
+    cosmo.b1=0
+    fish = Fisher(exp="ACT", cosmology=cosmo, setup_bispectra=False) # should only be true for testing
     fish.covariance.noise.n = 7
+
+    print("calc cl_kappa_pB22")
+    ells_samp = np.geomspace(1, 5000, 200)
+    cl_kappa_pB_tmp = pb22_kappa_ps(ells_samp, powerspectra=fish.covariance.power)
+    cl_kappa_pB = InterpolatedUnivariateSpline(ells_samp, cl_kappa_pB_tmp)(Ls)
+    print("finished cl_kappa_pB22")
+
     NLs = np.size(Ls)
     Cov = np.zeros((NLs, NLs))
     typs = np.char.array(list(typs))
     typ_combs = get_typs_combos(typs)
     nu = 353e9
-    C_inv = fish.covariance.get_C_inv(typs, int(np.ceil(np.max(Ls))), nu)
-    cl_kappa = fish.covariance.power.get_kappa_ps(Ls)
-    N0 = fish.covariance.noise.get_N0("kappa", int(np.ceil(np.max(Ls))))
-    for ip in typ_combs:
-        i = ip[0]
-        p = ip[1]
-        cinv_idx_i = np.where(typs == i)[0][0]
-        cinv_idx_p = np.where(typs == p)[0][0]
-        cinv_ip_spline = fish._interpolate(C_inv[cinv_idx_i][cinv_idx_p])
-        for iii, L in enumerate(Ls):
-            for jjj in np.arange(iii, NLs):
-                if iii == jjj:
-                    continue
-                Lp = Ls[jjj]
-                if Lp < tracer_Lmin or Lp > tracer_Lmax:
-                    continue
-                Lmin, Lmax = triangle_lims(L, Lp)
-                L1s = np.linspace(Lmin, Lmax, NL1s)
-                bi1 = fish.bi.get_bispectrum(f"k{i}k", Lp, L1s, L, M_spline=True, one_perm=True)
-                if i == p:
-                    bi2 = bi1
-                else:
-                    bi2 = fish.bi.get_bispectrum(f"k{p}k", Lp, L1s, L, M_spline=True, one_perm=True)
-                I = L1s * bi1 * bi2 * cinv_ip_spline(L1s)
-                Cov_ij = InterpolatedUnivariateSpline(L1s, I).integral(Lmin, Lmax) / F_L[iii] / F_L[jjj] / (2 * np.pi)
-                # L_facs = (2*L + 2*Lp + 2)/((2*L + 1) * (2*Lp + 1))
-                L_facs = 1 / ((2 * L + 1) * (2 * Lp + 1))
-                Cov[iii, jjj] += L_facs * Cov_ij - 1
-                Cov[jjj, iii] += L_facs * Cov_ij - 1
+    C_inv_tmp = fish.covariance.get_C_inv(typs, 5000, nu)
+    C = np.empty((np.size(typs), np.size(typs)), dtype=InterpolatedUnivariateSpline)
+    C_inv = np.empty((np.size(typs), np.size(typs)), dtype=InterpolatedUnivariateSpline)
+    for iii in np.arange(np.size(typs)):
+        for jjj in np.arange(iii, np.size(typs)):
+            typ_i = typs[iii]
+            typ_j = typs[jjj]
+            C_ij = fish.covariance.get_Cov(typ_i+typ_j, 5000)
+            C[iii][jjj] = InterpolatedUnivariateSpline(np.arange(np.size(C_ij)), C_ij)
+            C[jjj][iii] = C[iii][jjj]
+
+            C_inv_ij = C_inv_tmp[iii][jjj]
+            C_inv[iii][jjj] = InterpolatedUnivariateSpline(np.arange(np.size(C_inv_ij)),C_inv_ij)
+            C_inv[jjj][iii] = C_inv[iii][jjj]
+    cinv_idx_k = np.where(typs == "k")[0][0]
+    if F_L_tot is not None:
+        cl_kappa_cross = cl_kappa_pB*F_L_tot/F_L
+    else:
+        cl_kappa_cross = np.zeros[np.size(F_L)]
     for iii, L in enumerate(Ls):
-        cov_kk = cl_kappa[iii] + N0[L]
-        Cov[iii, iii] = ((cov_kk * A_tilde[iii]) + 1) / ((2 * L) + 1)
+        print(f"{iii} out of {np.size(Ls)}")
+        for jjj in np.arange(iii, NLs):
+            Lp = Ls[jjj]
+            # if Lp < tracer_Lmin or Lp > tracer_Lmax:
+            #     continue
+            Lmin, Lmax = triangle_lims(L, Lp)
+            L1s = np.linspace(Lmin, Lmax, NL1s)
+            L_fac = 2 * L + 1
+            Lp_fac = 2 * Lp + 1
+            L_facs = np.max([L_fac,Lp_fac]) / (L_fac * Lp_fac)
+            for ip in typ_combs:
+                i = ip[0]
+                p = ip[1]
+                cinv_idx_i = np.where(typs == i)[0][0]
+                cinv_idx_p = np.where(typs == p)[0][0]
+                cinv_ip = C_inv[cinv_idx_i][cinv_idx_p](L1s)
+                for jq in typ_combs:
+                    j = jq[0]
+                    q = jq[1]
+                    cinv_idx_j = np.where(typs == j)[0][0]
+                    cinv_idx_q = np.where(typs == q)[0][0]
+                    bi_ij = fish.bi.get_bispectrum(f"{i}{j}k", L1s, Lp, L, M_spline=True, one_perm=True)
+                    bi_pq = fish.bi.get_bispectrum(f"{p}{q}k", L1s, L, Lp, M_spline=True, one_perm=True)
+                    for ur in typ_combs:
+                        u = ur[0]
+                        r = ur[1]
+                        cinv_idx_u = np.where(typs == u)[0][0]
+                        cinv_idx_r = np.where(typs == r)[0][0]
+                        cinv_jr = C_inv[cinv_idx_j][cinv_idx_r](Lp)
+                        cinv_qu = C_inv[cinv_idx_q][cinv_idx_u](L)
+                        c_rk = C[cinv_idx_r][cinv_idx_k](Lp)
+                        c_uk = C[cinv_idx_u][cinv_idx_k](L)
+                        I = bi_ij * bi_pq * cinv_ip * cinv_jr * cinv_qu * c_rk * c_uk
+                        Cov_ij = InterpolatedUnivariateSpline(L1s, L1s * I).integral(Lmin, Lmax)
+                        Cov_ij *= L_facs * cl_kappa_pB[iii] * cl_kappa_pB[jjj] / F_L[iii] / F_L[jjj] / (2 * np.pi)
+                        Cov[iii, jjj] += Cov_ij
+                        Cov[jjj, iii] += Cov_ij
+            Cov[iii, jjj] -= cl_kappa_cross[iii] * cl_kappa_cross[jjj]
+            Cov[jjj, iii] -= cl_kappa_cross[iii] * cl_kappa_cross[jjj]
+    for iii, L in enumerate(Ls):
+        cov_kk = C[cinv_idx_k][cinv_idx_k](L)
+        Cov[iii, iii] = ((cov_kk * cl_kappa_pB[iii]**2/ F_L[iii]) + cl_kappa_cross[iii]**2)/ ((2 * L) + 1)
     return Ls, Cov
 
 
-def main(typs, Ls, F_L, A_tilde):
+def main(typs, Ls, F_L, NL1s, F_L_tot):
     t0 = time()
-    Ls, Cov = kappa_cross_Cov(typs, Ls, F_L, A_tilde, NL1s=10)
+    Ls, Cov = kappa_cross_Cov(typs, Ls, F_L, NL1s, F_L_tot)
     t1 = time()
     print(f"Done in {t1 - t0:.2f} seconds")
-    print(Cov)
-    # plt.imshow(np.abs(Cov), norm=LogNorm(1e-3,1e6), extent=(Ls[0], Ls[-1], Ls[-1], Ls[0]))
-    # plt.colorbar()
-    # plt.show()
+
+    np.save(f"../../omegaqeNBs/_kappa_cross_cov_{np.size(Ls)}.npy", Cov)
+    np.save(f"../../omegaqeNBs/_kappa_cross_cov_{np.size(Ls)}_Ls.npy", Ls)
+
 
     std_devs = np.sqrt(np.diag(Cov))
 
     std_matrix = np.outer(std_devs, std_devs)
 
+
     # plt.imshow(Cov / std_matrix, vmin=-0.4, vmax=1, extent=(Ls[0], Ls[-1], Ls[-1], Ls[0]))
     plt.imshow(np.abs(Cov / std_matrix), norm=LogNorm(1e-2,1e0), extent=(Ls[0], Ls[-1], Ls[-1], Ls[0]))
+    # plt.imshow(np.abs(Cov / std_matrix), extent=(Ls[0], Ls[-1], Ls[-1], Ls[0]))
+
     plt.colorbar()
     plt.show()
 
@@ -83,11 +126,11 @@ def main(typs, Ls, F_L, A_tilde):
 
 if __name__ == '__main__':
     typs = "kg"
-    Ls = np.arange(2, 5000, 100)
-    F_L_Ls = np.load("../../omegaqeNBs/_kappa_F_L_results_1perm/kg/ACT/gmv/TEB/30_3000/1_2000/Ls_k.npy")
-    F_L = np.load("../../omegaqeNBs/_kappa_F_L_results_1perm/kg/ACT/gmv/TEB/30_3000/1_2000/F_L_k.npy")
-    F_L_spline = InterpolatedUnivariateSpline(F_L_Ls, F_L)
-    F_L_pb = np.load("../../omegaqeNBs/_kappa_F_L_results_1perm/kg/ACT/gmv/TEB/30_3000/1_2000/F_L_k_pB.npy")
-    A_tilde = F_L_pb / (F_L**2)
-    A_tilde_spline = InterpolatedUnivariateSpline(F_L_Ls, A_tilde)
-    main(typs, Ls, F_L_spline(Ls), A_tilde_spline(Ls))
+    Ls = np.arange(30, 510, 10)
+    F_L_Ls = np.load("../../omegaqeNBs/_kappa_F_L_results/kg/ACT/gmv/TEB/30_3000/1_2000/Ls_k_pB.npy")
+    F_L_tmp = np.load("../../omegaqeNBs/_kappa_F_L_results/kg/ACT/gmv/TEB/30_3000/1_2000/F_L_k_pB.npy")
+    F_L_tot_tmp = np.load("../../omegaqeNBs/_old_kappa_F_L/_kappa_F_L_results_1perm_nob/kg/ACT/gmv/TEB/30_3000/1_2000/F_L_k.npy")
+    F_L = InterpolatedUnivariateSpline(F_L_Ls, F_L_tmp)(Ls)
+    F_L_tot = InterpolatedUnivariateSpline(F_L_Ls, F_L_tot_tmp)(Ls)
+    NL1s = 1000
+    main(typs, Ls, F_L, NL1s, F_L_tot)
