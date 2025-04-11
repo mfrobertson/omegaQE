@@ -209,24 +209,25 @@ class Fisher:
         thetas = np.arange(dTheta, max_angle + dTheta, dTheta, dtype=float)
         return thetas, dTheta
 
-    def _get_Cov(self, typ, Lmax):
+    def _get_Cov(self, typ, Lmax, noise=True):
         if typ == "ww":
+            if not noise: raise ValueError("No noise on omega???")
             return self.covariance.noise.get_N0("omega", Lmax)
         elif "w" in typ:
             return np.zeros(Lmax + 1)
-        return self.covariance.get_Cov(typ, Lmax)
+        return self.covariance.get_Cov(typ, Lmax, noise=noise)
 
-    def _get_denom_parts(self, typ, Lmax):
+    def _get_denom_parts(self, typ, Lmax, noise=True):
         if "L" in typ:
             typ = typ.replace("L", "k")
         elif "D" in typ:
             typ = typ.replace("D", "k")
-        Cov0 = self._get_Cov(typ[0] + typ[0], Lmax)
-        Cov1 = self._get_Cov(typ[1] + typ[1], Lmax)
-        Cov2 = self._get_Cov(typ[2] + typ[2], Lmax)
-        Cl01 = self._get_Cov(typ[0] + typ[1], Lmax)
-        Cl02 = self._get_Cov(typ[0] + typ[2], Lmax)
-        Cl12 = self._get_Cov(typ[1] + typ[2], Lmax)
+        Cov0 = self._get_Cov(typ[0] + typ[0], Lmax, noise)
+        Cov1 = self._get_Cov(typ[1] + typ[1], Lmax, noise)
+        Cov2 = self._get_Cov(typ[2] + typ[2], Lmax, noise)
+        Cl01 = self._get_Cov(typ[0] + typ[1], Lmax, noise)
+        Cl02 = self._get_Cov(typ[0] + typ[2], Lmax, noise)
+        Cl12 = self._get_Cov(typ[1] + typ[2], Lmax, noise)
 
         Cov0_spline = self._interpolate(Cov0)
         Cov1_spline = self._interpolate(Cov1)
@@ -305,8 +306,13 @@ class Fisher:
         weights = np.ones(np.size(thetas))
         return thetas, dTheta, weights, C1_spline, C2_spline
 
-    def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins, gal_distro="LSST_gold", lens_delta=False, include_lss=False, is_lss=False):
-        Lmax, Lmin, dLs, thetas, dTheta, weights, _, _, _ = self._integral_prep_sample(Ls,Ntheta,typ, nu,gal_bins,include_N0_kappa=include_N0_kappa,gal_distro=gal_distro)
+    def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins, gal_distro="LSST_gold", lens_delta=False, include_lss=False, is_lss=False, Lmin=30, Lmax=4000, use_cuts=False):
+        _, _, dLs, thetas, dTheta, weights, _, _, _ = self._integral_prep_sample(Ls,Ntheta,typ, nu,gal_bins,include_N0_kappa=include_N0_kappa,gal_distro=gal_distro)
+        Ls_start = int(np.min(Ls))
+        Ls_end = int(np.max(Ls))
+        if use_cuts == False:
+            Lmax = Ls_end
+            Lmin = Ls_start
         denom_parts = self._get_denom_parts(typ, Lmax)
         I = np.zeros(np.size(Ls))
         Ls2 = np.arange(Lmin, Lmax + 1, dL2)
@@ -330,7 +336,7 @@ class Fisher:
         if arr:
             return I
         I_spline = InterpolatedUnivariateSpline(Ls, I)
-        return I_spline.integral(Lmin, Lmax)
+        return I_spline.integral(Ls_start, Ls_end)
 
     def _get_optimal_bispectrum_Fisher_element_vec(self, typs, typ, Lmax, dL, Ntheta, f_sky, C_inv, Lmin, nu, gal_bins,
                                                    gal_distro="LSST_gold", param=None, dx=None, H0=False):
@@ -561,7 +567,7 @@ class Fisher:
 
     def get_bispectrum_Fisher(self, typ, Lmax=4000, dL=1, Ls=None, dL2=2, Ntheta=20, f_sky=1, arr=False, Lmin=30,
                               nu=353e9, gal_bins=(None, None, None, None), include_N0_kappa="both",
-                              gal_distro="LSST_gold", param=None, dx=None, lens_delta=False, include_lss=False):
+                              gal_distro="LSST_gold", param=None, dx=None, lens_delta=False, include_lss=False, is_lss=False, use_cuts=False):
         """
 
         Parameters
@@ -591,7 +597,7 @@ class Fisher:
                 raise RuntimeWarning("Trying to do param Fisher using sample method? (it is disabled)")
             return self._get_bispectrum_Fisher_sample(typ, Ls, dL2, Ntheta, f_sky, arr, nu=nu, gal_bins=gal_bins,
                                                       include_N0_kappa=include_N0_kappa, gal_distro=gal_distro,
-                                                      lens_delta=lens_delta, include_lss=include_lss)
+                                                      lens_delta=lens_delta, include_lss=include_lss, is_lss=is_lss, Lmin=Lmin, Lmax=Lmax, use_cuts=use_cuts)
         if typ[-1] != "w":
             raise RuntimeWarning(f"Are you sure you want to vectorized Fisher for type {typ}?")
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins,
