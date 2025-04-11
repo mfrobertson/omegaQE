@@ -69,6 +69,7 @@ class Bispectra:
             M1 = M_spline_cache[M_typ1].spline.ev(L1, L2)
             M2 = M_spline_cache[M_typ2].spline.ev(L2, L1)
             return M1, M2, L12_dot
+        raise ValueError("Don't want code to reach here, always use spline...")
         M1 = self._mode.components(L1, L2, typ=M_typ1, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         M2 = self._mode.components(L2, L1, typ=M_typ2, zmin=zmin, zmax=zmax, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro)
         return M1, M2, L12_dot
@@ -196,20 +197,20 @@ class Bispectra:
         w[k >= 100] = 0
         return w*self._mode._cosmo.get_matter_ps(self._mode.matter_PK, z, k, curly=False, weyl_scaled=False, typ="matter")
 
-    def _vectorise_ells(self, ells, ndim):
+    def _vectorise_ells(self, ells):
         if np.size(ells) == 1:
             return ells
-        if ndim == 1:
+        if ells.ndim == 1:
             return ells[:, None]
-        if ndim == 2:
+        if ells.ndim == 2:
             return ells[:, :, None]
         else:
-            raise ValueError(f"Too many (or too few) dimensions {ndim}")
+            raise ValueError(f"Too many (or too few) dimensions {ells.ndim}")
 
     def _delta_bispectrum(self, L1, L2, L3, chi, extended=False):
-        L1 = self._vectorise_ells(L1, L1.ndim)
-        L2 = self._vectorise_ells(L2, L2.ndim)
-        L3 = self._vectorise_ells(L3, L3.ndim)
+        L1 = self._vectorise_ells(L1)
+        L2 = self._vectorise_ells(L2)
+        L3 = self._vectorise_ells(L3)
         k1 = (L1 + 0.5) / chi if extended else L1 / chi
         k2 = (L2 + 0.5) / chi if extended else L2 / chi
         k3 = (L3 + 0.5) / chi if extended else L3 / chi
@@ -271,11 +272,13 @@ class Bispectra:
         lens_bi3 = self._lens_delta_bispectrum(typ[2] + typ[1] + typ[0], L3, L2, L1, M_spline, zmin, zmax, nu, gal_bins,gal_distro=gal_distro)
         return lens_bi1 + lens_bi2 + lens_bi3
 
-    def get_ld_bispectrum(self, typ, L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold"):
-        self._check_type(typ, pb=False)
-        if M_spline:
-            self._build_M_splines_lens_delta(typ, nu, gal_bins, gal_distro=gal_distro)
-        return self._lens_delta_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro)
+    def get_ld_bispectrum(self, typ, L1, L2, L3=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold", verbose=False):
+        # self._check_type(typ, pb=False)
+        self._check_type(typ)
+        # if M_spline:
+        #     self._build_M_splines_lens_delta(typ, nu, gal_bins, gal_distro=gal_distro)
+        # return self._lens_delta_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro)
+        return self._get_lens_delta_bis(typ, L1, L2, L3, M_spline, zmin, zmax, nu, gal_bins, gal_distro, verbose)
 
     def _get_third_L(self, L1, L2, theta):
         # Using cosine rule (remember that theta is not same as internal angle of bispectrum traingle)
@@ -290,10 +293,7 @@ class Bispectra:
     def get_ll_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None):
         if L3 is None:
             L3 = self._get_third_L(L1, L2, theta)
-        bi1 = self._get_ll_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax)
-        bi2 = self._get_ll_bispectrum(typ, L3, L2, L1, M_spline, zmin, zmax)
-        bi3 = self._get_ll_bispectrum(typ, L1, L3, L2, M_spline, zmin, zmax)
-        return bi1 + bi2 + bi3
+        return self._ll_rd_bispectrum("ll", typ, L1, L2, L3, M_spline, zmin, zmax)
 
     def _get_rd_bispectrum(self, typ, L1, L2, L3, M_spline=False, zmin=0, zmax=None):
         M1, M2, L12_dot = self._bispectra_prep(typ, L1, L2, L3, M_spline, zmin, zmax)
@@ -304,10 +304,25 @@ class Bispectra:
     def get_rd_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None):
         if L3 is None:
             L3 = self._get_third_L(L1, L2, theta)
-        bi1 = self._get_rd_bispectrum(typ, L1, L2, L3, M_spline, zmin, zmax)
-        bi2 = self._get_rd_bispectrum(typ, L3, L2, L1, M_spline, zmin, zmax)
-        bi3 = self._get_rd_bispectrum(typ, L1, L3, L2, M_spline, zmin, zmax)
-        return bi1 + bi2 + bi3
+        return self._ll_rd_bispectrum("rd", typ, L1, L2, L3, M_spline, zmin, zmax)
+
+    def _ll_rd_bispectrum(self, term, typ, L1, L2, L3, M_spline, zmin, zmax):
+        if term == "ll":
+            bi_func = self._get_ll_bispectrum
+        elif term == "rd":
+            bi_func = self._get_rd_bispectrum
+        else:
+            raise ValueError(f"Unknown term {term}")
+        b = bi_func(typ, L1, L2, L3, M_spline, zmin, zmax)
+        if typ[:2] == "kk":
+            b += bi_func(typ, L3, L2, L1, M_spline, zmin, zmax)
+            b += bi_func(typ, L1, L3, L2, M_spline, zmin, zmax)
+        elif "k" in typ[:2]:
+            if "typ"[0] == "k":
+                b += bi_func(typ, L3, L2, L1, M_spline, zmin, zmax)
+            else:
+                b += bi_func(typ, L1, L3, L2, M_spline, zmin, zmax)
+        return b
 
     def get_pb_bispectrum(self, typ, L1, L2, L3=None, theta=None, M_spline=False, zmin=0, zmax=None, nu=353e9, gal_bins=(None,None,None,None), gal_distro="LSST_gold", verbose=False, one_perm=False):
         self._check_type(typ)
