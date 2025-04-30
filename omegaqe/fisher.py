@@ -515,7 +515,10 @@ class Fisher:
                 L1 = L1_vec.rho
                 thetas12 = L1_vec.deltaphi(L2_vec)
                 bi1 = self.bi.get_bispectrum(bi_typ1, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro, one_perm=True)
-                bi2 = self.bi.get_bispectrum(bi_typ2, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=bi2_include_ld, include_lss=bi2_include_lss, one_perm=bi2_one_perm)
+                if kappa_typ == "lss":
+                    bi2 = self.bi.get_lss_bispectrum(bi_typ2, L1, L2, theta=thetas12, nu=353e9, gal_bins=gal_bins, gal_distro=gal_distro)
+                else:
+                    bi2 = self.bi.get_bispectrum(bi_typ2, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=bi2_include_ld, include_lss=bi2_include_lss, one_perm=bi2_one_perm)
                 if mag_bias:
                     bi2 += self.additional_mu_bispectra(bi_typ2, L1, L2, theta=thetas12, M_spline=True, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro)
                 C1 = C1_spline(L1)
