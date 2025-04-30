@@ -7,8 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from omegaqe.postborn import pb22_kappa_ps
 
-
-def kappa_cross_Cov(typs, Ls, F_L, NL1s=1000, F_L_tot=None, tracer_Lmin=30, tracer_Lmax=3000):
+def kappa_cross_Cov(typs, Ls, F_L, NL1s=1000, F_L_tot=None, tracer_Lmin=30, tracer_Lmax=3000, diag=True):
     def triangle_lims(A, B):
         third_side_min = np.max([np.abs(A-B), tracer_Lmin])
         third_side_max = np.min([A+B, tracer_Lmax])
@@ -52,18 +51,19 @@ def kappa_cross_Cov(typs, Ls, F_L, NL1s=1000, F_L_tot=None, tracer_Lmin=30, trac
     if F_L_tot is not None:
         cl_kappa_cross = cl_kappa_pB*F_L_tot/F_L
     else:
-        cl_kappa_cross = np.zeros[np.size(F_L)]
+        cl_kappa_cross = np.zeros(np.size(F_L))
+    Ntheta=20
+    # thetas, dTheta = fish._get_thetas(Ntheta, max_angle=2*np.pi)
     for iii, L in enumerate(Ls):
         print(f"{iii} out of {np.size(Ls)}")
-        for jjj in np.arange(iii, NLs):
+        jjj_max = iii + 1 if diag else NLs
+        for jjj in np.arange(iii, jjj_max):
             Lp = Ls[jjj]
-            # if Lp < tracer_Lmin or Lp > tracer_Lmax:
-            #     continue
-            Lmin, Lmax = triangle_lims(L, Lp)
-            L1s = np.linspace(Lmin, Lmax, NL1s)
+            L1_min, L1_max = triangle_lims(Lp, L)
+            L1s = np.arange(L1_min, L1_max+1)
             L_fac = 2 * L + 1
             Lp_fac = 2 * Lp + 1
-            L_facs = np.max([L_fac,Lp_fac]) / (L_fac * Lp_fac)
+            L_facs = 1 / (L_fac * Lp_fac)
             for ip in typ_combs:
                 i = ip[0]
                 p = ip[1]
@@ -86,27 +86,28 @@ def kappa_cross_Cov(typs, Ls, F_L, NL1s=1000, F_L_tot=None, tracer_Lmin=30, trac
                         cinv_qu = C_inv[cinv_idx_q][cinv_idx_u](L)
                         c_rk = C[cinv_idx_r][cinv_idx_k](Lp)
                         c_uk = C[cinv_idx_u][cinv_idx_k](L)
-                        I = bi_ij * bi_pq * cinv_ip * cinv_jr * cinv_qu * c_rk * c_uk
-                        Cov_ij = InterpolatedUnivariateSpline(L1s, L1s * I).integral(Lmin, Lmax)
-                        Cov_ij *= L_facs * cl_kappa_pB[iii] * cl_kappa_pB[jjj] / F_L[iii] / F_L[jjj] / (2 * np.pi)
+                        Cov_ij = np.sum(bi_ij * bi_pq * cinv_ip * cinv_jr * cinv_qu * c_rk * c_uk)
+                        Cov_ij *= L_facs * cl_kappa_pB[iii] * cl_kappa_pB[jjj] / F_L[iii] / F_L[jjj] / (2 * np.pi)**2
                         Cov[iii, jjj] += Cov_ij
-                        Cov[jjj, iii] += Cov_ij
-            Cov[iii, jjj] -= cl_kappa_cross[iii] * cl_kappa_cross[jjj]
-            Cov[jjj, iii] -= cl_kappa_cross[iii] * cl_kappa_cross[jjj]
+                        if iii != jjj:
+                            Cov[jjj, iii] += Cov_ij
+            # Cov[iii, jjj] -= cl_kappa_cross[iii] * cl_kappa_cross[jjj]
+            # if iii  != jjj:
+            #     Cov[jjj, iii] -= cl_kappa_cross[iii] * cl_kappa_cross[jjj]
     for iii, L in enumerate(Ls):
         cov_kk = C[cinv_idx_k][cinv_idx_k](L)
-        Cov[iii, iii] = ((cov_kk * cl_kappa_pB[iii]**2/ F_L[iii]) + cl_kappa_cross[iii]**2)/ ((2 * L) + 1)
+        Cov[iii, iii] += ((cov_kk * cl_kappa_pB[iii]**2/ F_L[iii]) + cl_kappa_cross[iii]**2)/ ((2 * L) + 1)
     return Ls, Cov
 
 
 def main(typs, Ls, F_L, NL1s, F_L_tot):
     t0 = time()
-    Ls, Cov = kappa_cross_Cov(typs, Ls, F_L, NL1s, F_L_tot)
+    Ls, Cov = kappa_cross_Cov(typs, Ls, F_L, NL1s, F_L_tot, diag=False)
     t1 = time()
     print(f"Done in {t1 - t0:.2f} seconds")
 
-    np.save(f"../../omegaqeNBs/_kappa_cross_cov_{np.size(Ls)}.npy", Cov)
-    np.save(f"../../omegaqeNBs/_kappa_cross_cov_{np.size(Ls)}_Ls.npy", Ls)
+    np.save(f"../../omegaqeNBs/_kappa_cross_cov_{np.size(Ls)}_2.npy", Cov)
+    np.save(f"../../omegaqeNBs/_kappa_cross_cov_{np.size(Ls)}_Ls_2.npy", Ls)
 
 
     std_devs = np.sqrt(np.diag(Cov))
@@ -125,11 +126,11 @@ def main(typs, Ls, F_L, NL1s, F_L_tot):
 
 
 if __name__ == '__main__':
-    typs = "kg"
-    Ls = np.arange(30, 510, 10)
-    F_L_Ls = np.load("../../omegaqeNBs/_kappa_F_L_results/kg/ACT/gmv/TEB/30_3000/1_2000/Ls_k_pB.npy")
-    F_L_tmp = np.load("../../omegaqeNBs/_kappa_F_L_results/kg/ACT/gmv/TEB/30_3000/1_2000/F_L_k_pB.npy")
-    F_L_tot_tmp = np.load("../../omegaqeNBs/_old_kappa_F_L/_kappa_F_L_results_1perm_nob/kg/ACT/gmv/TEB/30_3000/1_2000/F_L_k.npy")
+    typs = "k"
+    Ls = np.arange(30, 3001, 1)
+    F_L_Ls = np.load(f"../../omegaqeNBs/_kappa_F_L_results/{typs}/ACT/gmv/TEB/30_3000/1_2000/Ls_k_pB.npy")
+    F_L_tmp = np.load(f"../../omegaqeNBs/_kappa_F_L_results/{typs}/ACT/gmv/TEB/30_3000/1_2000/F_L_k_pB.npy")
+    F_L_tot_tmp = np.load(f"../../omegaqeNBs/_old_kappa_F_L/_kappa_F_L_results_1perm_nob/{typs}/ACT/gmv/TEB/30_3000/1_2000/F_L_k.npy")
     F_L = InterpolatedUnivariateSpline(F_L_Ls, F_L_tmp)(Ls)
     F_L_tot = InterpolatedUnivariateSpline(F_L_Ls, F_L_tot_tmp)(Ls)
     NL1s = 1000
