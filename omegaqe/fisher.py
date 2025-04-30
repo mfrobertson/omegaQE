@@ -189,12 +189,12 @@ class Fisher:
 
 
     def _get_bispectrum(self, typ, L1, L2, L3=None, theta=None, param_dx=(None, None), zmin=0, zmax=None, nu=353e9,
-                        gal_bins=(None, None, None, None), gal_distro="LSST_gold", H0=False, lens_delta=False, include_lss=False, is_lss=False):
+                        gal_bins=(None, None, None, None), gal_distro="LSST_gold", H0=False, lens_delta=False, include_lss=False, is_lss=False, one_perm=False):
         param, dx = param_dx
         if param is None:
             if is_lss:
                 return self.bi.get_lss_bispectrum(typ, L1, L2, L3, theta, zmin, zmax, nu, gal_bins, gal_distro)
-            return self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro, lens_delta=lens_delta, include_lss=include_lss)
+            return self.bi.get_bispectrum(typ, L1, L2, L3, theta, True, zmin, zmax, nu, gal_bins, gal_distro, lens_delta=lens_delta, include_lss=include_lss, one_perm=one_perm)
         if is_lss:
             raise ValueError("Doing cosmology fisher with LSS bispectrum? Not sure how you got here....")
         self.change_cosmology(param, dx, True, H0=H0)
@@ -235,10 +235,11 @@ class Fisher:
         Cl01_spline = self._interpolate(Cl01)
         Cl02_spline = self._interpolate(Cl02)
         Cl12_spline = self._interpolate(Cl12)
-        return Cov0, Cov1, Cov2, Cl01, Cl12, Cl02, Cov0_spline, Cov1_spline, Cov2_spline, Cl01_spline, Cl02_spline, Cl12_spline
+        return Cov0, Cov1, Cov2, Cl01, Cl12, Cl02, Cov0_spline, Cov1_spline, Cov2_spline, Cl01_spline, Cl12_spline, Cl02_spline
 
-    def _get_denom_vec(self, Cov0, Cov1, Cov2, Cl01, Cl12, Cl02, Cov0_spline, Cov1_spline, Cov2_spline, Cl01_spline, Cl02_spline, Cl12_spline, Ls, L3):
+    def _get_denom_vec(self, Cov0, Cov1, Cov2, Cl01, Cl12, Cl02, Cov0_spline, Cov1_spline, Cov2_spline, Cl01_spline, Cl12_spline, Cl02_spline, Ls, L3):
         denom = Cov0[None, Ls, None] * Cov1[None, None, Ls] * Cov2_spline(L3)
+        raise ValueError("Not impemented correct variance terms for vec case yet")
         denom += Cov0[None, Ls, None] * Cl12[None, None, Ls] * Cl12_spline(L3)
         denom += Cl01[None, Ls, None] * Cl12[None, None, Ls] * Cl02_spline(L3)
         denom += Cl01[None, Ls, None] * Cl01[None, None, Ls] * Cov2_spline(L3)
@@ -246,13 +247,17 @@ class Fisher:
         denom += Cl02[None, Ls, None] * Cov1[None, None, Ls] * Cl02_spline(L3)
         return denom
 
-    def _get_denom_samp(self, Cov0, Cov1, Cov2, Cl01, Cl12, Cl02, Cov0_spline, Cov1_spline, Cov2_spline, Cl01_spline, Cl02_spline, Cl12_spline, L1, L2, L3):
+    def _get_denom_samp(self, Cov0, Cov1, Cov2, Cl01, Cl12, Cl02, Cov0_spline, Cov1_spline, Cov2_spline, Cl01_spline, Cl12_spline, Cl02_spline, L1, L2, L3):
         denom = Cov0_spline(L1) * Cov1_spline(L2) * Cov2_spline(L3)
-        denom += Cov0_spline(L1) * Cl12_spline(L2) * Cl12_spline(L3)
-        denom += Cl01_spline(L1) * Cl12_spline(L2) * Cl02_spline(L3)
-        denom += Cl01_spline(L1) * Cl01_spline(L2) * Cov2_spline(L3)
-        denom += Cl02_spline(L1) * Cl01_spline(L2) * Cl12_spline(L3)
-        denom += Cl02_spline(L1) * Cov1_spline(L2) * Cl02_spline(L3)
+        # if L2 == L3:
+        #     denom += Cov0_spline(L1) * Cl12_spline(L2) * Cl12_spline(L3)
+        # if L2 == L3 and L1 == L2:
+        #     denom += Cl01_spline(L1) * Cl12_spline(L2) * Cl02_spline(L3)
+        #     denom += Cl02_spline(L1) * Cl01_spline(L2) * Cl12_spline(L3)
+        # if L1 == L2:
+        #     denom += Cl01_spline(L1) * Cl01_spline(L2) * Cov2_spline(L3)
+        # if L1 == L3:
+        #     denom += Cl02_spline(L1) * Cov1_spline(L2) * Cl02_spline(L3)
         return denom
 
     def _integral_prep_vec(self, Lmax, dL, Ntheta, typ, Lmin, nu, gal_bins, typs=None, C_inv=None, include_N0_kappa="both", gal_distro="LSST_gold"):
@@ -306,8 +311,19 @@ class Fisher:
         weights = np.ones(np.size(thetas))
         return thetas, dTheta, weights, C1_spline, C2_spline
 
-    def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins, gal_distro="LSST_gold", lens_delta=False, include_lss=False, is_lss=False, Lmin=30, Lmax=4000, use_cuts=False):
+    def _get_bispectrum_Fisher_sample(self, typ, Ls, dL2, Ntheta, f_sky, arr, include_N0_kappa, nu, gal_bins, gal_distro="LSST_gold", lens_delta=False, include_lss=False, is_lss=False, Lmin=30, Lmax=4000, use_cuts=False, one_perm=False):
         _, _, dLs, thetas, dTheta, weights, _, _, _ = self._integral_prep_sample(Ls,Ntheta,typ, nu,gal_bins,include_N0_kappa=include_N0_kappa,gal_distro=gal_distro)
+        unique_typs = len(set(typ))
+        if unique_typs == 1:
+            fac = 1/6
+            if one_perm:
+                fac = 1/2
+        elif unique_typs == 2:
+            fac = 1/2
+            if one_perm and typ.count("k") == 2:
+                fac = 1
+        else:
+            fac = 1
         Ls_start = int(np.min(Ls))
         Ls_end = int(np.max(Ls))
         if use_cuts == False:
@@ -328,11 +344,11 @@ class Fisher:
             w[L1 < Lmin] = 0
             # bispectrum = self._get_bispectrum(typ, L1, L2, L3, param_dx=(param, dx), nu=nu, gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=lens_delta, include_lss=include_lss, is_lss=is_lss)
             thetas12 = L1_vec.deltaphi(L2_vec)
-            bi = self._get_bispectrum(typ, L1, L2, theta=thetas12, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=lens_delta, include_lss=include_lss, is_lss=is_lss)
+            bi = self._get_bispectrum(typ, L1, L2, theta=thetas12, nu=nu, gal_bins=gal_bins, gal_distro=gal_distro, lens_delta=lens_delta, include_lss=include_lss, is_lss=is_lss, one_perm=one_perm)
             denom = self._get_denom_samp(*denom_parts, L1, L2, L3)
             I_tmp += dL2 * 2 * np.sum(L2 * w * dTheta * bi**2 / denom)
             I[iii] = 2 * np.pi * L3 * I_tmp
-        I *= f_sky / np.pi * 1 / ((2 * np.pi) ** 2)
+        I *= fac * f_sky / np.pi * 1 / ((2 * np.pi) ** 2)
         if arr:
             return I
         I_spline = InterpolatedUnivariateSpline(Ls, I)
@@ -459,7 +475,7 @@ class Fisher:
         return self.bi.get_bispectrum(bi_typ.replace("g", "u") + sec_var, L1, L2, theta=theta, M_spline=M_spline, nu=nu,gal_bins=gal_bins, gal_distro=gal_distro)
 
 
-    def _get_F_L_element_sample(self, typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega, pB_only):
+    def _get_F_L_element_sample(self, typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega, kappa_typ):
         if Lmax is None: Lmax = 5000
         if Lmin is None: Lmin = 2
         thetas, dTheta, _, C1_spline, C2_spline = self._integral_prep_F_L(Lmax, Ntheta, typ, typs, C_inv)
@@ -468,13 +484,24 @@ class Fisher:
         if any([np.isin(typ_i, self.covariance.test_types) for typ_i in typ[4:]]):
             typ = "opt_kkkk"  # if any test types are detected, it is assumed all observables are kappa
         sec_var = "w" if omega else "k"
-        bi2_include_lss = True
-        bi2_include_ld = True
-        bi2_one_perm = False
-        if pB_only:
+        if kappa_typ.lower() == "total":
+            bi2_include_lss = True
+            bi2_include_ld = True
+            bi2_one_perm = False
+        elif kappa_typ.lower() == "pb_1perm":
             bi2_include_lss = False
             bi2_include_ld = False
             bi2_one_perm = True
+        elif kappa_typ.lower() == "pb_tot":
+            bi2_include_lss = False
+            bi2_include_ld = False
+            bi2_one_perm = False
+        elif kappa_typ.lower() == "ld":
+            bi2_include_lss = False
+            bi2_include_ld = True
+            bi2_one_perm = False
+        else:
+            raise ValueError(f"kappa type not accepted {kappa_typ.lower()}")
         bi_typ1 = typ[4:6] + sec_var
         bi_typ2 = typ[6:] + sec_var
         if np.size(Ls) == 1:
@@ -500,7 +527,7 @@ class Fisher:
         F_L *= 1 / ((2 * np.pi) ** 2)
         return F_L
 
-    def _get_F_L(self, typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax, mag_bias, omega, pB_only):
+    def _get_F_L(self, typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax, mag_bias, omega, kappa_typ):
         typs = np.char.array(typs)
         if mag_bias: self.covariance.mag_bias = True
         if use_cache:
@@ -519,12 +546,12 @@ class Fisher:
         for iii in np.arange(Ncombos):
             for jjj in np.arange(iii, Ncombos):
                 typ = "opt_" + combos[iii] + combos[jjj]
-                F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega, pB_only)
+                F_L_tmp = self._get_F_L_element_sample(typs, typ, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega, kappa_typ)
                 if combos[iii] != combos[jjj]:
                     factor = 2     # This only works if both bispectra are the same (so not true for mag bias or pB-kappa)
-                    if mag_bias or (not omega and not pB_only):
+                    if mag_bias or (not omega and not kappa_typ.lower() != "pb_1perm"):
                         typ2 = "opt_" + combos[jjj] + combos[iii]
-                        F_L_tmp += self._get_F_L_element_sample(typs, typ2, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega, pB_only)
+                        F_L_tmp += self._get_F_L_element_sample(typs, typ2, Ls, dL2, Ntheta, C_inv, nu, gal_bins, C_omega_spline, gal_distro, Lmin, Lmax, mag_bias, omega, kappa_typ)
                         factor = 1
                 else:
                     factor = 1
@@ -567,7 +594,7 @@ class Fisher:
 
     def get_bispectrum_Fisher(self, typ, Lmax=4000, dL=1, Ls=None, dL2=2, Ntheta=20, f_sky=1, arr=False, Lmin=30,
                               nu=353e9, gal_bins=(None, None, None, None), include_N0_kappa="both",
-                              gal_distro="LSST_gold", param=None, dx=None, lens_delta=False, include_lss=False, is_lss=False, use_cuts=False):
+                              gal_distro="LSST_gold", param=None, dx=None, lens_delta=False, include_lss=False, is_lss=False, use_cuts=False, one_perm=False):
         """
 
         Parameters
@@ -597,7 +624,7 @@ class Fisher:
                 raise RuntimeWarning("Trying to do param Fisher using sample method? (it is disabled)")
             return self._get_bispectrum_Fisher_sample(typ, Ls, dL2, Ntheta, f_sky, arr, nu=nu, gal_bins=gal_bins,
                                                       include_N0_kappa=include_N0_kappa, gal_distro=gal_distro,
-                                                      lens_delta=lens_delta, include_lss=include_lss, is_lss=is_lss, Lmin=Lmin, Lmax=Lmax, use_cuts=use_cuts)
+                                                      lens_delta=lens_delta, include_lss=include_lss, is_lss=is_lss, Lmin=Lmin, Lmax=Lmax, use_cuts=use_cuts, one_perm=one_perm)
         if typ[-1] != "w":
             raise RuntimeWarning(f"Are you sure you want to vectorized Fisher for type {typ}?")
         return self._get_bispectrum_Fisher_vec(typ, Lmax, dL, Ntheta, f_sky, Lmin=Lmin, nu=nu, gal_bins=gal_bins,
@@ -605,7 +632,7 @@ class Fisher:
                                                dx=dx, lens_delta=lens_delta, include_lss=include_lss)
 
     def get_F_L(self, typs, Ls, dL2=2, Ntheta=1000, nu=353e9, gal_bins=(None, None, None, None), return_C_inv=False,
-                gal_distro="LSST_gold", use_cache=False, Lmin=None, Lmax=None, mag_bias=False, omega=True, pB_only=False):
+                gal_distro="LSST_gold", use_cache=False, Lmin=None, Lmax=None, mag_bias=False, omega=True, kappa_typ="pb_only"):
         """
 
         Parameters
@@ -620,7 +647,7 @@ class Fisher:
 
         """
         typs = list(typs)
-        return self._get_F_L(typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax, mag_bias, omega, pB_only)
+        return self._get_F_L(typs, Ls, dL2, Ntheta, nu, gal_bins, return_C_inv, gal_distro, use_cache, Lmin, Lmax, mag_bias, omega, kappa_typ)
 
     def get_optimal_bispectrum_Fisher(self, typs="kg", Lmax=4000, dL=2, Ls=None, dL2=2, Ntheta=10, f_sky=1,
                                       verbose=False, nu=353e9, gal_bins=(None, None, None, None), save_array=False,
