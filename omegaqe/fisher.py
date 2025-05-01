@@ -500,6 +500,10 @@ class Fisher:
             bi2_include_lss = False
             bi2_include_ld = True
             bi2_one_perm = False
+        elif kappa_typ.lower() == "lss":
+            bi2_include_lss = None
+            bi2_include_ld = None
+            bi2_one_perm = None
         else:
             raise ValueError(f"kappa type not accepted {kappa_typ.lower()}")
         bi_typ1 = typ[4:6] + sec_var
